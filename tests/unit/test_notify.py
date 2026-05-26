@@ -128,7 +128,7 @@ def test_daily_summary_sorted_by_score_descending() -> None:
     assert result.index("High") < result.index("Low")
 
 
-def test_cover_letter_fallback_contains_gastrovision() -> None:
+def test_cover_letter_fallback_is_generic() -> None:
     from nj.models.job import Job, JobStatus, VisaLabel
     from nj.models.score import ScoreResult
     from nj.tailoring.cover_letter import _fallback_cover_letter
@@ -154,7 +154,6 @@ def test_cover_letter_fallback_contains_gastrovision() -> None:
         scored_at=datetime.now(UTC),
     )
     result = _fallback_cover_letter(job, score)
-    assert "GastroVision" in result
-    assert "96.11%" in result
-    assert "Nishant Joshi" in result
-    assert "OPT" in result
+    assert "ML Engineer" in result
+    assert "Acme" in result
+    assert "Hiring Manager" in result

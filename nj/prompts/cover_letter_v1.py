@@ -12,10 +12,10 @@ Paragraph 1 (Opening): What specific thing about this role/company \
 interests you. Reference something real from the JD. One concrete reason.
 
 Paragraph 2 (Evidence): Your strongest relevant evidence. Lead with \
-GastroVision for ML/CV roles. Add Moffitt internship if relevant. \
-Connect your work directly to what they need. Specific numbers only.
+the anchor project for ML/CV roles. Connect your work directly to what \
+they need. Specific numbers only.
 
-Paragraph 3 (Closing): Brief. OPT status and availability. \
+Paragraph 3 (Closing): Brief. Work authorization status and availability. \
 Enthusiasm without begging. One sentence on next steps.
 
 RULES:
@@ -24,7 +24,49 @@ RULES:
 - Address to "Hiring Manager" if no name known
 - Never mention the word "passionate"
 - Only use facts from the candidate profile provided
-- Sign off as: Nishant Joshi"""
+- Sign off with the candidate's name from the profile"""
+
+
+def _build_candidate_facts(cv_base: dict) -> str:
+    facts = []
+    personal = cv_base.get("personal", {})
+
+    if personal.get("visa_note"):
+        facts.append(personal["visa_note"])
+    if personal.get("graduation_date"):
+        edu = cv_base.get("education", [{}])[0]
+        deg = edu.get("degree", "")
+        inst = edu.get("institution", "")
+        if deg and inst:
+            facts.append(f"{deg} at {inst}, {personal['graduation_date']}")
+
+    projects = cv_base.get("projects", [])
+    anchor = next((p for p in projects if p.get("anchor")), None)
+    if anchor:
+        bullets = anchor.get("bullets", [])
+        summary = bullets[0][:100] if bullets else ""
+        facts.append(f"{anchor['name']}: {summary}")
+
+    experience = cv_base.get("experience", [])
+    incoming = [
+        e for e in experience
+        if isinstance(e, dict) and e.get("status") == "incoming"
+    ]
+    for exp in incoming[:1]:
+        facts.append(
+            f"Upcoming: {exp.get('title')} at "
+            f"{exp.get('company')} ({exp.get('start')})"
+        )
+
+    skills = cv_base.get("skills", {})
+    all_skills: list[str] = []
+    for items in skills.values():
+        if isinstance(items, list):
+            all_skills.extend(items)
+    if all_skills:
+        facts.append(f"Core stack: {', '.join(all_skills[:8])}")
+
+    return "\n".join(f"- {f}" for f in facts)
 
 
 def build_user_prompt(
@@ -33,8 +75,11 @@ def build_user_prompt(
     job_description: str,
     matched_skills: list[str],
     overall_rationale: str,
+    cv_base: dict | None = None,
 ) -> str:
     from nj.utils.text import truncate
+
+    facts = _build_candidate_facts(cv_base) if cv_base else ""
 
     return f"""Write a cover letter for this application.
 
@@ -49,12 +94,6 @@ JD excerpt:
 {truncate(job_description, 800)}
 
 Candidate facts to draw from:
-- GastroVision: 96.11% accuracy medical image classification, \
-EfficientNet + ViT ensemble, Grad-CAM interpretability
-- Incoming ML Intern at Moffitt Cancer Center (medical imaging, \
-supervised by Dr. Palak Dave)
-- MSCS at University of South Dakota, graduating December 2026
-- F-1 OPT eligible December 2026
-- Core stack: PyTorch, EfficientNet, ViT, OpenCV, Docker, FastAPI
+{facts}
 
 Write the 3-paragraph cover letter now. Plain text only, no formatting."""

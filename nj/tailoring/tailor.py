@@ -120,6 +120,7 @@ async def _generate_cover_letter(
             job_description=job.description,
             matched_skills=score.matched_skills,
             overall_rationale=score.overall_rationale,
+            cv_base=cv_base,
         )
         request = LLMRequest(
             system=cover_letter_v1.SYSTEM_PROMPT,

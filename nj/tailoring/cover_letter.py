@@ -31,6 +31,7 @@ async def generate_and_save_cover_letter(
             job_description=job.description,
             matched_skills=score.matched_skills,
             overall_rationale=score.overall_rationale,
+            cv_base=cv_base,
         )
         request = LLMRequest(
             system=cover_letter_v1.SYSTEM_PROMPT,
@@ -61,11 +62,10 @@ def _fallback_cover_letter(job: Job, score: ScoreResult) -> str:
         f"Dear Hiring Manager,\n\n"
         f"I am writing to express my interest in the {job.title} "
         f"position at {job.company}.\n\n"
-        f"My background in machine learning and computer vision, "
-        f"including my GastroVision project achieving 96.11% accuracy "
-        f"in medical image classification, aligns well with this role.\n\n"
-        f"I am available on F-1 OPT starting December 2026 and am "
-        f"seeking H1B sponsorship.\n\n"
-        f"Thank you for your consideration.\n\n"
-        f"Nishant Joshi"
+        f"My background and project experience align well with "
+        f"this role. I am enthusiastic about contributing to "
+        f"your team.\n\n"
+        f"Please find my tailored CV attached.\n\n"
+        f"Best regards,\n"
+        f"[Your name]"
     )

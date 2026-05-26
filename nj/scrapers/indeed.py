@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -80,61 +81,131 @@ class IndeedScraper(BaseScraper):
         params = {"q": role, "l": location, "sort": "date", "fromage": "7"}
         url = f"{self.BASE_URL}?{urlencode(params)}"
         try:
-            await page.goto(url, timeout=20000)
+            response = await page.goto(url, timeout=20000)
             try:
                 await page.wait_for_selector("div.job_seen_beacon", timeout=8000)
             except Exception:
                 pass
             html = await page.content()
+            logger.debug(
+                "indeed_response",
+                status=response.status if response else "unknown",
+                html_length=len(html),
+                url=str(page.url),
+            )
             return self._parse_html(html)
         except Exception as e:
             logger.warning("indeed_fetch_failed", role=role, error=str(e))
             return []
 
     def _parse_html(self, html: str) -> list[Job]:
+        soup = BeautifulSoup(html, "html.parser")
+
+        cards = []
+        for sel in [
+            "div.job_seen_beacon",
+            "div.tapItem",
+            "div[class*='job_seen']",
+            "div[class*='jobsearch-ResultsList'] > div",
+            "li[class*='job']",
+            "div[data-jk]",
+            "td.resultContent",
+        ]:
+            cards = soup.select(sel)
+            if cards:
+                logger.debug("indeed_cards_found", selector=sel, count=len(cards))
+                break
+
+        if not cards:
+            debug_path = Path("logs/indeed_debug.html")
+            debug_path.parent.mkdir(exist_ok=True)
+            debug_path.write_text(html[:50000])
+            logger.warning(
+                "indeed_no_cards_found",
+                debug_saved=str(debug_path),
+                html_length=len(html),
+            )
+
         jobs = []
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            cards = soup.select("div.job_seen_beacon, div.jobsearch-SerpJobCard, div.result")
-            if not cards:
-                cards = soup.select("div[class*='job_seen'], div[class*='tapItem']")
-            for card in cards:
-                job = self._parse_card(card)
-                if job:
-                    jobs.append(job)
-        except Exception as e:
-            logger.warning("indeed_parse_error", error=str(e))
+        for card in cards:
+            job = self._parse_card(card)
+            if job:
+                jobs.append(job)
         return jobs
 
     def _parse_card(self, card) -> Job | None:
         try:
-            title_el = card.select_one("h2.jobTitle a, h2 a[data-jk]")
-            if not title_el:
+            title = ""
+            for sel in [
+                "h2.jobTitle a",
+                "h2 a[data-jk]",
+                "h2 span[title]",
+                "a.jcs-JobTitle",
+                "[class*='jobTitle'] a",
+                "[class*='JobTitle'] a",
+            ]:
+                el = card.select_one(sel)
+                if el:
+                    title = el.get_text(strip=True)
+                    break
+
+            if not title:
+                title = card.get_text(strip=True)[:80]
+
+            url = ""
+            for sel in ["h2 a", "a[data-jk]", "a[id*='job']"]:
+                el = card.select_one(sel)
+                if el and el.get("href"):
+                    href = el["href"]
+                    url = f"https://www.indeed.com{href}" if href.startswith("/") else href
+                    break
+
+            if not url:
                 return None
-            title = title_el.get_text(strip=True)
-            href = title_el.get("href", "")
-            url = href if href.startswith("http") else f"https://www.indeed.com{href}"
 
-            company_el = card.select_one(
-                'span[data-testid="company-name"], span.companyName, [class*="companyName"]'
-            )
-            company = company_el.get_text(strip=True) if company_el else "Unknown"
+            company = "Unknown"
+            for sel in [
+                "span[data-testid='company-name']",
+                "[class*='companyName']",
+                "[class*='company_name']",
+                "span.companyName",
+                "[class*='CompanyName']",
+            ]:
+                el = card.select_one(sel)
+                if el:
+                    company = el.get_text(strip=True)
+                    break
 
-            location_el = card.select_one(
-                'div[data-testid="text-location"], div.companyLocation, [class*="companyLocation"]'
-            )
-            location = location_el.get_text(strip=True) if location_el else ""
+            location = ""
+            for sel in [
+                "div[data-testid='text-location']",
+                "[class*='companyLocation']",
+                "[class*='location']",
+            ]:
+                el = card.select_one(sel)
+                if el:
+                    location = el.get_text(strip=True)
+                    break
 
-            desc_el = card.select_one(
-                "div.job-snippet, div[class*='snippet'], ul.job-snippet"
-            )
-            description = truncate(
-                clean_html(str(desc_el)) if desc_el else title, 3000
-            )
+            description = ""
+            for sel in [
+                "div[class*='snippet']",
+                "div[class*='Snippet']",
+                "div.job-snippet",
+                "ul[class*='snippet'] li",
+            ]:
+                els = card.select(sel)
+                if els:
+                    description = " ".join(e.get_text(strip=True) for e in els)
+                    break
+
+            if not description:
+                description = card.get_text(separator=" ", strip=True)[:500]
 
             if not title or not url:
                 return None
 
+            description = truncate(clean_html(description), 3000)
             job_id = Job.generate_id(company, title, url)
             visa_label = self.visa_filter.classify(description)
             return Job(

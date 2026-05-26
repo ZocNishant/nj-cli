@@ -18,6 +18,68 @@ class ScoringError(Exception):
     pass
 
 
+def _build_full_cv_summary(cv_base: dict) -> dict:
+    personal = cv_base.get("personal", {})
+
+    skills = cv_base.get("skills", {})
+    all_skills: list[str] = []
+    for items in skills.values():
+        if isinstance(items, list):
+            all_skills.extend(items)
+
+    experience = cv_base.get("experience", [])
+    exp_summary = []
+    for exp in experience:
+        if isinstance(exp, dict):
+            exp_summary.append({
+                "title": exp.get("title", ""),
+                "company": exp.get("company", ""),
+                "start": exp.get("start", ""),
+                "end": exp.get("end", ""),
+                "status": exp.get("status", ""),
+                "bullets": exp.get("bullets", [])[:3],
+            })
+
+    projects = cv_base.get("projects", [])
+    sorted_projects = sorted(projects, key=lambda p: p.get("priority", 99))
+    proj_summary = []
+    for p in sorted_projects:
+        proj_summary.append({
+            "name": p.get("name", ""),
+            "tech": p.get("tech", []),
+            "bullets": p.get("bullets", [])[:2],
+            "anchor": p.get("anchor", False),
+        })
+
+    education = cv_base.get("education", [])
+    edu_summary = []
+    for edu in education:
+        if isinstance(edu, dict):
+            edu_summary.append({
+                "degree": edu.get("degree", ""),
+                "institution": edu.get("institution", ""),
+                "end": edu.get("end", ""),
+                "courses": edu.get("courses", []),
+            })
+
+    return {
+        "personal": {
+            "name": personal.get("name", ""),
+            "visa_note": personal.get("visa_note", ""),
+            "graduation_date": personal.get("graduation_date", ""),
+        },
+        "all_skills": all_skills,
+        "experience": exp_summary,
+        "projects": proj_summary,
+        "education": edu_summary,
+        "research_interests": cv_base.get("research_interests", []),
+        "certifications": [
+            c.get("name", "") + " — " + c.get("detail", "")
+            for c in cv_base.get("certifications", [])[:5]
+        ],
+    }
+
+
 def _build_failed_result(job_id: str, reason: str) -> ScoreResult:
     return ScoreResult(
         job_id=job_id,
@@ -102,17 +164,16 @@ async def score_job(
 ) -> ScoreResult:
     logger.info("scoring_job", job_id=job.id, title=job.title, company=job.company)
 
-    skills = cv_base.get("skills", {})
-    projects = cv_base.get("projects", [])
-    top_projects = sorted(projects, key=lambda p: p.get("priority", 99))[:3]
+    cv_summary = _build_full_cv_summary(cv_base)
     weights = config.scoring.weights
 
     user_prompt = scoring_v1.build_user_prompt(
         job_title=job.title,
         job_description=job.description,
-        skills=skills,
-        top_projects=top_projects,
+        skills=cv_summary["all_skills"],
+        top_projects=cv_summary["projects"],
         weights=weights,
+        cv_base=cv_base,
     )
 
     request = LLMRequest(

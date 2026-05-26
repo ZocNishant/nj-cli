@@ -40,7 +40,6 @@ def run_search(
     dry_run: bool = False,
 ) -> None:
     import asyncio
-    import os
 
     from dotenv import load_dotenv
 
@@ -53,19 +52,8 @@ def run_search(
     from nj.utils.dedup import JobDeduplicator
 
     load_dotenv()
-    li_at = os.getenv("LINKEDIN_LI_AT", "")
-    if li_at:
-        from nj.scrapers.linkedin import LinkedInScraper
-
-        scraper = LinkedInScraper(
-            session_cookie=li_at,
-            visa_config=config.visa,
-            headless=True,
-        )
-    else:
-        from nj.scrapers.indeed import IndeedScraper
-
-        scraper = IndeedScraper(visa_config=config.visa)
+    scrapers = _get_enabled_scrapers(config)
+    logger.info("scrapers_active", scrapers=[s.name() for s in scrapers])
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
@@ -90,18 +78,26 @@ def run_search(
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task(f"Scraping {scraper.name()}...", total=None)
-        jobs = scraper.scrape(
-            roles=config.search.roles,
-            location=config.search.primary_region,
-        )
-        new_jobs = dedup.filter_new(jobs)
+        task = progress.add_task("Scraping jobs...", total=None)
+        all_raw_jobs = []
+        for scraper in scrapers:
+            try:
+                progress.update(task, description=f"Scraping {scraper.name()}...")
+                fetched = scraper.scrape(
+                    roles=config.search.roles,
+                    location=config.search.primary_region,
+                )
+                all_raw_jobs.extend(fetched)
+                logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
+            except Exception as e:
+                logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
+        new_jobs = dedup.filter_new(all_raw_jobs)
         for job in new_jobs:
             job_repo.save_job(job)
         all_jobs.extend(new_jobs)
         progress.update(
             task,
-            description=f"Scraped {len(new_jobs)} new jobs from {scraper.name()}",
+            description=f"Scraped {len(new_jobs)} new jobs from {len(scrapers)} sources",
         )
 
     if not all_jobs:

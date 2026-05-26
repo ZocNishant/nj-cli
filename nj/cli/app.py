@@ -182,6 +182,44 @@ def logs(
 
 
 @app.command()
+def prep(
+    job_id: str = typer.Option(None, "--job-id", "-j", help="Job ID from nj status"),
+    url: str = typer.Option(None, "--url", "-u", help="Job URL to prep for"),
+    last: bool = typer.Option(False, "--last", "-l", help="Prep for most recently applied job"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    output_dir: str = typer.Option("output", "--output"),
+) -> None:
+    """Generate interview prep PDF for a job."""
+    from nj.cli.cmd_prep import run_prep
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_prep(
+        config=config,
+        job_id=job_id,
+        url=url,
+        last=last,
+        db_path=db_path,
+        output_dir=output_dir,
+    )
+
+
+@app.command()
+def watch(
+    days_back: int = typer.Option(7, "--days", "-d", help="Days back to scan Gmail"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    setup: bool = typer.Option(False, "--setup", help="Show Gmail OAuth2 setup instructions"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Detect callbacks without updating DB"),
+) -> None:
+    """Scan Gmail for job callbacks and update application statuses."""
+    from nj.cli.cmd_watch import run_watch
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_watch(config=config, db_path=db_path, days_back=days_back, setup=setup, dry_run=dry_run)
+
+
+@app.command()
 def config(
     show: bool = typer.Option(False, "--show", help="Print config to terminal"),
     config_path: str = typer.Option("config.yaml", "--path"),

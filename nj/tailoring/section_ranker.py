@@ -5,9 +5,6 @@ from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-ANCHOR_PROJECT_ID = "gastrovision"
-
-
 def rank_projects(
     projects: list[dict],
     score: ScoreResult,
@@ -18,7 +15,7 @@ def rank_projects(
     anchor = None
     rest = []
     for p in projects:
-        if p.get("id") == ANCHOR_PROJECT_ID:
+        if p.get("anchor") is True:
             anchor = p
         else:
             rest.append(p)

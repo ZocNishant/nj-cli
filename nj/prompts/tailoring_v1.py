@@ -20,19 +20,19 @@ WHAT YOU MAY DO:
 - Reorder bullet points to lead with most relevant content
 - Rephrase bullets to echo JD keywords naturally (not stuffing)
 - Write or improve the summary paragraph using only existing facts
-- Reorder projects to lead with GastroVision for ML/CV roles
-- Suppress or compress IT/sysadmin bullets for ML roles (keep max 2)
-- Remove security tools from skills for ML/CV roles
+- Reorder projects to lead with the anchor project for matching roles
+- Suppress or compress less-relevant experience bullets (keep max 2)
+- Remove unrelated tools from skills for focused roles
 - Expand an existing bullet if the underlying fact supports it
 
-GASTROVISION RULE:
-GastroVision must always be the first project for ML, AI, and CV roles.
-Never move it lower. Never remove it.
+ANCHOR PROJECT RULE:
+The project marked anchor=true in the CV must always be listed first \
+for roles matching its tags. Never move it lower. Never remove it.
 
-MOFFITT INTERNSHIP RULE:
-If status is "incoming": render as title + company + dates only, \
-no bullets. Do not invent responsibilities.
-If status is "active": include bullets if provided.
+INCOMING EXPERIENCE RULE:
+For any experience entry with status='incoming': render as title + \
+company + dates only. Do not invent responsibilities.
+For status='active': include bullets if provided.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the exact schema of the input cv_base. \
@@ -56,6 +56,17 @@ def build_user_prompt(
     missing = ", ".join(score_result.get("missing_skills", [])[:5])
     emphasis = ", ".join(score_result.get("recommended_emphasis", [])[:4])
 
+    anchor = next(
+        (p for p in cv_base.get("projects", []) if p.get("anchor")),
+        None,
+    )
+    anchor_note = ""
+    if anchor:
+        anchor_note = (
+            f"\nIMPORTANT: '{anchor['name']}' is this candidate's "
+            f"anchor project. Always list it first for relevant roles."
+        )
+
     return f"""TAILORING REQUEST:
 Target Role: {job_title} at {job_company}
 
@@ -69,7 +80,7 @@ JD KEYWORDS TO ECHO NATURALLY (do not stuff):
 
 JOB DESCRIPTION (for context):
 {truncate(job_description, 1500)}
-
+{anchor_note}
 BASE CV (tailor this — never invent content):
 {json.dumps(cv_base, indent=2)[:3000]}
 
