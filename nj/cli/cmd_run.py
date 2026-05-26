@@ -15,6 +15,25 @@ logger = get_logger(__name__)
 console = Console()
 
 
+def _get_enabled_scrapers(config: Config) -> list:
+    import os
+
+    scrapers = []
+    li_at = os.getenv("LINKEDIN_LI_AT", "")
+    if li_at:
+        from nj.scrapers.linkedin import LinkedInScraper
+
+        scrapers.append(
+            LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
+        )
+    from nj.scrapers.indeed import IndeedScraper
+    from nj.scrapers.remoteok import RemoteOKScraper
+
+    scrapers.append(IndeedScraper(visa_config=config.visa))
+    scrapers.append(RemoteOKScraper(visa_config=config.visa))
+    return scrapers
+
+
 def run_pipeline(
     config: Config,
     db_path: str = "data/nj.db",
@@ -28,7 +47,6 @@ def run_pipeline(
     from nj.db.repos.score_repo import ScoreRepo
     from nj.notify.email import EmailNotifier
     from nj.providers.registry import get_provider
-    from nj.scrapers.indeed import IndeedScraper
     from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
     from nj.tailoring.cover_letter import generate_and_save_cover_letter
@@ -85,18 +103,25 @@ def run_pipeline(
 
     if not silent:
         console.print("[dim]Phase 1: Scraping...[/dim]")
-    scraper = IndeedScraper(visa_config=config.visa)
-    raw_jobs = scraper.scrape(
-        roles=config.search.roles,
-        location=config.search.primary_region,
-    )
-    new_jobs = dedup.filter_new(raw_jobs)
+    scrapers = _get_enabled_scrapers(config)
+    all_raw_jobs: list = []
+    for scraper in scrapers:
+        try:
+            fetched = scraper.scrape(
+                roles=config.search.roles,
+                location=config.search.primary_region,
+            )
+            all_raw_jobs.extend(fetched)
+            logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
+        except Exception as e:
+            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
+    new_jobs = dedup.filter_new(all_raw_jobs)
     for job in new_jobs:
         job_repo.save_job(job)
     if not silent:
         console.print(
             f"  Found [bold]{len(new_jobs)}[/bold] new jobs "
-            f"({len(raw_jobs) - len(new_jobs)} duplicates skipped)\n"
+            f"({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)\n"
         )
 
     if not new_jobs:

@@ -1,0 +1,5 @@
+scrapers:
+  linkedin: true      # requires LINKEDIN_LI_AT in .env
+  indeed: true        # uses Playwright, slower but reliable
+  remoteok: true      # no auth, always works, remote ML jobs
+  glassdoor: false    # not yet implemented

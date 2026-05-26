@@ -1,0 +1,33 @@
+[
+  {"legal": "This feed is protected by copyright. The information in this feed is for personal use only."},
+  {
+    "id": 1001,
+    "slug": "remote-ml-engineer-techcorp",
+    "company": "TechCorp",
+    "position": "ML Engineer",
+    "description": "Looking for an ML Engineer. H1B sponsorship available.",
+    "tags": ["machine-learning", "python", "pytorch"],
+    "location": "Remote",
+    "date": "2026-05-25T00:00:00+00:00"
+  },
+  {
+    "id": 1002,
+    "slug": "remote-frontend-dev-startup",
+    "company": "WebStartup",
+    "position": "Frontend Developer",
+    "description": "React frontend developer role. No ML involved.",
+    "tags": ["javascript", "react", "frontend"],
+    "location": "Remote",
+    "date": "2026-05-25T00:00:00+00:00"
+  },
+  {
+    "id": 1003,
+    "slug": "remote-ai-engineer-aicorp",
+    "company": "AICorp",
+    "position": "AI Engineer",
+    "description": "AI role. We do not offer visa sponsorship.",
+    "tags": ["ai", "deep-learning", "computer-vision"],
+    "location": "Remote",
+    "date": "2026-05-25T00:00:00+00:00"
+  }
+]

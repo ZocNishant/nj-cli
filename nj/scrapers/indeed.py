@@ -1,24 +1,24 @@
 from __future__ import annotations
 
+import asyncio
 import random
-import time
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
+from urllib.parse import urlencode
 
-import httpx
+from bs4 import BeautifulSoup
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
 from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
 from nj.utils.logger import get_logger
-from nj.utils.text import clean_html
+from nj.utils.text import clean_html, truncate
 
 logger = get_logger(__name__)
 
 
 class IndeedScraper(BaseScraper):
-    BASE_URL = "https://www.indeed.com/rss"
+    BASE_URL = "https://www.indeed.com/jobs"
 
     def __init__(self, visa_config: VisaConfig):
         self.visa_filter = VisaFilter(visa_config)
@@ -27,61 +27,114 @@ class IndeedScraper(BaseScraper):
         return "indeed"
 
     def scrape(self, roles: list[str], location: str = "United States") -> list[Job]:
+        try:
+            return asyncio.run(self._scrape_async(roles, location))
+        except Exception as e:
+            logger.error("indeed_scrape_fatal", error=str(e))
+            return []
+
+    async def _scrape_async(self, roles: list[str], location: str) -> list[Job]:
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            logger.error(
+                "playwright_not_installed",
+                hint="Run: playwright install chromium",
+            )
+            return []
+
         jobs: list[Job] = []
-        for role in roles:
-            try:
-                fetched = self._fetch_role(role, location)
-                jobs.extend(fetched)
-                delay = random.uniform(2, 5)
-                logger.info(
-                    "indeed_role_done",
-                    role=role,
-                    count=len(fetched),
-                    next_delay=round(delay, 1),
-                )
-                time.sleep(delay)
-            except Exception as e:
-                logger.warning("indeed_role_failed", role=role, error=str(e))
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            )
+            page = await context.new_page()
+
+            for role in roles:
+                try:
+                    fetched = await self._fetch_role(page, role, location)
+                    jobs.extend(fetched)
+                    delay = random.uniform(2, 5)
+                    logger.info(
+                        "indeed_role_done",
+                        role=role,
+                        count=len(fetched),
+                        next_delay=round(delay, 1),
+                    )
+                    await asyncio.sleep(delay)
+                except Exception as e:
+                    logger.warning("indeed_role_failed", role=role, error=str(e))
+
+            await browser.close()
+
         logger.info("indeed_scrape_complete", total=len(jobs), roles=len(roles))
         return jobs
 
-    def _fetch_role(self, role: str, location: str) -> list[Job]:
-        params = {"q": role, "l": location, "sort": "date"}
+    async def _fetch_role(self, page, role: str, location: str) -> list[Job]:
+        params = {"q": role, "l": location, "sort": "date", "fromage": "7"}
+        url = f"{self.BASE_URL}?{urlencode(params)}"
         try:
-            response = httpx.get(self.BASE_URL, params=params, timeout=15)
-            response.raise_for_status()
-            return self._parse_rss(response.text)
+            await page.goto(url, timeout=20000)
+            try:
+                await page.wait_for_selector("div.job_seen_beacon", timeout=8000)
+            except Exception:
+                pass
+            html = await page.content()
+            return self._parse_html(html)
         except Exception as e:
             logger.warning("indeed_fetch_failed", role=role, error=str(e))
             return []
 
-    def _parse_rss(self, xml_text: str) -> list[Job]:
+    def _parse_html(self, html: str) -> list[Job]:
         jobs = []
         try:
-            root = ET.fromstring(xml_text)
-            channel = root.find("channel")
-            if channel is None:
-                return []
-            for item in channel.findall("item"):
-                job = self._parse_item(item)
+            soup = BeautifulSoup(html, "html.parser")
+            cards = soup.select("div.job_seen_beacon, div.jobsearch-SerpJobCard, div.result")
+            if not cards:
+                cards = soup.select("div[class*='job_seen'], div[class*='tapItem']")
+            for card in cards:
+                job = self._parse_card(card)
                 if job:
                     jobs.append(job)
-        except ET.ParseError as e:
+        except Exception as e:
             logger.warning("indeed_parse_error", error=str(e))
         return jobs
 
-    def _parse_item(self, item: ET.Element) -> Job | None:
+    def _parse_card(self, card) -> Job | None:
         try:
-            title = item.findtext("title", "").strip()
-            url = item.findtext("link", "").strip()
-            description_raw = item.findtext("description", "")
-            description = clean_html(description_raw)
-            source_elem = item.find("source")
-            company = source_elem.text.strip() if source_elem is not None else "Unknown"
-            location_elem = item.find("{https://www.indeed.com/about/}location")
-            location = location_elem.text.strip() if location_elem is not None else ""
+            title_el = card.select_one("h2.jobTitle a, h2 a[data-jk]")
+            if not title_el:
+                return None
+            title = title_el.get_text(strip=True)
+            href = title_el.get("href", "")
+            url = href if href.startswith("http") else f"https://www.indeed.com{href}"
+
+            company_el = card.select_one(
+                'span[data-testid="company-name"], span.companyName, [class*="companyName"]'
+            )
+            company = company_el.get_text(strip=True) if company_el else "Unknown"
+
+            location_el = card.select_one(
+                'div[data-testid="text-location"], div.companyLocation, [class*="companyLocation"]'
+            )
+            location = location_el.get_text(strip=True) if location_el else ""
+
+            desc_el = card.select_one(
+                "div.job-snippet, div[class*='snippet'], ul.job-snippet"
+            )
+            description = truncate(
+                clean_html(str(desc_el)) if desc_el else title, 3000
+            )
+
             if not title or not url:
                 return None
+
             job_id = Job.generate_id(company, title, url)
             visa_label = self.visa_filter.classify(description)
             return Job(
@@ -97,5 +150,5 @@ class IndeedScraper(BaseScraper):
                 description_hash=Job.generate_hash(description),
             )
         except Exception as e:
-            logger.warning("indeed_item_parse_failed", error=str(e))
+            logger.warning("indeed_card_parse_failed", error=str(e))
             return None

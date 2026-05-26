@@ -15,21 +15,57 @@ logger = get_logger(__name__)
 console = Console()
 
 
+def _get_enabled_scrapers(config: Config) -> list:
+    import os
+
+    scrapers = []
+    li_at = os.getenv("LINKEDIN_LI_AT", "")
+    if li_at:
+        from nj.scrapers.linkedin import LinkedInScraper
+
+        scrapers.append(
+            LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
+        )
+    from nj.scrapers.indeed import IndeedScraper
+    from nj.scrapers.remoteok import RemoteOKScraper
+
+    scrapers.append(IndeedScraper(visa_config=config.visa))
+    scrapers.append(RemoteOKScraper(visa_config=config.visa))
+    return scrapers
+
+
 def run_search(
     config: Config,
     db_path: str = "data/nj.db",
     dry_run: bool = False,
 ) -> None:
     import asyncio
+    import os
+
+    from dotenv import load_dotenv
 
     from nj.db.engine import init_db
     from nj.db.repos.job_repo import JobRepo
     from nj.db.repos.score_repo import ScoreRepo
     from nj.providers.registry import get_provider
-    from nj.scrapers.indeed import IndeedScraper
     from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
     from nj.utils.dedup import JobDeduplicator
+
+    load_dotenv()
+    li_at = os.getenv("LINKEDIN_LI_AT", "")
+    if li_at:
+        from nj.scrapers.linkedin import LinkedInScraper
+
+        scraper = LinkedInScraper(
+            session_cookie=li_at,
+            visa_config=config.visa,
+            headless=True,
+        )
+    else:
+        from nj.scrapers.indeed import IndeedScraper
+
+        scraper = IndeedScraper(visa_config=config.visa)
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
@@ -54,8 +90,7 @@ def run_search(
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task("Scraping Indeed...", total=None)
-        scraper = IndeedScraper(visa_config=config.visa)
+        task = progress.add_task(f"Scraping {scraper.name()}...", total=None)
         jobs = scraper.scrape(
             roles=config.search.roles,
             location=config.search.primary_region,
@@ -66,11 +101,8 @@ def run_search(
         all_jobs.extend(new_jobs)
         progress.update(
             task,
-            description=f"Scraped {len(new_jobs)} new jobs from Indeed",
+            description=f"Scraped {len(new_jobs)} new jobs from {scraper.name()}",
         )
-
-        if config.search.include_global and not dry_run:
-            progress.update(task, description="Scraping global sources...")
 
     if not all_jobs:
         console.print("[yellow]No new jobs found.[/yellow]")
