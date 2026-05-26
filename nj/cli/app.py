@@ -205,6 +205,22 @@ def prep(
 
 
 @app.command()
+def gaps(
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    top_n: int = typer.Option(10, "--top", "-n", help="Number of gaps to show"),
+    min_frequency: int = typer.Option(
+        10, "--min-freq", help="Minimum % frequency to include a gap"
+    ),
+) -> None:
+    """Analyse skill gaps across all scored jobs — ranked by ROI."""
+    from nj.cli.cmd_gaps import run_gaps
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_gaps(config=config, db_path=db_path, top_n=top_n, min_frequency=min_frequency)
+
+
+@app.command()
 def diagnose(
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
