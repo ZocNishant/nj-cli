@@ -205,6 +205,22 @@ def prep(
 
 
 @app.command()
+def diagnose(
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    output_dir: str = typer.Option("output", "--output"),
+    no_pdf: bool = typer.Option(
+        False, "--no-pdf", help="Skip PDF generation, terminal output only"
+    ),
+) -> None:
+    """Diagnose your CV — find out why you are or are not getting interviews."""
+    from nj.cli.cmd_diagnose import run_diagnose
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_diagnose(config=config, db_path=db_path, output_dir=output_dir, no_pdf=no_pdf)
+
+
+@app.command()
 def watch(
     days_back: int = typer.Option(7, "--days", "-d", help="Days back to scan Gmail"),
     db_path: str = typer.Option("data/nj.db", "--db"),
