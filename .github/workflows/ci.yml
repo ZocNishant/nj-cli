@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Lint with ruff
+        run: poetry run ruff check nj/
+
+      - name: Check formatting with black
+        run: poetry run black --check nj/
+
+      - name: Run tests
+        run: |
+          poetry run pytest tests/ \
+            --tb=short \
+            --cov=nj \
+            --cov-report=term-missing \
+            --cov-fail-under=70
+
+      - name: Check for accidentally committed secrets
+        run: |
+          if [ -f .env ]; then
+            echo "ERROR: .env file found in repo"
+            exit 1
+          fi
+          if [ -f config.yaml ]; then
+            echo "ERROR: config.yaml found in repo"
+            exit 1
+          fi

@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from nj.db.engine import get_session
+from nj.db.models import JobORM
+from nj.models.job import Job, JobStatus, VisaLabel
+
+
+class JobRepo:
+    def __init__(self, db_path: str = "data/nj.db"):
+        self.db_path = db_path
+
+    def save_job(self, job: Job) -> None:
+        with get_session(self.db_path) as session:
+            existing = session.get(JobORM, job.id)
+            if existing:
+                existing.status = job.status.value
+                existing.visa_label = job.visa_label.value
+            else:
+                session.add(
+                    JobORM(
+                        id=job.id,
+                        title=job.title,
+                        company=job.company,
+                        url=job.url,
+                        description=job.description,
+                        location=job.location,
+                        salary_raw=job.salary_raw,
+                        source=job.source,
+                        visa_label=job.visa_label.value,
+                        scraped_at=job.scraped_at,
+                        status=job.status.value,
+                        description_hash=job.description_hash,
+                    )
+                )
+
+    def job_exists(self, job_id: str) -> bool:
+        with get_session(self.db_path) as session:
+            return session.get(JobORM, job_id) is not None
+
+    def get_jobs(self, status: JobStatus | None = None) -> list[Job]:
+        with get_session(self.db_path) as session:
+            q = session.query(JobORM)
+            if status:
+                q = q.filter(JobORM.status == status.value)
+            return [self._to_model(j) for j in q.all()]
+
+    def get_recent_jobs(self, days: int = 30) -> list[Job]:
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+        with get_session(self.db_path) as session:
+            rows = session.query(JobORM).filter(JobORM.scraped_at >= cutoff).all()
+            return [self._to_model(j) for j in rows]
+
+    def update_job_status(self, job_id: str, status: JobStatus) -> None:
+        with get_session(self.db_path) as session:
+            job = session.get(JobORM, job_id)
+            if job:
+                job.status = status.value
+
+    def _to_model(self, orm: JobORM) -> Job:
+        return Job(
+            id=orm.id,
+            title=orm.title,
+            company=orm.company,
+            url=orm.url,
+            description=orm.description,
+            location=orm.location,
+            salary_raw=orm.salary_raw,
+            source=orm.source,
+            visa_label=VisaLabel(orm.visa_label),
+            scraped_at=orm.scraped_at,
+            status=JobStatus(orm.status),
+            description_hash=orm.description_hash,
+        )

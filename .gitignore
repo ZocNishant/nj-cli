@@ -1,0 +1,15 @@
+.env
+config.yaml
+cv/cv_base.json
+cv/profile.json
+cookies/
+output/
+logs/
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+*.aux
+*.log
+.DS_Store

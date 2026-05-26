@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:indeed="https://www.indeed.com/about/">
+  <channel>
+    <title>Indeed Job Search</title>
+    <item>
+      <title>ML Engineer</title>
+      <link>https://www.indeed.com/job/ml-engineer-abc123</link>
+      <source>TechCorp Inc</source>
+      <description>&lt;p&gt;We are looking for an ML Engineer. H1B sponsorship available.&lt;/p&gt;</description>
+      <indeed:location>San Francisco, CA</indeed:location>
+    </item>
+    <item>
+      <title>Computer Vision Engineer</title>
+      <link>https://www.indeed.com/job/cv-engineer-def456</link>
+      <source>AI Startup</source>
+      <description>&lt;p&gt;Computer Vision role. No sponsorship available.&lt;/p&gt;</description>
+      <indeed:location>New York, NY</indeed:location>
+    </item>
+  </channel>
+</rss>
