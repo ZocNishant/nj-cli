@@ -205,6 +205,36 @@ def prep(
 
 
 @app.command()
+def frame(
+    project_id: str = typer.Option(
+        None, "--project", "-p", help="Project ID to frame (see nj frame --list)"
+    ),
+    audience: str = typer.Option(
+        None,
+        "--audience",
+        "-a",
+        help="Target audience: production_ml, research_lab, healthtech_startup, big_tech, early_stage_startup, custom",
+    ),
+    role_description: str = typer.Option(
+        "", "--role", help="Role description for custom audience"
+    ),
+    list_projects: bool = typer.Option(False, "--list", "-l", help="List available projects"),
+) -> None:
+    """Reframe a project for a specific audience or role type."""
+    from nj.cli.cmd_frame import run_frame
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_frame(
+        config=config,
+        project_id=project_id,
+        audience=audience,
+        role_description=role_description,
+        list_projects=list_projects,
+    )
+
+
+@app.command()
 def gaps(
     db_path: str = typer.Option("data/nj.db", "--db"),
     top_n: int = typer.Option(10, "--top", "-n", help="Number of gaps to show"),
