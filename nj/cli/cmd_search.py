@@ -72,7 +72,10 @@ def run_search(
     provider = get_provider(config.llm)
     visa_filter = VisaFilter(config.visa)
 
+    from nj.utils.logger import is_verbose
+
     all_jobs = []
+    counts: dict[str, int] = {}
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -87,9 +90,11 @@ def run_search(
                     roles=config.search.roles,
                     location=config.search.primary_region,
                 )
+                counts[scraper.name()] = len(fetched)
                 all_raw_jobs.extend(fetched)
                 logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
             except Exception as e:
+                counts[scraper.name()] = 0
                 logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
         new_jobs = dedup.filter_new(all_raw_jobs)
         for job in new_jobs:
@@ -98,6 +103,19 @@ def run_search(
         progress.update(
             task,
             description=f"Scraped {len(new_jobs)} new jobs from {len(scrapers)} sources",
+        )
+
+    if not is_verbose():
+        console.print(
+            f"\n[green]✓[/green] Scraped [bold]{len(all_raw_jobs)}[/bold] jobs  "
+            f"[dim]({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)[/dim]"
+        )
+        console.print(
+            "[dim]Sources: "
+            + " · ".join(
+                f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers
+            )
+            + "[/dim]"
         )
 
     if not all_jobs:

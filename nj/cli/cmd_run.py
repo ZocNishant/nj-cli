@@ -101,28 +101,46 @@ def run_pipeline(
 
     dedup = JobDeduplicator(job_repo)
 
+    from nj.utils.logger import is_verbose
+
     if not silent:
         console.print("[dim]Phase 1: Scraping...[/dim]")
     scrapers = _get_enabled_scrapers(config)
     all_raw_jobs: list = []
+    counts: dict[str, int] = {}
     for scraper in scrapers:
         try:
             fetched = scraper.scrape(
                 roles=config.search.roles,
                 location=config.search.primary_region,
             )
+            counts[scraper.name()] = len(fetched)
             all_raw_jobs.extend(fetched)
             logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
         except Exception as e:
+            counts[scraper.name()] = 0
             logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
     new_jobs = dedup.filter_new(all_raw_jobs)
     for job in new_jobs:
         job_repo.save_job(job)
     if not silent:
-        console.print(
-            f"  Found [bold]{len(new_jobs)}[/bold] new jobs "
-            f"({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)\n"
-        )
+        if not is_verbose():
+            console.print(
+                f"  [green]✓[/green] [bold]{len(new_jobs)}[/bold] new jobs  "
+                f"[dim]({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)[/dim]"
+            )
+            console.print(
+                "  [dim]Sources: "
+                + " · ".join(
+                    f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers
+                )
+                + "[/dim]\n"
+            )
+        else:
+            console.print(
+                f"  Found [bold]{len(new_jobs)}[/bold] new jobs "
+                f"({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)\n"
+            )
 
     if not new_jobs:
         if not silent:

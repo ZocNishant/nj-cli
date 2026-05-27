@@ -16,8 +16,17 @@ def main(
         "--schedule",
         help="Set run schedule: N=days between runs, 0=disable, show=display",
     ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed output including debug logs"
+    ),
 ) -> None:
     """nj — AI-powered job hunting CLI by Nishant Joshi."""
+    if verbose:
+        from nj.utils.logger import set_verbose, setup_logger
+
+        set_verbose(True)
+        setup_logger(level="DEBUG", console_level="DEBUG")
+
     if schedule is not None:
         from rich.console import Console
 
