@@ -27,6 +27,7 @@ rich = ">=13.0"
 structlog = ">=24.0"
 readchar = ">=4.0"
 beautifulsoup4 = ">=4.12"
+openai = ">=1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"

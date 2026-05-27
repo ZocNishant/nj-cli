@@ -322,10 +322,18 @@ def watch(
 def config(
     show: bool = typer.Option(False, "--show", help="Print config to terminal"),
     config_path: str = typer.Option("config.yaml", "--path"),
+    check_provider: bool = typer.Option(
+        False, "--check-provider", help="Test the configured LLM provider"
+    ),
 ) -> None:
-    """View or edit nj configuration."""
+    """View, edit, or check nj configuration."""
     from nj.cli.cmd_config import run_config
     from nj.models.config import Config
 
     cfg = Config.load(config_path)
-    run_config(config=cfg, config_path=config_path, show=show)
+    run_config(
+        config=cfg,
+        config_path=config_path,
+        show=show,
+        check_provider=check_provider,
+    )

@@ -1,3 +1,15 @@
+llm:
+  provider: claude          # options: claude, freellmapi
+  model: claude-sonnet-4-20250514
+  api_key: ""               # set in .env as ANTHROPIC_API_KEY
+
+  # FreeLLMAPI — free local proxy for dev/testing
+  # Runs 14 providers (Gemini, Groq, Cerebras, Mistral, etc.)
+  # behind one OpenAI-compatible endpoint.
+  # freellmapi_base_url: http://localhost:3001/v1
+  # freellmapi_api_key: freellmapi-your-key-here
+  # freellmapi_model: auto
+
 scrapers:
   linkedin: true      # requires LINKEDIN_LI_AT in .env
   indeed: true        # uses Playwright, slower but reliable

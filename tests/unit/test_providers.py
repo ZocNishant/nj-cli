@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from nj.models.config import LLMConfig
 from nj.providers.base import LLMRequest
 from nj.providers.claude import ClaudeProvider
-from nj.providers.openai import OpenAIProvider
+from nj.providers.openai import OpenAICompatibleProvider, OpenAIProvider
 from nj.providers.registry import get_provider
 
 
@@ -37,12 +37,12 @@ async def test_claude_provider_complete(mock_anthropic_response: MagicMock) -> N
     assert response.latency_ms >= 0
 
 
-@pytest.mark.asyncio
-async def test_openai_provider_raises_not_implemented() -> None:
-    provider = OpenAIProvider()
-    with pytest.raises(NotImplementedError) as exc_info:
-        await provider.complete(LLMRequest(system="sys", user="usr"))
-    assert "docs/adding-a-provider.md" in str(exc_info.value)
+def test_openai_compatible_provider_has_correct_name() -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test",
+        base_url="http://localhost:3001/v1",
+    )
+    assert provider.name() == "freellmapi"
 
 
 def test_registry_returns_claude_provider() -> None:
@@ -52,10 +52,14 @@ def test_registry_returns_claude_provider() -> None:
     assert provider.name() == "claude"
 
 
-def test_registry_returns_openai_provider() -> None:
-    config = LLMConfig(provider="openai", api_key="")
+def test_registry_returns_freellmapi_provider() -> None:
+    config = LLMConfig(
+        provider="freellmapi",
+        freellmapi_api_key="test-key",
+        freellmapi_base_url="http://localhost:3001/v1",
+    )
     provider = get_provider(config)
-    assert provider.name() == "openai"
+    assert provider.name() == "freellmapi"
 
 
 def test_registry_raises_for_unknown_provider() -> None:
@@ -76,3 +80,7 @@ def test_claude_supports_json_mode() -> None:
     with patch("nj.providers.claude.anthropic.Anthropic"):
         provider = ClaudeProvider(api_key="test")
     assert provider.supports_json_mode() is True
+
+
+def test_openai_alias_is_compatible_provider() -> None:
+    assert OpenAIProvider is OpenAICompatibleProvider
