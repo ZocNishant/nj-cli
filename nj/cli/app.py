@@ -44,6 +44,14 @@ def main(
 
 
 @app.command()
+def demo() -> None:
+    """Run an interactive demo — no API key or CV needed."""
+    from nj.cli.cmd_demo import run_demo
+
+    run_demo()
+
+
+@app.command()
 def init(
     config_path: str = typer.Option(
         "config.yaml", "--config", help="Path to config file"
