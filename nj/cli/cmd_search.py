@@ -19,18 +19,39 @@ def _get_enabled_scrapers(config: Config) -> list:
     import os
 
     scrapers = []
+
     li_at = os.getenv("LINKEDIN_LI_AT", "")
-    if li_at:
+    if li_at and config.scraper.linkedin_enabled:
         from nj.scrapers.linkedin import LinkedInScraper
 
         scrapers.append(
             LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
         )
-    from nj.scrapers.indeed import IndeedScraper
-    from nj.scrapers.remoteok import RemoteOKScraper
 
-    scrapers.append(IndeedScraper(visa_config=config.visa))
-    scrapers.append(RemoteOKScraper(visa_config=config.visa))
+    if config.scraper.adzuna_enabled:
+        from nj.scrapers.indeed import AdzunaScraper
+
+        adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
+        adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)
+        scrapers.append(
+            AdzunaScraper(
+                app_id=adzuna_id,
+                app_key=adzuna_key,
+                visa_config=config.visa,
+                country=config.scraper.adzuna_country,
+            )
+        )
+
+    if config.scraper.remoteok_enabled:
+        from nj.scrapers.remoteok import RemoteOKScraper
+
+        scrapers.append(RemoteOKScraper(visa_config=config.visa))
+
+    if not scrapers:
+        from nj.scrapers.remoteok import RemoteOKScraper
+
+        scrapers.append(RemoteOKScraper(visa_config=config.visa))
+
     return scrapers
 
 

@@ -1,0 +1,11 @@
+{
+  "_note": "Sample SkillGapReport from nj gaps across 118 scored jobs.",
+  "total_jobs_analyzed": 118,
+  "avg_total_score": 67.3,
+  "profile_coverage": 74.2,
+  "top_gaps": [
+    {"skill": "mlflow", "frequency_pct": 68, "estimated_score_boost": 8},
+    {"skill": "kubernetes", "frequency_pct": 54, "estimated_score_boost": 6},
+    {"skill": "wandb", "frequency_pct": 41, "estimated_score_boost": 4}
+  ]
+}

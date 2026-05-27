@@ -69,6 +69,15 @@ class ScheduleConfig(BaseModel):
     time: str = "08:00"
 
 
+class ScraperConfig(BaseModel):
+    adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
+    adzuna_country: str = "us"
+    adzuna_enabled: bool = True
+    remoteok_enabled: bool = True
+    linkedin_enabled: bool = True
+
+
 class Config(BaseModel):
     llm: LLMConfig = LLMConfig()
     search: SearchConfig = SearchConfig()
@@ -77,6 +86,7 @@ class Config(BaseModel):
     apply: ApplyConfig = ApplyConfig()
     notify: NotifyConfig = NotifyConfig()
     schedule: ScheduleConfig = ScheduleConfig()
+    scraper: ScraperConfig = ScraperConfig()
 
     @classmethod
     def load(cls, path: str = "config.yaml") -> "Config":

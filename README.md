@@ -9,9 +9,26 @@ Apache 2.0 license.
 
 ---
 
+## Why nj-cli is different
+
+**nj never invents your experience.**
+
+Every tailored CV is validated against your original before
+it leaves your machine. If Claude tries to add a skill you
+don't have, a job you didn't work, or a metric you didn't
+achieve — the validator rejects it and regenerates.
+
+This is not a prompt instruction. It is a separate validation
+module (`nj/tailoring/anti_hallucination.py`) that diffs the
+output against your source CV entity by entity.
+
+Most "AI CV tools" hallucinate. nj-cli does not.
+
+---
+
 ## What it does
 
-- Scrapes jobs from Indeed and LinkedIn
+- Scrapes jobs via Adzuna API (aggregates Indeed, Glassdoor, 15+ sources)
 - Filters visa-incompatible roles (OPT/H1B support built-in)
 - Scores each job with 6 explainable sub-scores via Claude AI
 - Tailors your LaTeX CV to each job description
@@ -43,7 +60,6 @@ brew install node            # if not installed
 git clone https://github.com/ZocNishant/nj-cli
 cd nj-cli
 poetry install
-playwright install chromium
 ```
 
 ---

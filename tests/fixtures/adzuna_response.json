@@ -1,0 +1,32 @@
+{
+  "results": [
+    {
+      "title": "Machine Learning Engineer",
+      "company": {"display_name": "TechCorp AI"},
+      "redirect_url": "https://www.adzuna.com/jobs/details/12345",
+      "description": "PyTorch ML engineer role. H1B sponsorship available.",
+      "location": {"display_name": "San Francisco, CA"},
+      "salary_min": 140000,
+      "salary_max": 180000
+    },
+    {
+      "title": "Computer Vision Engineer",
+      "company": {"display_name": "Vision Labs"},
+      "redirect_url": "https://www.adzuna.com/jobs/details/67890",
+      "description": "OpenCV and PyTorch. No sponsorship available.",
+      "location": {"display_name": "New York, NY"},
+      "salary_min": null,
+      "salary_max": null
+    },
+    {
+      "title": "AI Researcher",
+      "company": {"display_name": "Research AI"},
+      "redirect_url": "https://www.adzuna.com/jobs/details/11111",
+      "description": "Deep learning research role. Visa sponsorship provided.",
+      "location": {"display_name": "Remote"},
+      "salary_min": 160000,
+      "salary_max": 200000
+    }
+  ],
+  "count": 3
+}

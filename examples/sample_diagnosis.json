@@ -1,0 +1,40 @@
+{
+  "_note": "Sample DiagnosisResult from nj diagnose. Personal data anonymised.",
+  "overall_health": "moderate",
+  "critical_issues": [
+    {
+      "section": "experience",
+      "issue": "IT support roles dominate work history — recruiter sees sysadmin not ML engineer",
+      "severity": "high",
+      "fix": "Rewrite each IT bullet to lead with a quantified outcome or system impact, not a task description"
+    },
+    {
+      "section": "summary",
+      "issue": "No summary section — recruiter has no 15-second framing to anchor on",
+      "severity": "high",
+      "fix": "Add 3-line summary: ML engineer with medical imaging focus, anchor project, incoming internship"
+    },
+    {
+      "section": "skills",
+      "issue": "Security tools visible — signals wrong domain for ML roles",
+      "severity": "medium",
+      "fix": "Remove security tools section entirely for ML/CV applications — it creates noise"
+    }
+  ],
+  "hidden_strengths": [
+    "Anchor project: rare combination of clinical domain knowledge + state-of-the-art CV engineering",
+    "Incoming top-tier medical AI internship — strongest signal of credibility",
+    "EfficientNet + ViT ensemble is graduate-thesis quality work, not a tutorial project",
+    "96%+ accuracy with class imbalance handling shows production-thinking, not just research"
+  ],
+  "weak_sections": ["experience", "summary"],
+  "strong_sections": ["projects", "skills", "education"],
+  "recruiter_first_impression": "Sees an IT professional transitioning into ML. Anchor project saves it from the reject pile but the IT history creates doubt about ML depth.",
+  "ats_concerns": [
+    "Employment gap may trigger ATS filters",
+    "Security tool keywords may mismatch ML role ATS profiles"
+  ],
+  "positioning_mismatch": "CV is currently positioned as an IT professional who does ML projects on the side. Target roles want an ML engineer who has some IT background.",
+  "score_pattern_analysis": "Experience relevance consistently lowest sub-score (avg ~55). Skills match consistently highest (avg ~85). Gap signals the positioning problem clearly.",
+  "top_recommendation": "Add a 3-line summary section to the CV today. It is the single change with the highest immediate impact on recruiter first impression."
+}

@@ -1,0 +1,59 @@
+{
+  "_note": "Sample ScoreResult from a real nj-cli scoring run. Personal data anonymised.",
+  "total_score": 81,
+  "confidence": 0.87,
+  "sub_scores": [
+    {
+      "category": "skills_match",
+      "score": 88,
+      "weight": 0.30,
+      "rationale": "PyTorch, EfficientNet, ViT, Grad-CAM all present — strong overlap",
+      "evidence": ["PyTorch skills", "Grad-CAM interpretability"]
+    },
+    {
+      "category": "experience_relevance",
+      "score": 62,
+      "weight": 0.25,
+      "rationale": "GastroVision directly relevant; IT roles drag score",
+      "evidence": ["medical image analysis", "computer vision team"]
+    },
+    {
+      "category": "role_alignment",
+      "score": 81,
+      "weight": 0.20,
+      "rationale": "CV engineer targeting ML role — strong trajectory match",
+      "evidence": ["ML Engineer", "computer vision"]
+    },
+    {
+      "category": "sponsorship_compatibility",
+      "score": 95,
+      "weight": 0.15,
+      "rationale": "H1B sponsorship explicitly offered",
+      "evidence": ["H1B sponsorship available"]
+    },
+    {
+      "category": "location_fit",
+      "score": 90,
+      "weight": 0.05,
+      "rationale": "Remote USA — ideal for OPT candidate",
+      "evidence": ["Remote (USA)"]
+    },
+    {
+      "category": "resume_strength",
+      "score": 74,
+      "weight": 0.05,
+      "rationale": "Strong project anchor; work history needs reframing",
+      "evidence": []
+    }
+  ],
+  "matched_skills": ["PyTorch", "EfficientNet", "ViT", "Grad-CAM", "Transfer Learning", "Docker"],
+  "missing_skills": ["MLflow", "Kubernetes", "W&B"],
+  "recommended_emphasis": [
+    "GastroVision project",
+    "medical imaging domain",
+    "Grad-CAM interpretability"
+  ],
+  "visa_compatible": true,
+  "visa_notes": "H1B sponsorship explicitly available — strong match for OPT candidate.",
+  "overall_rationale": "Strong technical match on CV skills with GastroVision being directly relevant to medical image analysis. Main drag is work history reading as IT support rather than ML engineering. Sponsorship confirmed."
+}
