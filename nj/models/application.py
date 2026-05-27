@@ -15,6 +15,17 @@ class ApplicationStatus(str, Enum):
     BOT_DETECTED = "bot_detected"
     SKIPPED_THRESHOLD = "skipped_threshold"
     SKIPPED_VISA = "skipped_visa"
+    INTERVIEWING = "interviewing"
+    OFFERED = "offered"
+    REJECTED = "rejected"
+
+
+class OutcomeType(str, Enum):
+    INTERVIEW = "interview"
+    REJECTION = "rejection"
+    OFFER = "offer"
+    NO_RESPONSE = "no_response"
+    UNKNOWN = "unknown"
 
 
 class ApplicationRecord(BaseModel):
@@ -28,6 +39,8 @@ class ApplicationRecord(BaseModel):
     error_message: str | None = None
     retry_count: int = 0
     screenshot_path: str | None = None
+    outcome: OutcomeType | None = None
+    outcome_recorded_at: datetime | None = None
 
     @classmethod
     def create(cls, job_id: str, score: int) -> "ApplicationRecord":

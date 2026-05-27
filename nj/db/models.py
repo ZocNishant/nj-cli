@@ -56,6 +56,8 @@ class ApplicationRecordORM(Base):
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     screenshot_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String, nullable=True)
+    outcome_recorded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class JobLabelORM(Base):

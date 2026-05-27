@@ -45,6 +45,28 @@ class ScoreRepo:
                     )
                 )
 
+    def get_all_scores(self) -> list[ScoreResult]:
+        with get_session(self.db_path) as session:
+            rows = session.query(ScoreResultORM).all()
+            return [
+                ScoreResult(
+                    job_id=r.job_id,
+                    total_score=r.total_score,
+                    confidence=r.confidence,
+                    sub_scores=[SubScore(**s) for s in (r.sub_scores or [])],
+                    matched_skills=r.matched_skills or [],
+                    missing_skills=r.missing_skills or [],
+                    recommended_emphasis=r.recommended_emphasis or [],
+                    visa_compatible=r.visa_compatible,
+                    visa_notes=r.visa_notes or "",
+                    overall_rationale=r.overall_rationale or "",
+                    scored_at=r.scored_at,
+                    provider=r.provider or "",
+                    prompt_version=r.prompt_version or "",
+                )
+                for r in rows
+            ]
+
     def get_score(self, job_id: str) -> ScoreResult | None:
         with get_session(self.db_path) as session:
             row = session.get(ScoreResultORM, job_id)

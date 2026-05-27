@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from nj.db.engine import get_session
 from nj.db.models import ApplicationRecordORM
-from nj.models.application import ApplicationRecord, ApplicationStatus
+from nj.models.application import ApplicationRecord, ApplicationStatus, OutcomeType
 
 
 class ApplicationRepo:
@@ -25,6 +25,8 @@ class ApplicationRepo:
                     error_message=record.error_message,
                     retry_count=record.retry_count,
                     screenshot_path=record.screenshot_path,
+                    outcome=record.outcome.value if record.outcome else None,
+                    outcome_recorded_at=record.outcome_recorded_at,
                 )
             )
 
@@ -35,6 +37,13 @@ class ApplicationRepo:
             q = session.query(ApplicationRecordORM)
             if status:
                 q = q.filter(ApplicationRecordORM.status == status.value)
+            return [self._to_model(r) for r in q.all()]
+
+    def get_applications_with_outcomes(self) -> list[ApplicationRecord]:
+        with get_session(self.db_path) as session:
+            q = session.query(ApplicationRecordORM).filter(
+                ApplicationRecordORM.outcome.isnot(None)
+            )
             return [self._to_model(r) for r in q.all()]
 
     def count_today(self) -> int:
@@ -59,6 +68,19 @@ class ApplicationRepo:
                     if hasattr(record, k):
                         setattr(record, k, v)
 
+    def record_outcome(self, job_id: str, outcome: OutcomeType) -> int:
+        with get_session(self.db_path) as session:
+            records = (
+                session.query(ApplicationRecordORM)
+                .filter(ApplicationRecordORM.job_id == job_id)
+                .all()
+            )
+            now = datetime.now(UTC).replace(tzinfo=None)
+            for r in records:
+                r.outcome = outcome.value
+                r.outcome_recorded_at = now
+            return len(records)
+
     def _to_model(self, orm: ApplicationRecordORM) -> ApplicationRecord:
         return ApplicationRecord(
             id=orm.id,
@@ -71,4 +93,6 @@ class ApplicationRepo:
             error_message=orm.error_message,
             retry_count=orm.retry_count,
             screenshot_path=orm.screenshot_path,
+            outcome=OutcomeType(orm.outcome) if orm.outcome else None,
+            outcome_recorded_at=orm.outcome_recorded_at,
         )

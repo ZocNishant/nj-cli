@@ -166,13 +166,20 @@ def label(
 def calibrate(
     db_path: str = typer.Option("data/nj.db", "--db"),
     config_path: str = typer.Option("config.yaml", "--config"),
+    from_outcomes: bool = typer.Option(
+        False, "--from-outcomes", help="Calibrate using real interview outcome data"
+    ),
 ) -> None:
     """Calibrate scoring threshold from scored jobs."""
-    from nj.cli.cmd_calibrate import run_calibrate
     from nj.models.config import Config
 
     config = Config.load(config_path)
-    run_calibrate(config=config, db_path=db_path, config_path=config_path)
+    if from_outcomes:
+        from nj.cli.cmd_calibrate import run_calibrate_from_outcomes
+        run_calibrate_from_outcomes(config=config, db_path=db_path, config_path=config_path)
+    else:
+        from nj.cli.cmd_calibrate import run_calibrate
+        run_calibrate(config=config, db_path=db_path, config_path=config_path)
 
 
 @app.command()

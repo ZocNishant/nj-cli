@@ -167,7 +167,7 @@ def update_application_statuses(
     db_path: str = "data/nj.db",
 ) -> int:
     from nj.db.repos.application_repo import ApplicationRepo
-    from nj.models.application import ApplicationStatus
+    from nj.models.application import ApplicationStatus, OutcomeType
 
     if not callbacks:
         return 0
@@ -180,6 +180,11 @@ def update_application_statuses(
         CallbackSignal.OFFER: ApplicationStatus.OFFERED,
         CallbackSignal.REJECTION: ApplicationStatus.REJECTED,
     }
+    signal_to_outcome = {
+        CallbackSignal.INTERVIEW: OutcomeType.INTERVIEW,
+        CallbackSignal.OFFER: OutcomeType.OFFER,
+        CallbackSignal.REJECTION: OutcomeType.REJECTION,
+    }
 
     for cb in callbacks:
         app = cb.get("application")
@@ -191,6 +196,9 @@ def update_application_statuses(
             continue
         try:
             app_repo.update_status(app.id, new_status)
+            outcome = signal_to_outcome.get(signal)
+            if outcome:
+                app_repo.record_outcome(app.job_id, outcome)
             updated += 1
             logger.info(
                 "application_status_updated",
