@@ -196,6 +196,38 @@ def run_pipeline(
                 generate_and_save_cover_letter(job, result, cv_base, provider, "output")
             )
 
+        from nj.models.quality import GateDecision
+        from nj.scoring.quality_gate import check_application_quality
+
+        gate = check_application_quality(
+            job=job,
+            tailored_cv=tailored_cv,
+            cover_letter=cover_path or "",
+            score=result,
+            config=config,
+        )
+
+        if gate.decision == GateDecision.BLOCKED:
+            if not silent:
+                console.print(
+                    f"  [red]✗ Blocked:[/red] "
+                    f"{job.title[:25]} @ {job.company[:20]} — "
+                    f"{gate.blocking_reasons[0] if gate.blocking_reasons else 'quality gate'}"
+                )
+            record = ApplicationRecord.create(job.id, result.total_score)
+            record.status = ApplicationStatus.FAILED
+            record.error_message = (
+                f"quality_gate_blocked: {'; '.join(gate.blocking_reasons)}"
+            )
+            app_repo.save_application(record)
+            continue
+
+        if gate.has_warnings and not silent:
+            console.print(
+                f"  [yellow]⚠ Warnings:[/yellow] "
+                f"{', '.join(gate.warnings[:2])}"
+            )
+
         record = ApplicationRecord.create(job.id, result.total_score)
 
         if config.apply.enabled and not dry_run:

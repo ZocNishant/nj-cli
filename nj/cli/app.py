@@ -205,6 +205,19 @@ def prep(
 
 
 @app.command()
+def quality(
+    job_id: str = typer.Option(None, "--job-id", "-j", help="Check a specific job by ID"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """Run quality gate check on tailored applications."""
+    from nj.cli.cmd_quality import run_quality_check
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_quality_check(config=config, job_id=job_id, db_path=db_path)
+
+
+@app.command()
 def frame(
     project_id: str = typer.Option(
         None, "--project", "-p", help="Project ID to frame (see nj frame --list)"
