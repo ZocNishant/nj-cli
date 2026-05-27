@@ -1,0 +1,33 @@
+{
+  "description": "Senior role mismatch — score should be moderate not high",
+  "job": {
+    "title": "Staff ML Engineer",
+    "description": "10+ years ML experience required. Staff level. Lead teams of 8+ engineers. Principal architect for ML infrastructure.",
+    "location": "San Francisco",
+    "source": "linkedin"
+  },
+  "cv_summary": {
+    "skills": {"ml_frameworks": ["PyTorch", "TensorFlow"]},
+    "projects": [
+      {
+        "name": "GastroVision",
+        "anchor": true,
+        "tech": ["PyTorch"],
+        "bullets": ["96% accuracy medical imaging."],
+        "priority": 1
+      }
+    ],
+    "experience": [],
+    "education": [
+      {
+        "degree": "MS Computer Science",
+        "institution": "USD",
+        "end": "December 2026"
+      }
+    ]
+  },
+  "expected_score_min": 20,
+  "expected_score_max": 65,
+  "expected_visa_compatible": true,
+  "notes": "Senior mismatch — grad student vs staff engineer. Score should be low-moderate."
+}

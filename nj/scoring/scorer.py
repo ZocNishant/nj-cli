@@ -192,6 +192,7 @@ async def score_job(
             result = _parse_response(response.content, job.id)
             if result:
                 result.provider = provider.name()
+                result.raw_response = response.content[:2000]
                 logger.info(
                     "scoring_complete",
                     job_id=job.id,

@@ -196,13 +196,21 @@ def update_intern() -> None:
 def logs(
     last_n: int = typer.Option(20, "--last", "-n"),
     log_file: str = typer.Option("logs/nj.log", "--file"),
+    stats: bool = typer.Option(False, "--stats", help="Show reliability statistics"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
-    """View recent nj logs."""
+    """View recent nj logs or reliability stats."""
     from nj.cli.cmd_logs import run_logs
     from nj.models.config import Config
 
     config = Config.load()
-    run_logs(config=config, last_n=last_n, log_file=log_file)
+    run_logs(
+        config=config,
+        last_n=last_n,
+        log_file=log_file,
+        show_stats=stats,
+        db_path=db_path,
+    )
 
 
 @app.command()

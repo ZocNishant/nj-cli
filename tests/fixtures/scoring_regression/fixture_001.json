@@ -1,0 +1,45 @@
+{
+  "description": "Strong CV/ML match with explicit H1B sponsorship",
+  "job": {
+    "title": "Computer Vision Engineer",
+    "description": "We need a CV engineer with PyTorch, EfficientNet, medical imaging experience. H1B sponsorship available. Remote USA.",
+    "location": "Remote USA",
+    "source": "remoteok"
+  },
+  "cv_summary": {
+    "skills": {
+      "ml_frameworks": ["PyTorch", "TensorFlow", "OpenCV"],
+      "deep_learning": ["EfficientNet", "ViT", "Transfer Learning", "Grad-CAM"]
+    },
+    "projects": [
+      {
+        "name": "GastroVision",
+        "anchor": true,
+        "tech": ["PyTorch", "EfficientNet", "ViT"],
+        "bullets": ["Achieved 96.11% accuracy on medical image classification."],
+        "priority": 1
+      }
+    ],
+    "experience": [
+      {
+        "title": "ML Intern",
+        "company": "Moffitt Cancer Center",
+        "status": "incoming",
+        "bullets": [],
+        "tags": ["ml", "medical_imaging"]
+      }
+    ],
+    "education": [
+      {
+        "degree": "MS Computer Science",
+        "institution": "University of South Dakota",
+        "end": "December 2026"
+      }
+    ]
+  },
+  "expected_score_min": 70,
+  "expected_score_max": 95,
+  "expected_visa_compatible": true,
+  "expected_matched_skills_include": ["PyTorch", "EfficientNet"],
+  "notes": "Strong profile match. Visa confirmed. Score should be high."
+}

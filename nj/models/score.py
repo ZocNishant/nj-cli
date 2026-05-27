@@ -54,6 +54,7 @@ class ScoreResult(BaseModel):
     scored_at: datetime
     provider: str = ""
     prompt_version: str = ""
+    raw_response: str | None = None
 
     @classmethod
     def compute_total(cls, sub_scores: list[SubScore]) -> int:

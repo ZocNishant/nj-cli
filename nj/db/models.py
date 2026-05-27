@@ -41,6 +41,7 @@ class ScoreResultORM(Base):
     scored_at: Mapped[datetime] = mapped_column(DateTime)
     provider: Mapped[str] = mapped_column(String, default="")
     prompt_version: Mapped[str] = mapped_column(String, default="")
+    raw_response: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
 
 class ApplicationRecordORM(Base):

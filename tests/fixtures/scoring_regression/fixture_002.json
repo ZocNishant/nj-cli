@@ -1,0 +1,19 @@
+{
+  "description": "No sponsorship job — should be visa blocked",
+  "job": {
+    "title": "ML Engineer",
+    "description": "Machine learning role. US citizens and permanent residents only. No visa sponsorship available.",
+    "location": "New York",
+    "source": "indeed"
+  },
+  "cv_summary": {
+    "skills": {"ml_frameworks": ["PyTorch"]},
+    "projects": [],
+    "experience": [],
+    "education": []
+  },
+  "expected_visa_compatible": false,
+  "expected_score_min": 0,
+  "expected_score_max": 100,
+  "notes": "Visa should be marked incompatible due to no-sponsorship language."
+}
