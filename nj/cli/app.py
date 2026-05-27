@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import typer
 
+__version__ = "1.2.0"
+
 app = typer.Typer(
     name="nj",
     help="AI-powered job hunting CLI",
@@ -16,11 +18,24 @@ def main(
         "--schedule",
         help="Set run schedule: N=days between runs, 0=disable, show=display",
     ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show nj-cli version and exit",
+        is_eager=True,
+    ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show detailed output including debug logs"
     ),
 ) -> None:
     """nj — AI-powered job hunting CLI by Nishant Joshi."""
+    if version:
+        from rich.console import Console as RC
+
+        RC().print(f"nj-cli [bold]{__version__}[/bold]")
+        raise typer.Exit()
+
     if verbose:
         from nj.utils.logger import set_verbose, setup_logger
 
@@ -54,7 +69,7 @@ def main(
 
 @app.command()
 def demo() -> None:
-    """Run an interactive demo — no API key or CV needed."""
+    """Interactive demo — see nj output without API key."""
     from nj.cli.cmd_demo import run_demo
 
     run_demo()
@@ -66,7 +81,7 @@ def init(
         "config.yaml", "--config", help="Path to config file"
     ),
 ) -> None:
-    """Initialize nj — first-time setup wizard."""
+    """First-time setup wizard — API keys, CV, email, schedule."""
     from nj.cli.cmd_init import run_init
 
     run_init(config_path=config_path)
@@ -78,7 +93,7 @@ def run(
     silent: bool = typer.Option(False, "--silent"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
-    """Run the full job hunting pipeline."""
+    """Full pipeline: scrape jobs, score, tailor CV, apply."""
     from nj.cli.cmd_run import run_pipeline
     from nj.models.config import Config
 
@@ -91,7 +106,7 @@ def search(
     dry_run: bool = typer.Option(False, "--dry-run"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
-    """Search and score jobs without applying."""
+    """Scrape and score jobs without applying — review first."""
     from nj.cli.cmd_search import run_search
     from nj.models.config import Config
 
@@ -105,7 +120,7 @@ def tailor(
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
 ) -> None:
-    """Tailor CV for a specific job URL."""
+    """Tailor your CV and generate cover letter for a job URL."""
     from nj.cli.cmd_tailor import run_tailor
     from nj.models.config import Config
 
@@ -120,7 +135,7 @@ def review(
     ),
     db_path: str = typer.Option("data/nj.db", "--db", help="Path to SQLite database"),
 ) -> None:
-    """Review scored jobs interactively before applying."""
+    """Interactively review scored jobs before applying."""
     from nj.cli.cmd_review import run_review
     from nj.models.config import Config
 
@@ -136,7 +151,7 @@ def status(
         None, "--update-status", help="New status value"
     ),
 ) -> None:
-    """Show application tracker dashboard."""
+    """Application tracker — history, scores, trajectory."""
     from nj.cli.cmd_status import run_status
     from nj.models.config import Config
 
@@ -154,7 +169,7 @@ def label(
     db_path: str = typer.Option("data/nj.db", "--db"),
     stats: bool = typer.Option(False, "--stats", help="Show label distribution stats"),
 ) -> None:
-    """Label jobs to build calibration dataset."""
+    """Label jobs yes/no/maybe to build calibration dataset."""
     from nj.cli.cmd_label import run_label
     from nj.models.config import Config
 
@@ -170,26 +185,51 @@ def calibrate(
         False, "--from-outcomes", help="Calibrate using real interview outcome data"
     ),
 ) -> None:
-    """Calibrate scoring threshold from scored jobs."""
+    """Tune score threshold from data or real interview outcomes."""
     from nj.models.config import Config
 
     config = Config.load(config_path)
     if from_outcomes:
         from nj.cli.cmd_calibrate import run_calibrate_from_outcomes
+
         run_calibrate_from_outcomes(config=config, db_path=db_path, config_path=config_path)
     else:
         from nj.cli.cmd_calibrate import run_calibrate
+
         run_calibrate(config=config, db_path=db_path, config_path=config_path)
 
 
 @app.command()
 def update_intern() -> None:
-    """Generate CV bullets from your internship description."""
+    """Add internship bullets to CV from plain English."""
     from nj.cli.cmd_update_intern import run_update_intern
     from nj.models.config import Config
 
     config = Config.load()
     run_update_intern(config=config)
+
+
+@app.command()
+def update_cv(
+    section: str = typer.Option(
+        None,
+        "--section",
+        "-s",
+        help=(
+            "Section to update: summary, skills, "
+            "research_interests, soft_skills, personal"
+        ),
+    ),
+    show: bool = typer.Option(
+        False, "--show", help="Show all editable sections and current values"
+    ),
+) -> None:
+    """Update CV sections interactively — no JSON editing needed."""
+    from nj.cli.cmd_update_cv import run_update_cv
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_update_cv(config=config, section=section, show=show)
 
 
 @app.command()
@@ -199,7 +239,7 @@ def logs(
     stats: bool = typer.Option(False, "--stats", help="Show reliability statistics"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
-    """View recent nj logs or reliability stats."""
+    """View recent logs or reliability stats."""
     from nj.cli.cmd_logs import run_logs
     from nj.models.config import Config
 
@@ -221,7 +261,7 @@ def prep(
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
 ) -> None:
-    """Generate interview prep PDF for a job."""
+    """Generate interview prep PDF for a specific job."""
     from nj.cli.cmd_prep import run_prep
     from nj.models.config import Config
 
@@ -241,7 +281,7 @@ def quality(
     job_id: str = typer.Option(None, "--job-id", "-j", help="Check a specific job by ID"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
-    """Run quality gate check on tailored applications."""
+    """Run pre-submit quality gate on tailored applications."""
     from nj.cli.cmd_quality import run_quality_check
     from nj.models.config import Config
 
@@ -287,7 +327,7 @@ def gaps(
         10, "--min-freq", help="Minimum % frequency to include a gap"
     ),
 ) -> None:
-    """Analyse skill gaps across all scored jobs — ranked by ROI."""
+    """Analyse skill gaps across scored jobs — ranked by ROI."""
     from nj.cli.cmd_gaps import run_gaps
     from nj.models.config import Config
 
@@ -303,7 +343,7 @@ def diagnose(
         False, "--no-pdf", help="Skip PDF generation, terminal output only"
     ),
 ) -> None:
-    """Diagnose your CV — find out why you are or are not getting interviews."""
+    """Diagnose your CV — find out why interviews are not coming."""
     from nj.cli.cmd_diagnose import run_diagnose
     from nj.models.config import Config
 
@@ -318,7 +358,7 @@ def watch(
     setup: bool = typer.Option(False, "--setup", help="Show Gmail OAuth2 setup instructions"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Detect callbacks without updating DB"),
 ) -> None:
-    """Scan Gmail for job callbacks and update application statuses."""
+    """Check Gmail for interview callbacks and offer signals."""
     from nj.cli.cmd_watch import run_watch
     from nj.models.config import Config
 
@@ -334,7 +374,7 @@ def config(
         False, "--check-provider", help="Test the configured LLM provider"
     ),
 ) -> None:
-    """View, edit, or check nj configuration."""
+    """View, edit, or test the configured LLM provider."""
     from nj.cli.cmd_config import run_config
     from nj.models.config import Config
 
