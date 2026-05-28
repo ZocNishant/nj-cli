@@ -1,39 +1,53 @@
 from __future__ import annotations
 
+import sys
+
 import typer
 
 __version__ = "1.2.0"
 
 app = typer.Typer(
     name="nj",
-    help="AI-powered job hunting CLI",
+    help="AI career operating system",
     no_args_is_help=True,
 )
 
 
-@app.callback()
+def main_entry() -> None:
+    """Entry point: bare 'nj' launches the interactive shell; anything
+    with arguments delegates to the Typer app as usual."""
+    if len(sys.argv) == 1:
+        from nj.cli.shell import run_shell
+
+        run_shell(version=__version__)
+    else:
+        app()
+
+
+@app.callback(invoke_without_command=True)
 def main(
-    schedule: str = typer.Option(
-        None,
-        "--schedule",
-        help="Set run schedule: N=days between runs, 0=disable, show=display",
-    ),
+    ctx: typer.Context,
     version: bool = typer.Option(
         False,
         "--version",
         "-V",
-        help="Show nj-cli version and exit",
+        help="Show version and exit",
         is_eager=True,
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed output including debug logs"
+        False, "--verbose", "-v", help="Show detailed debug output"
+    ),
+    schedule: str = typer.Option(
+        None,
+        "--schedule",
+        help="Set schedule: N=days, 0=disable, show=display",
     ),
 ) -> None:
-    """nj — AI-powered job hunting CLI by Nishant Joshi."""
+    """nj — AI career operating system."""
     if version:
         from rich.console import Console as RC
 
-        RC().print(f"nj-cli [bold]{__version__}[/bold]")
+        RC().print(f"nj-cli [bold]v{__version__}[/bold]")
         raise typer.Exit()
 
     if verbose:
@@ -43,11 +57,11 @@ def main(
         setup_logger(level="DEBUG", console_level="DEBUG")
 
     if schedule is not None:
-        from rich.console import Console
+        from rich.console import Console as RC2
 
         from nj.scheduler.manager import set_schedule, show_schedule
 
-        console = Console()
+        rc = RC2()
         if schedule == "show":
             show_schedule()
             raise typer.Exit()
@@ -55,16 +69,19 @@ def main(
             days = int(schedule)
             set_schedule(days)
             if days == 0:
-                console.print("[yellow]Schedule disabled.[/yellow]")
+                rc.print("[yellow]Schedule disabled.[/yellow]")
             else:
-                console.print(f"[green]Schedule set:[/green] every {days} day(s)")
+                rc.print(f"[green]Schedule set:[/green] every {days} day(s)")
             raise typer.Exit()
         except ValueError:
-            console.print(
-                f"[red]Invalid schedule value: {schedule}[/red]\n"
-                "Use a number (days) or 'show'."
-            )
+            rc.print(f"[red]Invalid:[/red] {schedule}")
             raise typer.Exit(1)
+
+    if ctx.invoked_subcommand is None:
+        from nj.cli.shell import run_shell
+
+        run_shell(version=__version__)
+        raise typer.Exit()
 
 
 @app.command()
@@ -364,6 +381,56 @@ def watch(
 
     config = Config.load()
     run_watch(config=config, db_path=db_path, days_back=days_back, setup=setup, dry_run=dry_run)
+
+
+@app.command()
+def diff(
+    job_id: str = typer.Option(
+        None, "--job-id", "-j",
+        help="Job ID to diff (first 8 chars work)",
+    ),
+    section: str = typer.Option(
+        None, "--section", "-s",
+        help="Section to diff: summary, skills, experience, projects",
+    ),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """Show exactly what changed between base CV and tailored CV."""
+    from nj.cli.cmd_diff import run_diff
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_diff(
+        config=config,
+        job_id=job_id,
+        section=section,
+        db_path=db_path,
+    )
+
+
+@app.command()
+def explain(
+    job_id: str = typer.Option(
+        None, "--job-id", "-j",
+        help="Job ID to explain (first 8 chars work too)",
+    ),
+    top_n: int = typer.Option(
+        10, "--top", "-n",
+        help="Show top N scored jobs when no ID given",
+    ),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """Explain exactly why a job scored the way it did."""
+    from nj.cli.cmd_explain import run_explain
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_explain(
+        config=config,
+        job_id=job_id,
+        top_n=top_n,
+        db_path=db_path,
+    )
 
 
 @app.command()

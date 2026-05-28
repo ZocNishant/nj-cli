@@ -14,3 +14,5 @@ dist/
 *.aux
 *.log
 .DS_Store
+data/
+*.db

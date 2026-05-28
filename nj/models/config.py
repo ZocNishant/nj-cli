@@ -76,6 +76,10 @@ class ScraperConfig(BaseModel):
     adzuna_enabled: bool = True
     remoteok_enabled: bool = True
     linkedin_enabled: bool = True
+    jsearch_enabled: bool = True
+    arbeitnow_enabled: bool = True
+    weworkremotely_enabled: bool = True
+    usajobs_enabled: bool = False
 
 
 class Config(BaseModel):

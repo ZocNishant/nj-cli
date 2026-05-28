@@ -11,7 +11,21 @@ llm:
   # freellmapi_model: auto
 
 scraper:
-  adzuna_enabled: true   # free API, aggregates Indeed + others
-  remoteok_enabled: true # always works, no auth needed
-  linkedin_enabled: true # requires LINKEDIN_LI_AT in .env
-  adzuna_country: us     # us, gb, au, ca, de, fr, etc.
+  # Free, no auth required
+  remoteok_enabled: true        # RemoteOK RSS — always works
+  weworkremotely_enabled: true  # WeWorkRemotely RSS — strong remote ML roles
+  arbeitnow_enabled: true       # Arbeitnow API — remote + European tech roles
+
+  # Free API, registration required
+  adzuna_enabled: true          # Adzuna — aggregates Indeed + others (1000 calls/day)
+  adzuna_country: us            # us, gb, au, ca, de, fr, etc.
+                                # credentials via ADZUNA_APP_ID / ADZUNA_APP_KEY in .env
+
+  # Paid API (free tier available)
+  jsearch_enabled: true         # JSearch (RapidAPI) — 30+ boards including LinkedIn, Glassdoor
+                                # free tier: 10 searches/day; set JSEARCH_API_KEY in .env
+
+  # Optional scrapers (disabled by default)
+  linkedin_enabled: true        # requires LINKEDIN_LI_AT cookie in .env
+  usajobs_enabled: false        # USAJobs.gov — federal ML/AI roles; opt-in only
+                                # set USAJOBS_API_KEY + USAJOBS_USER_AGENT in .env

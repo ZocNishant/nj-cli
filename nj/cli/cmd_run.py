@@ -20,6 +20,12 @@ def _get_enabled_scrapers(config: Config) -> list:
 
     scrapers = []
 
+    jsearch_key = os.getenv("JSEARCH_API_KEY", "")
+    if jsearch_key and config.scraper.jsearch_enabled:
+        from nj.scrapers.jsearch import JSearchScraper
+
+        scrapers.append(JSearchScraper(api_key=jsearch_key, visa_config=config.visa))
+
     li_at = os.getenv("LINKEDIN_LI_AT", "")
     if li_at and config.scraper.linkedin_enabled:
         from nj.scrapers.linkedin import LinkedInScraper
@@ -28,11 +34,11 @@ def _get_enabled_scrapers(config: Config) -> list:
             LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
         )
 
-    if config.scraper.adzuna_enabled:
+    adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
+    adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)
+    if adzuna_id and config.scraper.adzuna_enabled:
         from nj.scrapers.indeed import AdzunaScraper
 
-        adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
-        adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)
         scrapers.append(
             AdzunaScraper(
                 app_id=adzuna_id,
@@ -46,6 +52,29 @@ def _get_enabled_scrapers(config: Config) -> list:
         from nj.scrapers.remoteok import RemoteOKScraper
 
         scrapers.append(RemoteOKScraper(visa_config=config.visa))
+
+    if config.scraper.weworkremotely_enabled:
+        from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
+
+        scrapers.append(WeWorkRemotelyScraper(visa_config=config.visa))
+
+    if config.scraper.arbeitnow_enabled:
+        from nj.scrapers.arbeitnow import ArbeitnowScraper
+
+        scrapers.append(ArbeitnowScraper(visa_config=config.visa))
+
+    usajobs_key = os.getenv("USAJOBS_API_KEY", "")
+    usajobs_agent = os.getenv("USAJOBS_USER_AGENT", "")
+    if usajobs_key and usajobs_agent and config.scraper.usajobs_enabled:
+        from nj.scrapers.usajobs import USAJobsScraper
+
+        scrapers.append(
+            USAJobsScraper(
+                api_key=usajobs_key,
+                user_agent=usajobs_agent,
+                visa_config=config.visa,
+            )
+        )
 
     if not scrapers:
         from nj.scrapers.remoteok import RemoteOKScraper

@@ -49,6 +49,19 @@ def render_cv(
             raise RendererError("tectonic ran but PDF not found")
         pdf_dst = Path(output_dir) / f"{filename}.pdf"
         shutil.copy2(pdf_src, pdf_dst)
+
+        # Save tailored CV JSON for nj diff
+        import json as _json
+        json_dst = Path(output_dir) / f"{filename}.json"
+        try:
+            json_dst.write_text(
+                _json.dumps(cv_data, indent=2),
+                encoding="utf-8",
+            )
+            logger.debug("tailored_cv_json_saved", path=str(json_dst))
+        except Exception as e:
+            logger.warning("tailored_cv_json_save_failed", error=str(e))
+
         logger.info("pdf_rendered", path=str(pdf_dst))
         return str(pdf_dst)
 
