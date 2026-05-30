@@ -93,6 +93,10 @@ TIPS = [
     "nj watch → check Gmail for interview callbacks",
     "nj search --dry-run → scrape jobs without scoring (free)",
     "nj demo → see what nj produces without an API key",
+    "nj ml train → train sponsorship + salary models on USCIS data",
+    "nj intel company NAME → H1B history for any company",
+    "nj graph build → build your career knowledge graph",
+    "nj ml predict --company NAME --role TITLE → sponsorship probability",
 ]
 
 

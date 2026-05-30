@@ -54,7 +54,12 @@ def run_explain(
         )
         return
 
+    from nj.db.repos.enrichment_repo import EnrichmentRepo
+
+    enrichment_repo = EnrichmentRepo(db_path)
+    enrichment = enrichment_repo.get_enrichment(job.id)
     _display_full_explanation(job, score)
+    _display_enrichment(enrichment)
 
 
 def _show_top_jobs(job_repo, score_repo, top_n: int) -> None:
@@ -264,3 +269,71 @@ def _display_full_explanation(job, score) -> None:
         f"\n  [dim]Job ID: {job.id}[/dim]\n"
         f"  [dim]Run: nj tailor --url {job.url}[/dim]"
     )
+
+
+def _display_enrichment(enrichment: dict | None) -> None:
+    if not enrichment:
+        return
+    has_data = any(
+        [
+            enrichment.get("sponsorship"),
+            enrichment.get("salary"),
+            enrichment.get("uscis_profile"),
+            enrichment.get("semantic"),
+        ]
+    )
+    if not has_data:
+        return
+
+    console.print(Rule("[dim]Intelligence enrichment[/dim]"))
+
+    sponsor = enrichment.get("sponsorship")
+    if sponsor and sponsor.get("probability") is not None:
+        prob = sponsor["probability"]
+        tier = sponsor.get("tier", "")
+        color = "green" if prob >= 0.7 else "yellow" if prob >= 0.45 else "red"
+        bar_len = int(prob * 15)
+        bar = "█" * bar_len + "░" * (15 - bar_len)
+        console.print(
+            f"  [dim]ML sponsorship:[/dim] "
+            f"[{color}]{bar}[/{color}] "
+            f"[{color}]{prob:.1%}[/{color}] "
+            f"[dim]{tier}[/dim]"
+        )
+
+    uscis = enrichment.get("uscis_profile")
+    if uscis and uscis.get("total_petitions", 0) > 0:
+        tier = uscis.get("sponsor_tier", "UNKNOWN")
+        color = {"STRONG": "green", "MODERATE": "yellow", "WEAK": "red"}.get(
+            tier, "dim"
+        )
+        approval = uscis.get("approval_rate", 0)
+        ml_count = uscis.get("ml_ai_petitions", 0)
+        console.print(
+            f"  [dim]USCIS data:[/dim]    "
+            f"[{color}]{uscis['total_petitions']} petitions[/{color}] · "
+            f"[{color}]{approval}% approved[/{color}] · "
+            f"[dim]{ml_count} ML roles[/dim]"
+        )
+
+    salary = enrichment.get("salary")
+    if salary and salary.get("predicted_salary"):
+        pred = salary["predicted_salary"]
+        rng = salary.get("range") or {}
+        low = rng.get("low", 0)
+        high = rng.get("high", 0)
+        console.print(
+            f"  [dim]Salary est:[/dim]    "
+            f"[green]${pred:,}[/green] "
+            f"[dim](${low:,} – ${high:,})[/dim]"
+        )
+
+    semantic = enrichment.get("semantic")
+    if semantic and semantic.get("score") is not None:
+        score = semantic["score"]
+        color = "green" if score >= 70 else "yellow" if score >= 50 else "red"
+        console.print(
+            f"  [dim]Semantic match:[/dim] "
+            f"[{color}]{score}/100[/{color}] "
+            f"[dim]{semantic.get('interpretation', '')}[/dim]"
+        )

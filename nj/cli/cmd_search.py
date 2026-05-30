@@ -176,6 +176,18 @@ def run_search(
         f"\n[bold]{len(all_jobs)} new jobs found.[/bold] " f"Scoring now...\n"
     )
 
+    from nj.intel.enrichment import JobEnrichment
+    from nj.db.repos.enrichment_repo import EnrichmentRepo
+
+    enricher = JobEnrichment(db_path=db_path)
+    enrichment_repo = EnrichmentRepo(db_path=db_path)
+
+    if not is_verbose():
+        console.print("[dim]Enriching jobs with intel...[/dim]")
+    enrichments = enricher.enrich_batch(all_jobs, cv_base)
+    for job_id, enrichment in enrichments.items():
+        enrichment_repo.save_enrichment(job_id, enrichment)
+
     scored = []
     blocked = 0
     with Progress(
@@ -200,13 +212,14 @@ def run_search(
             scored.append((job, result))
             progress.advance(task)
 
-    _display_search_results(scored, blocked, dry_run)
+    _display_search_results(scored, blocked, dry_run, enrichments)
 
 
 def _display_search_results(
     scored: list,
     blocked: int,
     dry_run: bool,
+    enrichments: dict | None = None,
 ) -> None:
     if not scored:
         console.print(
@@ -215,26 +228,48 @@ def _display_search_results(
         )
         return
 
+    enrichments = enrichments or {}
+
     table = Table(
         title="Search results",
         box=box.ROUNDED,
         show_lines=False,
     )
     table.add_column("Score", width=7, justify="center")
+    table.add_column("Sponsor%", width=9, justify="center")
+    table.add_column("Salary est", width=12, justify="right")
     table.add_column("Visa", width=11)
-    table.add_column("Company", width=22)
-    table.add_column("Role", width=30)
-    table.add_column("Location", width=20)
+    table.add_column("Company", width=20)
+    table.add_column("Role", width=28)
 
     for job, result in sorted(scored, key=lambda x: x[1].total_score, reverse=True):
         score = result.total_score
         color = "green" if score >= 75 else "yellow" if score >= 60 else "red"
+
+        enrichment = enrichments.get(job.id, {})
+        sponsor = enrichment.get("sponsorship") or {}
+        salary_data = enrichment.get("salary") or {}
+
+        prob = sponsor.get("probability")
+        sponsor_str = f"{prob:.0%}" if prob is not None else "—"
+        sponsor_color = (
+            "green"
+            if prob and prob >= 0.7
+            else "yellow"
+            if prob and prob >= 0.45
+            else "dim"
+        )
+
+        salary_pred = salary_data.get("predicted_salary")
+        salary_str = f"${salary_pred // 1000}k" if salary_pred else "—"
+
         table.add_row(
             f"[{color}]{score}[/{color}]",
+            f"[{sponsor_color}]{sponsor_str}[/{sponsor_color}]",
+            salary_str,
             job.visa_label.value,
-            job.company[:22],
-            job.title[:30],
-            job.location[:20],
+            job.company[:20],
+            job.title[:28],
         )
 
     console.print(table)

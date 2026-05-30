@@ -71,6 +71,22 @@ class JobLabelORM(Base):
     score_at_label_time: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class JobEnrichmentORM(Base):
+    __tablename__ = "job_enrichments"
+
+    job_id: Mapped[str] = mapped_column(String, primary_key=True)
+    sponsorship_prob: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sponsorship_tier: Mapped[str | None] = mapped_column(String, nullable=True)
+    predicted_salary: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    salary_low: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    salary_high: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    semantic_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    uscis_petitions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uscis_approval_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    uscis_sponsor_tier: Mapped[str | None] = mapped_column(String, nullable=True)
+    enriched_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class GraphNodeORM(Base):
     __tablename__ = "graph_nodes"
 
