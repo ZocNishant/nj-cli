@@ -37,6 +37,8 @@ SHELL_COMMANDS = {
     "label":         "Label jobs for calibration dataset",
     "quality":       "Run quality gate on tailored applications",
     "watch":         "Check Gmail for interview callbacks",
+    "graph":         "Career knowledge graph — visualize your career",
+    "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
     "update-cv":     "Update CV sections interactively",
     "update-intern": "Add internship bullets to CV",
     "logs":          "View logs or reliability stats",
@@ -236,7 +238,7 @@ def _show_help() -> None:
     table.add_column("Description", style="dim")
 
     sections = {
-        "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame"],
+        "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame", "graph", "intel"],
         "Job hunting":  ["search", "run", "review", "tailor", "quality"],
         "Applications": ["status", "calibrate", "label", "watch", "prep"],
         "CV management": ["update-cv", "update-intern"],
@@ -289,6 +291,8 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "label":         "nj.cli.cmd_label:run_label",
         "quality":       "nj.cli.cmd_quality:run_quality_check",
         "watch":         "nj.cli.cmd_watch:run_watch",
+        "graph":         "nj.cli.cmd_graph:run_graph",
+        "intel":         "nj.cli.cmd_intel:run_intel",
         "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
         "logs":          "nj.cli.cmd_logs:run_logs",
@@ -389,6 +393,50 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             from nj.cli.cmd_config import run_config
 
             run_config(config=config, show=show, check_provider=check)
+            return True
+
+        if command == "graph":
+            sub = args[0] if args else "stats"
+            query_arg = args[1] if len(args) > 1 else ""
+            target = _get_flag(args, "--target") or _get_flag(args, "-t") or ""
+            from nj.cli.cmd_graph import run_graph
+
+            run_graph(
+                config=config,
+                subcommand=sub,
+                query=query_arg,
+                target=target,
+            )
+            return True
+
+        if command == "intel":
+            sub = args[0] if args else None
+            # Collect remaining positional args (non-flag) as query
+            query_parts = [
+                a for i, a in enumerate(args[1:])
+                if not a.startswith("-") and (
+                    i == 0 or not args[i].startswith("-")
+                )
+            ]
+            query_arg = " ".join(query_parts)
+            state = _get_flag(args, "--state") or _get_flag(args, "-s") or ""
+            year_str = _get_flag(args, "--year") or _get_flag(args, "-y") or "0"
+            limit_str = _get_flag(args, "--limit") or _get_flag(args, "-n") or "20"
+            try:
+                year = int(year_str)
+            except ValueError:
+                year = 0
+            try:
+                limit = int(limit_str)
+            except ValueError:
+                limit = 20
+            func(
+                subcommand=sub,
+                query=query_arg,
+                state=state,
+                year=year,
+                limit=limit,
+            )
             return True
 
         func(config=config)

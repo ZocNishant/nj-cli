@@ -434,6 +434,56 @@ def explain(
 
 
 @app.command()
+def graph(
+    subcommand: str = typer.Argument(
+        "stats",
+        help="build | show | stats | skills | companies | path",
+    ),
+    query: str = typer.Argument("", help="From node (for path command)"),
+    target: str = typer.Option(
+        "", "--target", "-t", help="Target node (for path command)"
+    ),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """Career knowledge graph — your career as connected data."""
+    from nj.cli.cmd_graph import run_graph
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_graph(
+        config=config,
+        subcommand=subcommand,
+        query=query,
+        target=target,
+        db_path=db_path,
+    )
+
+
+@app.command()
+def intel(
+    subcommand: str = typer.Argument(
+        None, help="sync | company | top | role | search | stats"
+    ),
+    query: str = typer.Argument("", help="Company name, role query, or search term"),
+    state: str = typer.Option("", "--state", "-s", help="Filter by state (e.g. CA, NY)"),
+    year: int = typer.Option(0, "--year", "-y", help="Filter by year (2022–2024)"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max results to show"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """H1B sponsorship intelligence — who sponsors ML/AI visas and for how much."""
+    from nj.cli.cmd_intel import run_intel
+
+    run_intel(
+        subcommand=subcommand,
+        query=query,
+        state=state,
+        year=year,
+        limit=limit,
+        db_path=db_path,
+    )
+
+
+@app.command()
 def config(
     show: bool = typer.Option(False, "--show", help="Print config to terminal"),
     config_path: str = typer.Option("config.yaml", "--path"),
