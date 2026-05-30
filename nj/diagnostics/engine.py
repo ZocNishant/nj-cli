@@ -15,18 +15,52 @@ class DiagnosticsError(Exception):
     pass
 
 
+def _build_graph_context(db_path: str) -> str:
+    try:
+        from nj.graph.repo import GraphRepo
+        repo = GraphRepo(db_path=db_path)
+        stats = repo.get_graph_stats()
+        if stats["total_nodes"] == 0:
+            return ""
+        skill_nodes = repo.get_nodes_by_type("skill")
+        company_nodes = repo.get_nodes_by_type("company")
+        top_skills = [n.label for n in skill_nodes[:15]]
+        companies = [n.label for n in company_nodes[:10]]
+        lines = [
+            f"Graph: {stats['total_nodes']} nodes, {stats['total_edges']} edges",
+        ]
+        if top_skills:
+            lines.append(f"Known skills: {', '.join(top_skills)}")
+        if companies:
+            lines.append(f"Companies applied: {', '.join(companies)}")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _build_score_context(recent_scores: list[dict]) -> str:
+    if not recent_scores:
+        return ""
+    avg = sum(s.get("total_score", 0) for s in recent_scores) / len(recent_scores)
+    return f"{len(recent_scores)} jobs scored, avg {avg:.1f}/100"
+
+
 async def diagnose_cv(
     cv_base: dict,
     config: Config,
     provider: BaseLLMProvider,
     recent_scores: list[dict] | None = None,
+    db_path: str = "data/nj.db",
 ) -> DiagnosisResult:
     logger.info("diagnosis_start", target_roles=config.search.roles)
+
+    graph_context = _build_graph_context(db_path)
 
     user_prompt = diagnosis_v1.build_user_prompt(
         cv_base=cv_base,
         target_roles=config.search.roles,
         recent_scores=recent_scores,
+        graph_context=graph_context,
     )
     request = LLMRequest(
         system=diagnosis_v1.SYSTEM_PROMPT,

@@ -62,6 +62,7 @@ def build_user_prompt(
     cv_base: dict,
     target_roles: list[str],
     recent_scores: list[dict] | None = None,
+    graph_context: str = "",
 ) -> str:
     import json
 
@@ -93,6 +94,10 @@ def build_user_prompt(
             )
         )
 
+    graph_section = ""
+    if graph_context:
+        graph_section = f"\nCAREER GRAPH CONTEXT:\n{graph_context}\n"
+
     return f"""Diagnose this candidate's CV for ML/AI/CV engineering roles.
 
 TARGET ROLES: {', '.join(target_roles)}
@@ -100,7 +105,7 @@ TARGET ROLES: {', '.join(target_roles)}
 CANDIDATE CV:
 {cv_json}
 {score_context}
-
+{graph_section}
 Provide a brutally honest diagnosis. Identify root causes of \
 interview failure or success. Be specific about every issue.
 Return only JSON."""

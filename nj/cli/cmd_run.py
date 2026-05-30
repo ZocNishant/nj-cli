@@ -307,6 +307,24 @@ def run_pipeline(
             record.cover_letter_path = cover_path
             record.status = ApplicationStatus.SUBMITTED
             app_repo.save_application(record)
+
+            # Auto-update career graph
+            try:
+                from nj.graph.builder import GraphBuilder
+
+                builder = GraphBuilder(db_path=db_path)
+                builder.add_job_application(
+                    job_title=job.title,
+                    company=job.company,
+                    score=result.total_score,
+                    matched_skills=result.matched_skills,
+                    missing_skills=result.missing_skills,
+                    outcome=None,
+                )
+                logger.debug("graph_updated", job_id=job.id, company=job.company)
+            except Exception as e:
+                logger.debug("graph_update_failed", error=str(e))
+
             rate_limiter.record_application()
             if not silent:
                 notifier.send_application_email(

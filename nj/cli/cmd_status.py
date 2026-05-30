@@ -112,6 +112,7 @@ def run_status(
 
     console.print(table)
     _print_stats(applications)
+    _print_enrichment_summary(db_path)
 
 
 def _print_stats(applications: list) -> None:
@@ -141,3 +142,59 @@ def _print_stats(applications: list) -> None:
     stats.add_row("Average score (applied)", f"{avg_score:.1f}")
     stats.add_row("Interviews", f"[blue]{interviews}[/blue]")
     console.print(Panel(stats, title="Stats", border_style="dim"))
+
+
+def _print_enrichment_summary(db_path: str) -> None:
+    try:
+        from nj.db.repos.enrichment_repo import EnrichmentRepo
+        from nj.graph.repo import GraphRepo
+        repo = EnrichmentRepo(db_path)
+        from nj.db.engine import get_engine
+        from sqlalchemy import text
+        engine = get_engine(db_path)
+        with engine.connect() as conn:
+            try:
+                enriched = conn.execute(
+                    text("SELECT COUNT(*) FROM job_enrichments")
+                ).scalar() or 0
+            except Exception:
+                enriched = 0
+
+        graph_stats = {}
+        try:
+            graph_repo = GraphRepo(db_path=db_path)
+            graph_stats = graph_repo.get_graph_stats()
+        except Exception:
+            pass
+
+        if enriched == 0 and not graph_stats.get("total_nodes"):
+            return
+
+        rows = []
+        if enriched > 0:
+            rows.append(("Jobs enriched", str(enriched)))
+
+        nodes = graph_stats.get("total_nodes", 0)
+        edges = graph_stats.get("total_edges", 0)
+        if nodes > 0:
+            rows.append(("Graph nodes", str(nodes)))
+            rows.append(("Graph edges", str(edges)))
+            node_types = graph_stats.get("node_types", {})
+            skills = node_types.get("skill", 0)
+            companies = node_types.get("company", 0)
+            if skills:
+                rows.append(("  Skills tracked", str(skills)))
+            if companies:
+                rows.append(("  Companies tracked", str(companies)))
+
+        if not rows:
+            return
+
+        intel_table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
+        intel_table.add_column(width=28, style="dim")
+        intel_table.add_column(width=10, justify="right")
+        for label, value in rows:
+            intel_table.add_row(label, value)
+        console.print(Panel(intel_table, title="Intelligence", border_style="dim"))
+    except Exception:
+        pass

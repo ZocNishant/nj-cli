@@ -206,6 +206,24 @@ def update_application_statuses(
                 company=app.company,
                 new_status=new_status,
             )
+            try:
+                from nj.graph.builder import GraphBuilder
+                from nj.db.repos.job_repo import JobRepo
+                builder = GraphBuilder(db_path=db_path)
+                job_repo = JobRepo(db_path)
+                jobs = job_repo.get_jobs()
+                job = next((j for j in jobs if j.id == app.job_id), None)
+                if job:
+                    builder.add_job_application(
+                        job_title=job.title,
+                        company=job.company,
+                        score=0,
+                        matched_skills=[],
+                        missing_skills=[],
+                        outcome=cb["signal"],
+                    )
+            except Exception:
+                pass
         except Exception as e:
             logger.warning("status_update_failed", app_id=app.id, error=str(e))
 

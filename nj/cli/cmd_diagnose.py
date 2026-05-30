@@ -80,7 +80,7 @@ def run_diagnose(
 
     try:
         result = asyncio.run(
-            diagnose_cv(cv_base, config, provider, recent_scores or None)
+            diagnose_cv(cv_base, config, provider, recent_scores or None, db_path=db_path)
         )
     except DiagnosticsError as e:
         console.print(f"[red]Diagnosis failed:[/red] {e}")
