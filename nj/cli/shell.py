@@ -37,6 +37,7 @@ SHELL_COMMANDS = {
     "label":         "Label jobs for calibration dataset",
     "quality":       "Run quality gate on tailored applications",
     "watch":         "Check Gmail for interview callbacks",
+    "ml":            "ML models — sponsorship, salary, semantic",
     "graph":         "Career knowledge graph — visualize your career",
     "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
     "update-cv":     "Update CV sections interactively",
@@ -238,7 +239,7 @@ def _show_help() -> None:
     table.add_column("Description", style="dim")
 
     sections = {
-        "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame", "graph", "intel"],
+        "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame", "graph", "intel", "ml"],
         "Job hunting":  ["search", "run", "review", "tailor", "quality"],
         "Applications": ["status", "calibrate", "label", "watch", "prep"],
         "CV management": ["update-cv", "update-intern"],
@@ -291,6 +292,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "label":         "nj.cli.cmd_label:run_label",
         "quality":       "nj.cli.cmd_quality:run_quality_check",
         "watch":         "nj.cli.cmd_watch:run_watch",
+        "ml":            "nj.cli.cmd_ml:run_ml",
         "graph":         "nj.cli.cmd_graph:run_graph",
         "intel":         "nj.cli.cmd_intel:run_intel",
         "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
@@ -393,6 +395,27 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             from nj.cli.cmd_config import run_config
 
             run_config(config=config, show=show, check_provider=check)
+            return True
+
+        if command == "ml":
+            sub = args[0] if args else "status"
+            company = _get_flag(args, "--company") or _get_flag(args, "-c") or ""
+            role_arg = _get_flag(args, "--role") or _get_flag(args, "-r") or ""
+            state = _get_flag(args, "--state") or "CA"
+            year_s = _get_flag(args, "--year")
+            year = int(year_s) if year_s else 2024
+            jid = _get_flag(args, "--job-id")
+            from nj.cli.cmd_ml import run_ml
+
+            run_ml(
+                config=config,
+                subcommand=sub,
+                company=company,
+                role=role_arg,
+                state=state,
+                year=year,
+                job_id=jid,
+            )
             return True
 
         if command == "graph":

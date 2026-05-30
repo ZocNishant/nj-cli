@@ -434,6 +434,36 @@ def explain(
 
 
 @app.command()
+def ml(
+    subcommand: str = typer.Argument(
+        "status",
+        help="status | train | predict | salary | semantic",
+    ),
+    company: str = typer.Option("", "--company", "-c"),
+    role: str = typer.Option("", "--role", "-r"),
+    state: str = typer.Option("CA", "--state", "-s"),
+    year: int = typer.Option(2024, "--year", "-y"),
+    job_id: str = typer.Option(None, "--job-id", "-j"),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """ML models — sponsorship probability, salary prediction, semantic matching."""
+    from nj.cli.cmd_ml import run_ml
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_ml(
+        config=config,
+        subcommand=subcommand,
+        company=company,
+        role=role,
+        state=state,
+        year=year,
+        job_id=job_id,
+        db_path=db_path,
+    )
+
+
+@app.command()
 def graph(
     subcommand: str = typer.Argument(
         "stats",
