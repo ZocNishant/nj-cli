@@ -97,6 +97,7 @@ TIPS = [
     "nj intel company NAME → H1B history for any company",
     "nj graph build → build your career knowledge graph",
     "nj ml predict --company NAME --role TITLE → sponsorship probability",
+    "nj postmortem → find out exactly why applications are failing",
 ]
 
 

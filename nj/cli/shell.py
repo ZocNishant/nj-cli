@@ -40,6 +40,7 @@ SHELL_COMMANDS = {
     "ml":            "ML models — sponsorship, salary, semantic",
     "graph":         "Career knowledge graph — visualize your career",
     "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
+    "postmortem":    "Analyse why applications are failing",
     "update-cv":     "Update CV sections interactively",
     "update-intern": "Add internship bullets to CV",
     "logs":          "View logs or reliability stats",
@@ -295,6 +296,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "ml":            "nj.cli.cmd_ml:run_ml",
         "graph":         "nj.cli.cmd_graph:run_graph",
         "intel":         "nj.cli.cmd_intel:run_intel",
+        "postmortem":    "nj.cli.cmd_postmortem:run_postmortem",
         "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
         "logs":          "nj.cli.cmd_logs:run_logs",
@@ -430,6 +432,12 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 query=query_arg,
                 target=target,
             )
+            return True
+
+        if command == "postmortem":
+            min_apps = int(_get_flag(args, "--min") or 3)
+            from nj.cli.cmd_postmortem import run_postmortem
+            run_postmortem(config=config, min_applications=min_apps)
             return True
 
         if command == "intel":

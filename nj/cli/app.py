@@ -514,6 +514,26 @@ def intel(
 
 
 @app.command()
+def postmortem(
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    min_applications: int = typer.Option(
+        3, "--min",
+        help="Minimum applications needed for analysis",
+    ),
+) -> None:
+    """Analyse application failure patterns — why are you not getting interviews."""
+    from nj.cli.cmd_postmortem import run_postmortem
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_postmortem(
+        config=config,
+        db_path=db_path,
+        min_applications=min_applications,
+    )
+
+
+@app.command()
 def config(
     show: bool = typer.Option(False, "--show", help="Print config to terminal"),
     config_path: str = typer.Option("config.yaml", "--path"),
