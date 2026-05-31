@@ -192,6 +192,24 @@ def run_pipeline(
                 f"({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)\n"
             )
 
+    from nj.scoring.ghost_filter import GhostJobFilter
+
+    ghost_filter = GhostJobFilter(enabled=True, max_age_days=45)
+    new_jobs, ghost_jobs = ghost_filter.filter_jobs(new_jobs)
+
+    if ghost_jobs and not silent:
+        if not is_verbose():
+            console.print(
+                f"  [dim]Ghost filter: {len(ghost_jobs)} jobs removed "
+                f"({len(new_jobs)} remaining)[/dim]\n"
+            )
+        else:
+            console.print(f"  [dim]Ghost filter removed {len(ghost_jobs)} jobs:[/dim]")
+            for job, result in ghost_jobs[:5]:
+                console.print(
+                    f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]"
+                )
+
     if not new_jobs:
         if not silent:
             console.print("[yellow]No new jobs to process.[/yellow]")

@@ -168,6 +168,23 @@ def run_search(
             + "[/dim]"
         )
 
+    from nj.scoring.ghost_filter import GhostJobFilter
+
+    ghost_filter = GhostJobFilter(enabled=True, max_age_days=45)
+    all_jobs, ghost_jobs = ghost_filter.filter_jobs(all_jobs)
+
+    if ghost_jobs and not is_verbose():
+        console.print(
+            f"[dim]Ghost filter: {len(ghost_jobs)} jobs removed "
+            f"({len(all_jobs)} remaining)[/dim]"
+        )
+    elif ghost_jobs and is_verbose():
+        console.print(f"[dim]Ghost filter removed {len(ghost_jobs)} jobs:[/dim]")
+        for job, result in ghost_jobs[:5]:
+            console.print(
+                f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]"
+            )
+
     if not all_jobs:
         console.print("[yellow]No new jobs found.[/yellow]")
         return
