@@ -78,6 +78,13 @@ class NJCompleter:
         "update-intern": [],
         "postmortem": [],
         "demo": [],
+        "manual": list({
+            "search", "enrich", "explain", "diagnose", "gaps", "frame",
+            "diff", "postmortem", "intel", "graph", "ml", "prep", "review",
+            "status", "calibrate", "watch", "tailor", "update-cv",
+            "update-intern", "init", "run", "demo", "logs", "config",
+            "quality", "label", "manual",
+        }),
         "help": [],
         "clear": [],
         "exit": [],
@@ -156,6 +163,7 @@ SHELL_COMMANDS = {
     "update-intern": "Add internship bullets to CV",
     "logs":          "View logs or reliability stats",
     "config":        "View or edit configuration",
+    "manual":        "Full command reference with examples",
     "demo":          "Run interactive demo",
     "help":          "Show all commands",
     "clear":         "Clear the screen",
@@ -364,7 +372,7 @@ def _show_help() -> None:
         "Job hunting":  ["search", "run", "review", "tailor", "quality"],
         "Applications": ["status", "calibrate", "label", "watch", "prep"],
         "CV management": ["update-cv", "update-intern"],
-        "System": ["logs", "config", "demo", "help", "clear", "exit"],
+        "System": ["logs", "config", "manual", "demo", "help", "clear", "exit"],
     }
 
     for section, cmds in sections.items():
@@ -422,6 +430,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
         "logs":          "nj.cli.cmd_logs:run_logs",
         "demo":          "nj.cli.cmd_demo:run_demo",
+        "manual":        "nj.cli.cmd_help_full:run_manual",
     }
 
     if command not in COMMAND_MAP:
@@ -566,6 +575,12 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             min_apps = int(_get_flag(args, "--min") or 3)
             from nj.cli.cmd_postmortem import run_postmortem
             run_postmortem(config=config, min_applications=min_apps)
+            return True
+
+        if command == "manual":
+            cmd_arg = args[0] if args else None
+            from nj.cli.cmd_help_full import run_manual
+            run_manual(command=cmd_arg)
             return True
 
         if command == "intel":

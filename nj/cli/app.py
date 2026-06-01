@@ -550,6 +550,18 @@ def postmortem(
 
 
 @app.command()
+def manual(
+    command: str = typer.Argument(None, help="Command to get help for"),
+) -> None:
+    """Full command reference — every flag and example."""
+    from nj.cli.cmd_help_full import run_manual
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_manual(config=config, command=command)
+
+
+@app.command()
 def config(
     show: bool = typer.Option(False, "--show", help="Print config to terminal"),
     config_path: str = typer.Option("config.yaml", "--path"),
