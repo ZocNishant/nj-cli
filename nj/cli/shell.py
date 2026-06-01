@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import random
+import readline
 import shlex
 import sys
 from datetime import datetime, UTC
@@ -20,6 +21,115 @@ from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
 console = Console()
+
+
+class NJCompleter:
+    """
+    Tab completer for nj interactive shell.
+    Completes:
+    - Command names
+    - Subcommands (intel sync, graph build, ml train...)
+    - --flags for each command
+    - File paths for URL arguments
+    """
+
+    SUBCOMMANDS = {
+        "intel": ["sync", "top", "company", "role", "search", "stats"],
+        "graph": ["build", "show", "stats", "skills", "companies", "path"],
+        "ml": ["train", "predict", "salary", "semantic", "status"],
+        "calibrate": ["--from-outcomes"],
+        "logs": ["--stats", "--last"],
+        "status": ["--no-trajectory"],
+        "search": ["--dry-run", "--verbose"],
+        "run": ["--dry-run", "--silent"],
+        "diagnose": ["--no-pdf"],
+        "gaps": ["--top"],
+        "frame": [
+            "--list",
+            "--audience production_ml",
+            "--audience research_lab",
+            "--audience healthtech_startup",
+            "--audience big_tech",
+            "--audience early_stage_startup",
+            "--audience custom",
+        ],
+        "prep": ["--last", "--job-id", "--url"],
+        "explain": ["--top"],
+        "diff": [
+            "--section skills",
+            "--section experience",
+            "--section projects",
+            "--section summary",
+        ],
+        "enrich": ["--no-score"],
+        "update-cv": [
+            "--show",
+            "--section summary",
+            "--section skills",
+            "--section personal",
+            "--section research_interests",
+        ],
+        "config": ["--show", "--check-provider"],
+        "tailor": [],
+        "review": [],
+        "label": [],
+        "quality": [],
+        "watch": ["--setup", "--days"],
+        "update-intern": [],
+        "postmortem": [],
+        "demo": [],
+        "help": [],
+        "clear": [],
+        "exit": [],
+        "quit": [],
+    }
+
+    def __init__(self, commands: list[str]):
+        self.commands = sorted(commands)
+        self.matches: list[str] = []
+
+    def complete(self, text: str, state: int) -> str | None:
+        if state == 0:
+            self.matches = self._get_matches(text)
+        try:
+            return self.matches[state]
+        except IndexError:
+            return None
+
+    def _get_matches(self, text: str) -> list[str]:
+        line = readline.get_line_buffer()
+        parts = line.split()
+
+        if len(parts) == 0 or (len(parts) == 1 and not line.endswith(" ")):
+            return [c + " " for c in self.commands if c.startswith(text)]
+
+        first_word = parts[0].lower()
+        if first_word in self.SUBCOMMANDS:
+            subs = self.SUBCOMMANDS[first_word]
+            if len(parts) == 1 and line.endswith(" "):
+                return subs
+            elif len(parts) >= 2:
+                current = parts[-1] if not line.endswith(" ") else ""
+                return [s for s in subs if s.startswith(current)]
+
+        return []
+
+
+def _setup_readline(completer: NJCompleter) -> None:
+    try:
+        readline.set_completer(completer.complete)
+        readline.set_completer_delims(" \t\n")
+        doc = getattr(readline, "__doc__", "") or ""
+        if "libedit" in doc:
+            readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            readline.parse_and_bind("tab: complete")
+        readline.parse_and_bind('"\\e[A": history-search-backward')
+        readline.parse_and_bind('"\\e[B": history-search-forward')
+        logger.debug("readline_setup_complete")
+    except Exception as e:
+        logger.debug("readline_setup_failed", error=str(e))
+
 
 SHELL_COMMANDS = {
     "search":        "Scrape and score jobs",
@@ -231,6 +341,10 @@ def _render_splash(stats: dict, version: str) -> None:
         f"  [dim]v{version} · "
         f"type [bold]help[/bold] to see commands · "
         f"[bold]exit[/bold] to quit[/dim]"
+    )
+    console.print(
+        "  [dim]Tab to complete · ↑↓ for history · "
+        "[bold]help[/bold] for commands[/dim]"
     )
     console.print()
 
@@ -529,6 +643,17 @@ def run_shell(version: str = "1.2.0") -> None:
     except Exception:
         config = Config()
 
+    completer = NJCompleter(list(SHELL_COMMANDS.keys()))
+    _setup_readline(completer)
+
+    history_path = Path.home() / ".nj_history"
+    try:
+        if history_path.exists():
+            readline.read_history_file(str(history_path))
+        readline.set_history_length(500)
+    except Exception:
+        pass
+
     _boot_sequence()
     stats = _get_stats()
     _render_splash(stats, version)
@@ -565,6 +690,11 @@ def run_shell(version: str = "1.2.0") -> None:
 
     except Exception as e:
         console.print(f"[red]Shell error:[/red] {e}")
+
+    try:
+        readline.write_history_file(str(history_path))
+    except Exception:
+        pass
 
     console.print()
     console.print(Panel(
