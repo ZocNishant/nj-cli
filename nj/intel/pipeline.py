@@ -14,9 +14,9 @@ from nj.utils.logger import get_logger
 logger = get_logger(__name__)
 
 USCIS_DATA_URLS: dict[int, str] = {
-    2022: "https://www.uscis.gov/sites/default/files/document/data/H-1B_Disclosure_Data_FY2022_Q4.csv",
-    2023: "https://www.uscis.gov/sites/default/files/document/data/H-1B_Disclosure_Data_FY2023_Q4.csv",
-    2024: "https://www.uscis.gov/sites/default/files/document/data/H-1B_Disclosure_Data_FY2024_Q4.csv",
+    2023: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2023.csv",
+    2022: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2022.csv",
+    2024: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2024.csv",
 }
 
 ML_AI_KEYWORDS: set[str] = {
@@ -122,92 +122,46 @@ def parse_uscis_csv(csv_path: Path, year: int) -> list[dict[str, Any]]:
 def _parse_uscis_row(
     row: dict[str, str], year: int, source_file: str
 ) -> dict[str, Any] | None:
-    employer = (
-        row.get("EMPLOYER_NAME")
-        or row.get("PETITIONER_NAME")
-        or row.get("employer_name")
-        or ""
-    ).strip()
-    if not employer:
+    try:
+        employer = (row.get("Employer") or "").strip()
+
+        if not employer:
+            return None
+
+        initial_approval = int(row.get("Initial Approval") or 0)
+        initial_denial = int(row.get("Initial Denial") or 0)
+        continuing_approval = int(row.get("Continuing Approval") or 0)
+        continuing_denial = int(row.get("Continuing Denial") or 0)
+
+        total_approved = initial_approval + continuing_approval
+        total_denied = initial_denial + continuing_denial
+        total = total_approved + total_denied
+
+        if total == 0:
+            return None
+
+        state = (row.get("State") or "").strip()
+        city = (row.get("City") or "").strip()
+
+        case_status = "Certified" if total_approved > 0 else "Denied"
+
+        return {
+            "employer_name": employer,
+            "employer_name_normalized": normalize_company(employer),
+            "job_title": "H1B Employee",
+            "job_title_normalized": "h1b employee",
+            "wage_from": None,
+            "wage_to": None,
+            "wage_unit": "Year",
+            "case_status": case_status,
+            "year": year,
+            "worksite_state": state,
+            "worksite_city": city,
+            "is_ml_role": False,
+            "source_file": source_file,
+            # petition counts — stripped before ORM insert
+            "total_approved": total_approved,
+            "total_denied": total_denied,
+        }
+    except Exception:
         return None
-
-    title = (
-        row.get("JOB_TITLE")
-        or row.get("SOC_TITLE")
-        or row.get("job_title")
-        or ""
-    ).strip()
-
-    status = (
-        row.get("CASE_STATUS")
-        or row.get("case_status")
-        or ""
-    ).strip()
-
-    wage_from_raw = (
-        row.get("WAGE_RATE_OF_PAY_FROM")
-        or row.get("PREVAILING_WAGE")
-        or row.get("wage_from")
-        or None
-    )
-    wage_to_raw = row.get("WAGE_RATE_OF_PAY_TO") or row.get("wage_to") or None
-    wage_unit_raw = (
-        row.get("WAGE_UNIT_OF_PAY")
-        or row.get("wage_unit")
-        or "Year"
-    ).strip()
-
-    wage_from = parse_wage(wage_from_raw)
-    wage_to = parse_wage(wage_to_raw)
-
-    # Annualize hourly wages
-    unit_lower = wage_unit_raw.lower()
-    if unit_lower in ("hour", "hr", "hourly"):
-        if wage_from is not None:
-            wage_from = wage_from * 2080
-        if wage_to is not None:
-            wage_to = wage_to * 2080
-        wage_unit = "year"
-    elif unit_lower in ("week", "weekly"):
-        if wage_from is not None:
-            wage_from = wage_from * 52
-        if wage_to is not None:
-            wage_to = wage_to * 52
-        wage_unit = "year"
-    elif unit_lower in ("month", "monthly", "bi-weekly"):
-        if wage_from is not None:
-            wage_from = wage_from * 12
-        if wage_to is not None:
-            wage_to = wage_to * 12
-        wage_unit = "year"
-    else:
-        wage_unit = "year"
-
-    state = (
-        row.get("WORKSITE_STATE")
-        or row.get("EMPLOYER_STATE")
-        or row.get("worksite_state")
-        or ""
-    ).strip().upper()
-    city = (
-        row.get("WORKSITE_CITY")
-        or row.get("EMPLOYER_CITY")
-        or row.get("worksite_city")
-        or ""
-    ).strip().title()
-
-    return {
-        "employer_name": employer,
-        "employer_name_normalized": normalize_company(employer),
-        "job_title": title,
-        "job_title_normalized": normalize_title(title),
-        "wage_from": wage_from,
-        "wage_to": wage_to,
-        "wage_unit": wage_unit,
-        "case_status": status,
-        "year": year,
-        "worksite_state": state,
-        "worksite_city": city,
-        "is_ml_role": is_ml_role(title),
-        "source_file": source_file,
-    }

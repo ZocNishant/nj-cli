@@ -34,6 +34,15 @@ class IntelRepo:
     # Write
     # ------------------------------------------------------------------
 
+    _ORM_FIELDS = frozenset({
+        "employer_name", "employer_name_normalized",
+        "job_title", "job_title_normalized",
+        "wage_from", "wage_to", "wage_unit",
+        "case_status", "year",
+        "worksite_state", "worksite_city",
+        "is_ml_role", "source_file",
+    })
+
     def bulk_insert_petitions(
         self, records: list[dict[str, Any]], batch_size: int = 1000
     ) -> int:
@@ -42,7 +51,8 @@ class IntelRepo:
             for i in range(0, len(records), batch_size):
                 batch = records[i : i + batch_size]
                 for rec in batch:
-                    orm = H1BPetitionORM(**rec)
+                    orm_rec = {k: v for k, v in rec.items() if k in self._ORM_FIELDS}
+                    orm = H1BPetitionORM(**orm_rec)
                     session.add(orm)
                 session.flush()
                 inserted += len(batch)
@@ -80,68 +90,94 @@ class IntelRepo:
             return [_company_to_dict(r) for r in rows]
 
     def get_company_profile(self, company_name: str) -> dict[str, Any] | None:
-        from nj.intel.pipeline import normalize_company
-
-        norm = normalize_company(company_name)
+        normalized = company_name.lower().strip()[:20]
         with get_session(self._db_path) as session:
-            # Try exact normalized match first, then partial
-            row = session.execute(
-                select(CompanyIntelORM).where(
-                    CompanyIntelORM.name_normalized == norm
+            rows = (
+                session.execute(
+                    select(H1BPetitionORM).where(
+                        H1BPetitionORM.employer_name_normalized.contains(normalized)
+                    )
                 )
-            ).scalar_one_or_none()
+                .scalars()
+                .all()
+            )
 
-            if row is None:
-                row = session.execute(
-                    select(CompanyIntelORM)
-                    .where(CompanyIntelORM.name_normalized.like(f"%{norm}%"))
-                    .order_by(CompanyIntelORM.total_petitions.desc())
-                    .limit(1)
-                ).scalar_one_or_none()
+            if not rows:
+                return {}
 
-            if row is None:
-                return None
+            # Aggregate across years
+            total_approved = 0
+            total_denied = 0
+            years: set[int] = set()
+            states: list[str] = []
 
-            return _company_to_dict(row)
+            for r in rows:
+                if "certif" in r.case_status.lower():
+                    total_approved += 1
+                else:
+                    total_denied += 1
+                years.add(r.year)
+                if r.worksite_state:
+                    states.append(r.worksite_state)
+
+            total = total_approved + total_denied
+            approval_rate = total_approved / total * 100 if total > 0 else 0.0
+            sponsor_tier = _compute_sponsor_tier(total, approval_rate, 0)
+
+            from collections import Counter
+            state_counts = Counter(states)
+            top_states = [s for s, _ in state_counts.most_common(5)]
+
+            return {
+                "company": rows[0].employer_name,
+                "total_petitions": total,
+                "approved": total_approved,
+                "denied": total_denied,
+                "approval_rate": round(approval_rate, 1),
+                "ml_ai_petitions": 0,
+                "median_salary": None,
+                "sponsor_tier": sponsor_tier,
+                "top_roles": [],
+                "years_active": sorted(years),
+                "top_states": top_states,
+            }
 
     def get_top_ml_sponsors(
-        self, state: str = "", year: int = 0, limit: int = 20
+        self,
+        state: str | None = None,
+        year: int | None = None,
+        limit: int = 20,
     ) -> list[dict[str, Any]]:
         with get_session(self._db_path) as session:
             stmt = (
-                select(CompanyIntelORM)
-                .where(CompanyIntelORM.ml_ai_petitions > 0)
-                .order_by(CompanyIntelORM.ml_ai_petitions.desc())
+                select(
+                    H1BPetitionORM.employer_name,
+                    func.count(H1BPetitionORM.id).label("total"),
+                )
+                .where(H1BPetitionORM.case_status.contains("Certif"))
+            )
+            if state:
+                stmt = stmt.where(
+                    H1BPetitionORM.worksite_state == state.upper()
+                )
+            if year:
+                stmt = stmt.where(H1BPetitionORM.year == year)
+            stmt = (
+                stmt.group_by(H1BPetitionORM.employer_name)
+                .order_by(text("total DESC"))
                 .limit(limit)
             )
-            rows = session.execute(stmt).scalars().all()
-            results = [_company_to_dict(r) for r in rows]
+            results = session.execute(stmt).all()
 
-        if state:
-            state_upper = state.upper()
-            # Re-filter by state using petition-level data
-            with get_session(self._db_path) as session:
-                stmt2 = (
-                    select(
-                        H1BPetitionORM.employer_name_normalized,
-                        func.count().label("cnt"),
-                    )
-                    .where(
-                        H1BPetitionORM.is_ml_role == True,  # noqa: E712
-                        H1BPetitionORM.worksite_state == state_upper,
-                    )
-                    .group_by(H1BPetitionORM.employer_name_normalized)
-                    .order_by(text("cnt DESC"))
-                    .limit(limit)
-                )
-                if year:
-                    stmt2 = stmt2.where(H1BPetitionORM.year == year)
-                rows2 = session.execute(stmt2).all()
-                norm_names = {r.employer_name_normalized for r in rows2}
-
-            results = [r for r in results if r["name_normalized"] in norm_names]
-
-        return results[:limit]
+            return [
+                {
+                    "company": r.employer_name,
+                    "total_ml_petitions": r.total,
+                    "avg_salary": None,
+                    "sponsor_tier": _compute_sponsor_tier(r.total, 80, 0),
+                }
+                for r in results
+            ]
 
     def get_role_sponsorship(
         self, role_query: str, limit: int = 15

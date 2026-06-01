@@ -1,8 +1,6 @@
 """Unit tests for the H1B intelligence pipeline."""
 from __future__ import annotations
 
-import pytest
-
 from nj.intel.pipeline import (
     normalize_company,
     normalize_title,
@@ -109,55 +107,66 @@ def test_parse_wage_non_numeric():
 
 def test_parse_uscis_row_valid():
     row = {
-        "EMPLOYER_NAME": "Google LLC",
-        "JOB_TITLE": "Machine Learning Engineer",
-        "CASE_STATUS": "Certified",
-        "WAGE_RATE_OF_PAY_FROM": "150000",
-        "WAGE_RATE_OF_PAY_TO": "200000",
-        "WAGE_UNIT_OF_PAY": "Year",
-        "WORKSITE_STATE": "CA",
-        "WORKSITE_CITY": "Mountain View",
+        "Employer": "Google LLC",
+        "Initial Approval": "120",
+        "Initial Denial": "5",
+        "Continuing Approval": "80",
+        "Continuing Denial": "2",
+        "State": "CA",
+        "City": "Mountain View",
     }
     result = _parse_uscis_row(row, year=2023, source_file="test.csv")
     assert result is not None
     assert result["employer_name"] == "Google LLC"
-    assert result["job_title"] == "Machine Learning Engineer"
-    assert result["wage_from"] == 150_000.0
+    assert result["job_title"] == "H1B Employee"
+    assert result["case_status"] == "Certified"
     assert result["year"] == 2023
-    assert result["is_ml_role"] is True
+    assert result["is_ml_role"] is False
     assert result["worksite_state"] == "CA"
     assert result["source_file"] == "test.csv"
+    assert result["wage_from"] is None
 
 
-def test_parse_uscis_row_hourly_annualized():
+def test_parse_uscis_row_denied_when_no_approvals():
     row = {
-        "EMPLOYER_NAME": "Acme Corp",
-        "JOB_TITLE": "Data Scientist",
-        "CASE_STATUS": "Certified",
-        "WAGE_RATE_OF_PAY_FROM": "60",
-        "WAGE_RATE_OF_PAY_TO": "80",
-        "WAGE_UNIT_OF_PAY": "Hour",
-        "WORKSITE_STATE": "NY",
-        "WORKSITE_CITY": "New York",
+        "Employer": "Tiny Corp",
+        "Initial Approval": "0",
+        "Initial Denial": "3",
+        "Continuing Approval": "0",
+        "Continuing Denial": "1",
+        "State": "NY",
+        "City": "Albany",
     }
     result = _parse_uscis_row(row, year=2022, source_file="test.csv")
     assert result is not None
-    assert result["wage_from"] == pytest.approx(60 * 2080)
-    assert result["wage_to"] == pytest.approx(80 * 2080)
-    assert result["wage_unit"] == "year"
+    assert result["case_status"] == "Denied"
 
 
 def test_parse_uscis_row_missing_employer_returns_none():
     row = {
-        "EMPLOYER_NAME": "",
-        "JOB_TITLE": "Software Engineer",
-        "CASE_STATUS": "Certified",
-        "WAGE_RATE_OF_PAY_FROM": "100000",
-        "WAGE_UNIT_OF_PAY": "Year",
-        "WORKSITE_STATE": "WA",
-        "WORKSITE_CITY": "Seattle",
+        "Employer": "",
+        "Initial Approval": "10",
+        "Initial Denial": "0",
+        "Continuing Approval": "5",
+        "Continuing Denial": "0",
+        "State": "WA",
+        "City": "Seattle",
     }
     result = _parse_uscis_row(row, year=2023, source_file="test.csv")
+    assert result is None
+
+
+def test_parse_uscis_row_zero_total_returns_none():
+    row = {
+        "Employer": "Ghost Corp",
+        "Initial Approval": "0",
+        "Initial Denial": "0",
+        "Continuing Approval": "0",
+        "Continuing Denial": "0",
+        "State": "TX",
+        "City": "Austin",
+    }
+    result = _parse_uscis_row(row, year=2024, source_file="test.csv")
     assert result is None
 
 

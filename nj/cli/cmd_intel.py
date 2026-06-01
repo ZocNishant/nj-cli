@@ -91,7 +91,7 @@ def _run_company(company_name: str, db_path: str) -> None:
         return
 
     profile = repo.get_company_profile(company_name)
-    if profile is None:
+    if not profile:
         console.print(
             f"\n[yellow]No data found for:[/yellow] {company_name}\n"
             f"  Try [bold]intel search {company_name.split()[0].lower()}[/bold] "
@@ -106,7 +106,7 @@ def _run_company(company_name: str, db_path: str) -> None:
     console.print()
     console.print(
         Panel(
-            f"[bold]{profile['name']}[/bold]",
+            f"[bold]{profile['company']}[/bold]",
             subtitle=f"[{tier_color}]{tier}[/{tier_color}] sponsor",
             border_style=tier_color.replace("bold ", ""),
         )
@@ -116,32 +116,22 @@ def _run_company(company_name: str, db_path: str) -> None:
     table.add_column("Field", style="dim", width=22)
     table.add_column("Value", style="bold")
 
-    approval_pct = f"{profile['approval_rate'] * 100:.1f}%"
-    med_sal = (
-        f"${profile['median_salary']:,.0f}" if profile["median_salary"] else "N/A"
-    )
+    approval_pct = f"{profile['approval_rate']:.1f}%"
 
     table.add_row("Sponsor tier", f"{tier_icon} {tier}")
-    table.add_row("Total petitions", f"{profile['total_petitions']:,}")
-    table.add_row("Approved", f"{profile['approved_petitions']:,}")
-    table.add_row("Denied", f"{profile['denied_petitions']:,}")
+    table.add_row("Total employer records", f"{profile['total_petitions']:,}")
+    table.add_row("Approved records", f"{profile['approved']:,}")
+    table.add_row("Denied records", f"{profile['denied']:,}")
     table.add_row("Approval rate", approval_pct)
-    table.add_row("ML/AI petitions", f"{profile['ml_ai_petitions']:,}")
-    table.add_row("Median salary", med_sal)
     table.add_row(
         "Years active",
         ", ".join(str(y) for y in profile["years_active"]) or "N/A",
     )
     table.add_row(
         "States",
-        ", ".join(profile["states"][:6]) or "N/A",
+        ", ".join(profile["top_states"][:6]) or "N/A",
     )
     console.print(table)
-
-    if profile["top_roles"]:
-        console.print("  [dim]Top roles:[/dim]")
-        for role in profile["top_roles"][:5]:
-            console.print(f"    [dim]·[/dim] {role}")
     console.print()
 
 
@@ -167,22 +157,16 @@ def _run_top(state: str, year: int, limit: int, db_path: str) -> None:
     table.add_column("#", style="dim", width=4)
     table.add_column("Company", style="bold", min_width=28)
     table.add_column("Tier", width=10)
-    table.add_column("ML Petitions", justify="right", width=14)
-    table.add_column("Approval %", justify="right", width=11)
-    table.add_column("Avg Salary", justify="right", width=11)
+    table.add_column("Employer Records", justify="right", width=17)
 
     for i, r in enumerate(results, 1):
         tier = r["sponsor_tier"]
         tier_str = TIER_ICONS.get(tier, tier)
-        approval = f"{r['approval_rate'] * 100:.0f}%"
-        salary = f"${r['avg_salary']:,.0f}" if r.get("avg_salary") else "N/A"
         table.add_row(
             str(i),
-            r["name"],
+            r["company"],
             tier_str,
-            str(r["ml_ai_petitions"]),
-            approval,
-            salary,
+            str(r["total_ml_petitions"]),
         )
 
     console.print()
