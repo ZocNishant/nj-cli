@@ -98,6 +98,7 @@ TIPS = [
     "nj graph build → build your career knowledge graph",
     "nj ml predict --company NAME --role TITLE → sponsorship probability",
     "nj postmortem → find out exactly why applications are failing",
+    "nj enrich <url> → instant intelligence on any job URL",
 ]
 
 

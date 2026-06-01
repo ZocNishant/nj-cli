@@ -40,6 +40,7 @@ SHELL_COMMANDS = {
     "ml":            "ML models — sponsorship, salary, semantic",
     "graph":         "Career knowledge graph — visualize your career",
     "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
+    "enrich":        "Full intelligence report for any job URL",
     "postmortem":    "Analyse why applications are failing",
     "update-cv":     "Update CV sections interactively",
     "update-intern": "Add internship bullets to CV",
@@ -301,6 +302,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "ml":            "nj.cli.cmd_ml:run_ml",
         "graph":         "nj.cli.cmd_graph:run_graph",
         "intel":         "nj.cli.cmd_intel:run_intel",
+        "enrich":        "nj.cli.cmd_enrich:run_enrich",
         "postmortem":    "nj.cli.cmd_postmortem:run_postmortem",
         "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
@@ -437,6 +439,13 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 query=query_arg,
                 target=target,
             )
+            return True
+
+        if command == "enrich":
+            url_arg = args[0] if args else None
+            no_score = "--no-score" in args
+            from nj.cli.cmd_enrich import run_enrich
+            run_enrich(config=config, url=url_arg, no_score=no_score)
             return True
 
         if command == "postmortem":

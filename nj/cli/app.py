@@ -514,6 +514,22 @@ def intel(
 
 
 @app.command()
+def enrich(
+    url: str = typer.Argument(None, help="Job URL to analyze"),
+    no_score: bool = typer.Option(
+        False, "--no-score", help="Skip AI scoring (faster, no API credits)"
+    ),
+    db_path: str = typer.Option("data/nj.db", "--db"),
+) -> None:
+    """Instant intelligence report for any job URL."""
+    from nj.cli.cmd_enrich import run_enrich
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_enrich(config=config, url=url, no_score=no_score, db_path=db_path)
+
+
+@app.command()
 def postmortem(
     db_path: str = typer.Option("data/nj.db", "--db"),
     min_applications: int = typer.Option(
