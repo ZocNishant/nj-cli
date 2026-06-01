@@ -156,27 +156,58 @@ def run_pipeline(
     if not silent:
         console.print("[dim]Phase 1: Scraping...[/dim]")
     scrapers = _get_enabled_scrapers(config)
+    import inspect
+    import time
+
+    async def _scrape_one(scraper) -> tuple[str, list]:
+        try:
+            if inspect.iscoroutinefunction(scraper.scrape):
+                jobs = await scraper.scrape(
+                    config.search.roles,
+                    config.search.primary_region,
+                )
+            else:
+                jobs = await asyncio.to_thread(
+                    scraper.scrape,
+                    config.search.roles,
+                    config.search.primary_region,
+                )
+            logger.info("scraper_done", scraper=scraper.name(), count=len(jobs))
+            return scraper.name(), jobs
+        except Exception as e:
+            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
+            return scraper.name(), []
+
+    async def _scrape_all() -> dict[str, list]:
+        results = await asyncio.gather(
+            *[_scrape_one(s) for s in scrapers], return_exceptions=True
+        )
+        output = {}
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning("scraper_gather_failed", error=str(result))
+                continue
+            name, jobs = result
+            output[name] = jobs
+        return output
+
+    t_scrape_start = time.monotonic()
+    scraper_results = asyncio.run(_scrape_all())
+    t_scrape_elapsed = round(time.monotonic() - t_scrape_start, 1)
+
     all_raw_jobs: list = []
     counts: dict[str, int] = {}
-    for scraper in scrapers:
-        try:
-            fetched = scraper.scrape(
-                roles=config.search.roles,
-                location=config.search.primary_region,
-            )
-            counts[scraper.name()] = len(fetched)
-            all_raw_jobs.extend(fetched)
-            logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
-        except Exception as e:
-            counts[scraper.name()] = 0
-            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
+    for name, jobs in scraper_results.items():
+        counts[name] = len(jobs)
+        all_raw_jobs.extend(jobs)
     new_jobs = dedup.filter_new(all_raw_jobs)
     for job in new_jobs:
         job_repo.save_job(job)
     if not silent:
         if not is_verbose():
             console.print(
-                f"  [green]✓[/green] [bold]{len(new_jobs)}[/bold] new jobs  "
+                f"  [green]✓[/green] [bold]{len(new_jobs)}[/bold] new jobs in "
+                f"[cyan]{t_scrape_elapsed}s[/cyan]  "
                 f"[dim]({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)[/dim]"
             )
             console.print(

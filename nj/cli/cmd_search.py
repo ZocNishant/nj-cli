@@ -124,49 +124,69 @@ def run_search(
 
     from nj.utils.logger import is_verbose
 
-    all_jobs = []
-    counts: dict[str, int] = {}
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Scraping jobs...", total=None)
-        all_raw_jobs = []
-        for scraper in scrapers:
-            try:
-                progress.update(task, description=f"Scraping {scraper.name()}...")
-                fetched = scraper.scrape(
-                    roles=config.search.roles,
-                    location=config.search.primary_region,
+    import asyncio
+    import inspect
+    import time
+
+    async def _scrape_one(scraper) -> tuple[str, list]:
+        try:
+            if inspect.iscoroutinefunction(scraper.scrape):
+                jobs = await scraper.scrape(
+                    config.search.roles,
+                    config.search.primary_region,
                 )
-                counts[scraper.name()] = len(fetched)
-                all_raw_jobs.extend(fetched)
-                logger.info("scraper_done", scraper=scraper.name(), count=len(fetched))
-            except Exception as e:
-                counts[scraper.name()] = 0
-                logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
-        new_jobs = dedup.filter_new(all_raw_jobs)
-        for job in new_jobs:
-            job_repo.save_job(job)
-        all_jobs.extend(new_jobs)
-        progress.update(
-            task,
-            description=f"Scraped {len(new_jobs)} new jobs from {len(scrapers)} sources",
+            else:
+                jobs = await asyncio.to_thread(
+                    scraper.scrape,
+                    config.search.roles,
+                    config.search.primary_region,
+                )
+            logger.info("scraper_done", scraper=scraper.name(), count=len(jobs))
+            return scraper.name(), jobs
+        except Exception as e:
+            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
+            return scraper.name(), []
+
+    async def _scrape_all() -> dict[str, list]:
+        results = await asyncio.gather(
+            *[_scrape_one(s) for s in scrapers], return_exceptions=True
         )
+        output = {}
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning("scraper_gather_failed", error=str(result))
+                continue
+            name, jobs = result
+            output[name] = jobs
+        return output
+
+    t_start = time.monotonic()
+    scraper_results = asyncio.run(_scrape_all())
+    t_elapsed = round(time.monotonic() - t_start, 1)
+
+    all_raw_jobs: list = []
+    counts: dict[str, int] = {}
+    for name, jobs in scraper_results.items():
+        counts[name] = len(jobs)
+        all_raw_jobs.extend(jobs)
+
+    new_jobs = dedup.filter_new(all_raw_jobs)
+    for job in new_jobs:
+        job_repo.save_job(job)
+    all_jobs = list(new_jobs)
 
     if not is_verbose():
-        console.print(
-            f"\n[green]✓[/green] Scraped [bold]{len(all_raw_jobs)}[/bold] jobs  "
-            f"[dim]({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)[/dim]"
+        total = sum(counts.values())
+        sources = " · ".join(
+            f"{name}={count}" for name, count in counts.items() if count > 0
         )
         console.print(
-            "[dim]Sources: "
-            + " · ".join(
-                f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers
-            )
-            + "[/dim]"
+            f"\n[green]✓[/green] Scraped [bold]{total}[/bold] jobs in "
+            f"[cyan]{t_elapsed}s[/cyan]  "
+            f"[dim]({len(all_raw_jobs) - len(new_jobs)} dupes skipped)[/dim]"
         )
+        if sources:
+            console.print(f"[dim]Sources: {sources}[/dim]")
 
     from nj.scoring.ghost_filter import GhostJobFilter
 
@@ -205,29 +225,53 @@ def run_search(
     for job_id, enrichment in enrichments.items():
         enrichment_repo.save_enrichment(job_id, enrichment)
 
-    scored = []
-    blocked = 0
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Scoring...", total=len(all_jobs))
-        for job in all_jobs:
-            if visa_filter.should_skip(job):
-                blocked += 1
-                progress.advance(task)
-                continue
-            if dry_run:
-                progress.advance(task)
-                continue
-            result = asyncio.run(score_job(job, cv_base, config, provider, score_repo))
-            from nj.models.job import JobStatus
+    from asyncio import Semaphore
+    from nj.models.job import JobStatus
 
-            job.status = JobStatus.PENDING_REVIEW
-            job_repo.update_job_status(job.id, JobStatus.PENDING_REVIEW)
-            scored.append((job, result))
-            progress.advance(task)
+    jobs_to_score = [j for j in all_jobs if not visa_filter.should_skip(j)]
+    blocked = len(all_jobs) - len(jobs_to_score)
+
+    if dry_run:
+        _display_search_results([], blocked, dry_run, enrichments)
+        return
+
+    async def _score_all_jobs(
+        jobs: list,
+        semaphore: Semaphore,
+    ) -> list:
+        async def _score_one(job):
+            async with semaphore:
+                try:
+                    return job, await score_job(
+                        job=job,
+                        cv_base=cv_base,
+                        config=config,
+                        provider=provider,
+                        repo=score_repo,
+                    )
+                except Exception as e:
+                    logger.warning("score_failed", job_id=job.id, error=str(e))
+                    return None
+
+        results = await asyncio.gather(*[_score_one(j) for j in jobs])
+        return [r for r in results if r is not None]
+
+    sem = Semaphore(5)
+    t_score_start = time.monotonic()
+    score_pairs = asyncio.run(_score_all_jobs(jobs_to_score, sem))
+    t_score_elapsed = round(time.monotonic() - t_score_start, 1)
+
+    scored = []
+    for job, result in score_pairs:
+        job.status = JobStatus.PENDING_REVIEW
+        job_repo.update_job_status(job.id, JobStatus.PENDING_REVIEW)
+        scored.append((job, result))
+
+    if not is_verbose():
+        console.print(
+            f"[green]✓[/green] Scored [bold]{len(scored)}[/bold] jobs in "
+            f"[cyan]{t_score_elapsed}s[/cyan]"
+        )
 
     _display_search_results(scored, blocked, dry_run, enrichments)
 

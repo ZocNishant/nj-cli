@@ -126,10 +126,15 @@ TAGLINES = [
 def _boot_sequence() -> None:
     import time
 
+    t_start = time.monotonic()
     console.print()
     for msg in BOOT_MESSAGES:
         console.print(f"  [dim cyan][ * ][/dim cyan] [dim]{msg}[/dim]")
         time.sleep(0.08)
+    t_elapsed = round(time.monotonic() - t_start, 1)
+    console.print(
+        f"  [dim cyan][ ✓ ][/dim cyan] [dim]ready in {t_elapsed}s[/dim]"
+    )
     console.print()
 
 
