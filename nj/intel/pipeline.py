@@ -16,8 +16,13 @@ logger = get_logger(__name__)
 USCIS_DATA_URLS: dict[int, str] = {
     2023: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2023.csv",
     2022: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2022.csv",
-    2024: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2024.csv",
+    2021: "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-2021.csv",
 }
+
+USCIS_URL_PATTERNS: list[str] = [
+    "https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-{year}.csv",
+    "https://www.uscis.gov/sites/default/files/document/data/H-1B_Disclosure_Data_FY{year}_Q4.csv",
+]
 
 ML_AI_KEYWORDS: set[str] = {
     "machine learning",
@@ -72,29 +77,48 @@ def parse_wage(wage_str: str | None) -> float | None:
         return None
 
 
-def download_uscis_data(year: int, data_dir: str = "data/intel") -> Path:
-    url = USCIS_DATA_URLS.get(year)
-    if not url:
-        raise ValueError(f"No USCIS data URL for year {year}")
+def download_uscis_data(
+    year: int,
+    data_dir: str = "data/intel",
+) -> Path | None:
+    Path(data_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(data_dir) / f"h1b_{year}.csv"
 
-    dest_dir = Path(data_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    if output_path.exists():
+        logger.info("h1b_data_cached", year=year)
+        return output_path
 
-    filename = url.split("/")[-1]
-    dest = dest_dir / filename
+    urls_to_try: list[str] = []
+    if year in USCIS_DATA_URLS:
+        urls_to_try.append(USCIS_DATA_URLS[year])
+    for pattern in USCIS_URL_PATTERNS:
+        url = pattern.format(year=year)
+        if url not in urls_to_try:
+            urls_to_try.append(url)
 
-    if dest.exists():
-        logger.info("uscis_data_cached", year=year, path=str(dest))
-        return dest
+    for url in urls_to_try:
+        logger.info("trying_uscis_url", year=year, url=url)
+        try:
+            with httpx.stream(
+                "GET", url, timeout=60, follow_redirects=True
+            ) as r:
+                if r.status_code == 404:
+                    continue
+                r.raise_for_status()
+                with open(output_path, "wb") as f:
+                    for chunk in r.iter_bytes(chunk_size=8192):
+                        f.write(chunk)
+            size = output_path.stat().st_size
+            logger.info("uscis_data_downloaded", year=year, size=size)
+            return output_path
+        except Exception as e:
+            logger.debug("uscis_url_failed", url=url, error=str(e))
+            if output_path.exists():
+                output_path.unlink()
+            continue
 
-    logger.info("downloading_uscis_data", year=year, url=url)
-    with httpx.Client(timeout=120, follow_redirects=True) as client:
-        response = client.get(url)
-        response.raise_for_status()
-        dest.write_bytes(response.content)
-
-    logger.info("uscis_data_downloaded", year=year, size=dest.stat().st_size)
-    return dest
+    logger.warning("h1b_data_unavailable", year=year)
+    return None
 
 
 def parse_uscis_csv(csv_path: Path, year: int) -> list[dict[str, Any]]:

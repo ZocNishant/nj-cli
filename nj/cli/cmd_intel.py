@@ -58,11 +58,12 @@ def _show_intel_help() -> None:
 
 
 def _run_sync(db_path: str, year: int = 0) -> None:
-    from nj.intel.pipeline import USCIS_DATA_URLS, download_uscis_data, parse_uscis_csv
+    from nj.intel.pipeline import download_uscis_data, parse_uscis_csv
     from nj.db.repos.intel_repo import IntelRepo
 
     repo = IntelRepo(db_path)
-    years_to_sync = [year] if year else list(USCIS_DATA_URLS.keys())
+    years = [2023, 2022, 2021]
+    years_to_sync = [year] if year else years
 
     for y in years_to_sync:
         if repo.petitions_exist_for_year(y):
@@ -71,6 +72,9 @@ def _run_sync(db_path: str, year: int = 0) -> None:
         console.print(f"  [cyan]Downloading {y} USCIS data...[/cyan]")
         try:
             csv_path = download_uscis_data(y)
+            if csv_path is None:
+                console.print(f"  [yellow]✗ {y}:[/yellow] data unavailable — skipping")
+                continue
             console.print(f"  [dim]Parsing {csv_path.name}...[/dim]")
             records = parse_uscis_csv(csv_path, y)
             count = repo.bulk_insert_petitions(records)
