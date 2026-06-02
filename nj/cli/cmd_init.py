@@ -33,8 +33,8 @@ _SPONSORSHIP_STATUSES = [
 ]
 
 
-def run_init(config_path: str = "config.yaml") -> None:
-    if Path(config_path).exists():
+def run_init(config_path: str = "config.yaml", force: bool = False) -> None:
+    if not force and Path(config_path).exists():
         overwrite = Confirm.ask(
             "[yellow]nj is already initialized.[/yellow] "
             "Re-run setup and overwrite existing config?"

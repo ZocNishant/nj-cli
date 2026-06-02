@@ -80,6 +80,7 @@ class NJCompleter:
         "label": [],
         "quality": [],
         "watch": ["--setup", "--days"],
+        "init": ["--force"],
         "update-role": [],
         "update-intern": [],
         "postmortem": [],
@@ -193,8 +194,9 @@ SHELL_COMMANDS = {
     "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
     "enrich":        "Full intelligence report for any job URL",
     "postmortem":    "Analyse why applications are failing",
+    "init":          "First-time setup wizard",
     "update-cv":     "Update CV sections interactively",
-    "update-role":   "Generate CV bullets for any experience entry",
+    "update-role":   "Add any new role/job to your CV",
     "update-intern": "Alias for update-role (backward-compatible)",
     "logs":          "View logs or reliability stats",
     "config":        "View or edit configuration",
@@ -478,6 +480,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "enrich":        "nj.cli.cmd_enrich:run_enrich",
         "postmortem":    "nj.cli.cmd_postmortem:run_postmortem",
         "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
+        "init":          "nj.cli.cmd_init:run_init",
         "update-role":   "nj.cli.cmd_update_role:run_update_role",
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
         "logs":          "nj.cli.cmd_logs:run_logs",
@@ -677,6 +680,17 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 limit=limit,
             )
             _show_success(command)
+            return True
+
+        if command == "init":
+            from nj.cli.cmd_init import run_init
+            force = "--force" in args
+            run_init(force=force)
+            return True
+
+        if command == "update-role":
+            from nj.cli.cmd_update_role import run_update_role
+            run_update_role(config=config)
             return True
 
         func(config=config)
