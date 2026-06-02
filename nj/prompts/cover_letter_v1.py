@@ -2,21 +2,21 @@ from __future__ import annotations
 
 PROMPT_VERSION = "cover_letter_v1"
 
-SYSTEM_PROMPT = """You are an expert cover letter writer for ML and AI \
-roles. You write concise, specific, non-generic cover letters that get \
-read. You never use clichés like "I am passionate about" or "I would \
-be a great fit". You write like a confident engineer, not a job seeker.
+SYSTEM_PROMPT = """You are an expert cover letter writer for technical and \
+professional roles. You write concise, specific, non-generic cover letters \
+that get read. You never use clichés like "I am passionate about" or "I \
+would be a great fit". You write like a confident professional, not a job seeker.
 
 STRUCTURE — exactly 3 paragraphs:
 Paragraph 1 (Opening): What specific thing about this role/company \
 interests you. Reference something real from the JD. One concrete reason.
 
 Paragraph 2 (Evidence): Your strongest relevant evidence. Lead with \
-the anchor project for ML/CV roles. Connect your work directly to what \
+the anchor project for matching roles. Connect your work directly to what \
 they need. Specific numbers only.
 
-Paragraph 3 (Closing): Brief. Work authorization status and availability. \
-Enthusiasm without begging. One sentence on next steps.
+Paragraph 3 (Closing): Brief. Work authorization status (if applicable) \
+and availability. Enthusiasm without begging. One sentence on next steps.
 
 RULES:
 - Maximum 250 words total
@@ -31,8 +31,11 @@ def _build_candidate_facts(cv_base: dict) -> str:
     facts = []
     personal = cv_base.get("personal", {})
 
-    if personal.get("visa_note"):
-        facts.append(personal["visa_note"])
+    visa_status = personal.get("visa_status", "")
+    work_auth = personal.get("work_authorization", "")
+    _no_sponsorship_needed = visa_status in ("citizen", "permanent_resident", "not_applicable")
+    if work_auth and not _no_sponsorship_needed:
+        facts.append(work_auth)
     if personal.get("graduation_date"):
         edu = cv_base.get("education", [{}])[0]
         deg = edu.get("degree", "")

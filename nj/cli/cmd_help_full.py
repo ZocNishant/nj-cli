@@ -277,15 +277,13 @@ COMMAND_REFERENCE = {
         ],
         "notes": "Saves to cv/cv_base.json. Complex sections (skills dict) suggest editing JSON directly.",
     },
-    "update-intern": {
-        "description": "Generate CV bullets from plain English internship description.",
-        "flags": [
-            ("--db PATH", "Database path"),
-        ],
+    "update-role": {
+        "description": "Generate CV bullets for any experience entry from plain English.",
+        "flags": [],
         "examples": [
-            ("nj update-intern", "Interactive bullet generator"),
+            ("nj update-role", "Interactive bullet generator for any role"),
         ],
-        "notes": "Prompts for plain English description → Claude generates 3-4 bullets → preview + confirm → saves to cv_base.json.",
+        "notes": "Select an experience entry, describe your work in plain English → Claude generates 3-4 ATS-friendly bullets → preview + confirm → saves to cv_base.json.",
     },
     "init": {
         "description": "First-time setup wizard — API keys, CV import, email, schedule.",
@@ -443,7 +441,7 @@ def _show_full_manual() -> None:
         "Job discovery": ["search", "enrich", "tailor", "review", "quality"],
         "Data & ML": ["intel", "graph", "ml"],
         "Applications": ["run", "status", "calibrate", "label", "watch", "prep"],
-        "CV management": ["update-cv", "update-intern"],
+        "CV management": ["update-cv", "update-role"],
         "System": ["init", "demo", "logs", "config", "manual"],
     }
 

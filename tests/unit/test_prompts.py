@@ -5,7 +5,8 @@ from nj.prompts import cover_letter_v1, intern_update_v1, scoring_v1, tailoring_
 _SAMPLE_CV = {
     "personal": {
         "name": "Alex Smith",
-        "visa_note": "F-1 OPT eligible June 2026",
+        "visa_status": "opt",
+        "work_authorization": "F-1 OPT eligible June 2026",
         "graduation_date": "June 2026",
     },
     "education": [{"degree": "MSCS", "institution": "State University"}],

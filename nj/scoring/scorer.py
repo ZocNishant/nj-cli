@@ -65,7 +65,8 @@ def _build_full_cv_summary(cv_base: dict) -> dict:
     return {
         "personal": {
             "name": personal.get("name", ""),
-            "visa_note": personal.get("visa_note", ""),
+            "visa_status": personal.get("visa_status", ""),
+            "work_authorization": personal.get("work_authorization", ""),
             "graduation_date": personal.get("graduation_date", ""),
         },
         "all_skills": all_skills,

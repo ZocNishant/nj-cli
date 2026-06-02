@@ -2,9 +2,8 @@ from __future__ import annotations
 
 PROMPT_VERSION = "scoring_v1"
 
-SYSTEM_PROMPT = """You are an expert technical recruiter specializing in \
-ML, AI, and Computer Vision roles. You are evaluating candidate fit for \
-a specific job opening.
+SYSTEM_PROMPT = """You are an expert technical recruiter evaluating \
+candidate fit for a specific job opening.
 
 Your job is to score the fit between a candidate profile and a job \
 description across 6 categories. Think step by step before assigning \
@@ -63,8 +62,10 @@ sponsorship_compatibility, location_fit, resume_strength"""
 def _build_candidate_context(cv_base: dict) -> str:
     personal = cv_base.get("personal", {})
     name = personal.get("name", "Candidate")
-    visa_note = personal.get("visa_note", "")
+    visa_status = personal.get("visa_status", "")
+    work_auth = personal.get("work_authorization", "")
     grad_date = personal.get("graduation_date", "")
+    seniority = cv_base.get("seniority", "")
 
     projects = cv_base.get("projects", [])
     anchor = next(
@@ -83,8 +84,11 @@ def _build_candidate_context(cv_base: dict) -> str:
     top_skills = ", ".join(all_skills[:10])
 
     context = f"CANDIDATE: {name}\n"
-    if visa_note:
-        context += f"Visa/work auth: {visa_note}\n"
+    if seniority:
+        context += f"Seniority: {seniority}\n"
+    _no_sponsorship_needed = visa_status in ("citizen", "permanent_resident", "not_applicable")
+    if work_auth and not _no_sponsorship_needed:
+        context += f"Work auth: {work_auth}\n"
     if grad_date:
         context += f"Graduation: {grad_date}\n"
     if anchor_name:

@@ -1,16 +1,36 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
+from nj.models.cv import CareerField, VisaStatus
 from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
 console = Console()
+
+_DEFAULT_ROLES: dict[str, list[str]] = {
+    "ml_ai": ["ML Engineer", "AI Engineer", "Applied Scientist"],
+    "software_engineering": ["Software Engineer", "Backend Engineer", "Full-Stack Engineer"],
+    "data_science": ["Data Scientist", "Data Analyst", "Analytics Engineer"],
+    "product": ["Product Manager", "APM", "Senior PM"],
+    "design": ["UX Designer", "Product Designer", "UI Designer"],
+    "research": ["Research Scientist", "Research Engineer", "AI Researcher"],
+    "devops_infra": ["DevOps Engineer", "Platform Engineer", "SRE"],
+    "cybersecurity": ["Security Engineer", "Penetration Tester", "SOC Analyst"],
+    "finance_quant": ["Quantitative Analyst", "Quantitative Developer", "Risk Analyst"],
+    "other": ["Software Engineer", "Data Analyst"],
+}
+
+_SPONSORSHIP_STATUSES = [
+    s.value for s in VisaStatus
+    if s not in (VisaStatus.NOT_APPLICABLE, VisaStatus.CITIZEN, VisaStatus.PERMANENT_RESIDENT)
+]
 
 
 def run_init(config_path: str = "config.yaml") -> None:
@@ -20,21 +40,20 @@ def run_init(config_path: str = "config.yaml") -> None:
             "Re-run setup and overwrite existing config?"
         )
         if not overwrite:
-            console.print(
-                "[dim]Aborted. Use [bold]nj config[/bold] to edit settings.[/dim]"
-            )
+            console.print("[dim]Aborted. Use [bold]nj config[/bold] to edit settings.[/dim]")
             return
 
     console.print(
         Panel(
-            "[bold]Welcome to nj[/bold] — AI-powered job hunting CLI\n\n"
+            "[bold]Welcome to nj[/bold] — AI Career Operating System\n\n"
             "This wizard will set up:\n"
             "  • Anthropic API key (for AI scoring + tailoring)\n"
-            "  • Email notifications (SMTP or SendGrid)\n"
+            "  • Personal profile (name, location, contact)\n"
+            "  • Career field and target roles\n"
+            "  • Visa / work authorization\n"
             "  • Your CV base file\n"
             "  • Job search preferences\n"
-            "  • Visa / work auth settings\n"
-            "  • Run schedule\n\n"
+            "  • Email notifications (optional)\n\n"
             "[dim]Your config is saved locally and never committed to git.[/dim]",
             title="nj init",
             border_style="cyan",
@@ -45,7 +64,7 @@ def run_init(config_path: str = "config.yaml") -> None:
     config_data: dict = {}
 
     console.print("\n[bold cyan]Step 1 — Anthropic API key[/bold cyan]")
-    api_key = _setup_anthropic(env)
+    api_key = _step_api(env)
     env["ANTHROPIC_API_KEY"] = api_key
     config_data["llm"] = {
         "provider": "claude",
@@ -53,31 +72,31 @@ def run_init(config_path: str = "config.yaml") -> None:
         "api_key": api_key,
     }
 
-    console.print("\n[bold cyan]Step 2 — Email notifications[/bold cyan]")
-    notify_config = _setup_email(env)
-    config_data["notify"] = notify_config
+    console.print("\n[bold cyan]Step 2 — Personal info[/bold cyan]")
+    personal = _step_personal()
 
-    console.print("\n[bold cyan]Step 3 — CV setup[/bold cyan]")
-    _setup_cv(api_key)
+    console.print("\n[bold cyan]Step 3 — Career profile[/bold cyan]")
+    career = _step_career()
 
-    console.print(
-        "\n[bold cyan]Step 4 — LinkedIn session cookie (optional)[/bold cyan]"
-    )
-    li_at = _setup_linkedin(env)
-    if li_at:
-        env["LINKEDIN_LI_AT"] = li_at
+    console.print("\n[bold cyan]Step 4 — Visa / work authorization[/bold cyan]")
+    visa = _step_visa()
+    config_data["visa"] = visa
 
-    console.print("\n[bold cyan]Step 5 — Job search preferences[/bold cyan]")
-    search_config = _setup_search()
-    config_data["search"] = search_config
+    console.print("\n[bold cyan]Step 5 — CV setup[/bold cyan]")
+    _step_cv(api_key, personal, career, visa)
 
-    console.print("\n[bold cyan]Step 6 — Visa / work authorization[/bold cyan]")
-    visa_config = _setup_visa()
-    config_data["visa"] = visa_config
+    console.print("\n[bold cyan]Step 6 — Job search preferences[/bold cyan]")
+    prefs = _step_preferences(career)
+    config_data["search"] = {
+        "roles": career["target_roles"],
+        "primary_region": career["target_country"],
+        "include_global": career.get("include_global", False),
+        **prefs,
+    }
 
-    console.print("\n[bold cyan]Step 7 — Run schedule[/bold cyan]")
-    schedule_config = _setup_schedule()
-    config_data["schedule"] = schedule_config
+    console.print("\n[bold cyan]Step 7 — Notifications (optional)[/bold cyan]")
+    notify = _step_notifications(env)
+    config_data["notify"] = notify
 
     config_data["scoring"] = {"threshold": 62}
     config_data["apply"] = {
@@ -85,6 +104,7 @@ def run_init(config_path: str = "config.yaml") -> None:
         "max_per_day": 5,
         "automation_phase": 1,
     }
+    config_data["schedule"] = {"enabled": False, "every_days": 3, "time": "08:00"}
 
     _write_env(env)
     _write_config(config_data, config_path)
@@ -106,7 +126,7 @@ def run_init(config_path: str = "config.yaml") -> None:
     )
 
 
-def _setup_anthropic(env: dict) -> str:
+def _step_api(env: dict) -> str:
     existing = env.get("ANTHROPIC_API_KEY", "")
     if existing:
         console.print(f"[dim]Found existing API key: {existing[:8]}...[/dim]")
@@ -120,72 +140,118 @@ def _setup_anthropic(env: dict) -> str:
             console.print("[red]API key cannot be empty.[/red]")
             continue
         console.print("[dim]Testing connection...[/dim]", end=" ")
-        if _test_anthropic(key.strip()):
+        if _test_api_key(key.strip()):
             console.print("[green]Connected.[/green]")
             return key.strip()
         else:
             console.print("[red]Failed.[/red] Check your key and try again.")
 
 
-def _test_anthropic(api_key: str) -> bool:
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=10,
-            messages=[{"role": "user", "content": "Reply: READY"}],
-        )
-        return bool(msg.content)
-    except Exception as e:
-        logger.warning("anthropic_test_failed", error=str(e))
-        return False
-
-
-def _setup_email(env: dict) -> dict:
-    provider = Prompt.ask(
-        "Email provider",
-        choices=["smtp", "sendgrid"],
-        default="smtp",
+def _step_personal() -> dict:
+    console.print("[dim]Enter your contact information.[/dim]")
+    name = Prompt.ask("Full name")
+    email = Prompt.ask("Email address")
+    phone = Prompt.ask("Phone number [dim](optional, press Enter to skip)[/dim]", default="")
+    location = Prompt.ask(
+        "City, Country [dim](e.g. San Francisco, USA)[/dim]", default=""
     )
-    email_to = Prompt.ask("Send notifications to (your email)")
+    linkedin = Prompt.ask("LinkedIn URL [dim](optional)[/dim]", default="")
+    github = Prompt.ask("GitHub URL [dim](optional)[/dim]", default="")
+    website = Prompt.ask("Personal website [dim](optional)[/dim]", default="")
+    graduation_date = Prompt.ask(
+        "Graduation date [dim](e.g. May 2025, leave blank if not applicable)[/dim]",
+        default="",
+    )
+    return {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "location": location,
+        "linkedin": linkedin,
+        "github": github,
+        "website": website,
+        "graduation_date": graduation_date,
+    }
 
-    if provider == "smtp":
-        host = Prompt.ask("SMTP host", default="smtp.gmail.com")
-        port = int(Prompt.ask("SMTP port", default="587"))
-        user = Prompt.ask("SMTP username (your Gmail address)")
-        password = Prompt.ask(
-            "SMTP password [dim](Gmail: use App Password, not your login)[/dim]",
-            password=True,
-        )
-        env.update(
-            {
-                "SMTP_HOST": host,
-                "SMTP_PORT": str(port),
-                "SMTP_USER": user,
-                "SMTP_PASSWORD": password,
-            }
-        )
-        return {
-            "email_to": email_to,
-            "provider": "smtp",
-            "smtp_host": host,
-            "smtp_port": port,
-            "smtp_user": user,
-            "smtp_password": password,
-        }
+
+def _step_career() -> dict:
+    fields = [f.value for f in CareerField]
+    console.print(f"[dim]Available fields: {', '.join(fields)}[/dim]")
+    field = Prompt.ask(
+        "Career field",
+        choices=fields,
+        default="software_engineering",
+    )
+    seniority = Prompt.ask(
+        "Seniority level",
+        choices=["junior", "mid", "senior", "staff"],
+        default="mid",
+    )
+    default_roles = _DEFAULT_ROLES.get(field, ["Software Engineer"])
+    console.print(f"[dim]Suggested roles for {field}: {', '.join(default_roles)}[/dim]")
+    custom = Confirm.ask("Customise target roles?", default=False)
+    if custom:
+        roles_raw = Prompt.ask("Enter roles (comma-separated)")
+        roles = [r.strip() for r in roles_raw.split(",") if r.strip()]
     else:
-        sg_key = Prompt.ask("SendGrid API key", password=True)
-        env["SENDGRID_API_KEY"] = sg_key
+        roles = default_roles
+    target_country = Prompt.ask("Primary target country", default="USA")
+    include_global = Confirm.ask("Also search globally?", default=False)
+    return {
+        "career_field": field,
+        "seniority": seniority,
+        "target_roles": roles,
+        "target_country": target_country,
+        "include_global": include_global,
+    }
+
+
+def _step_visa() -> dict:
+    needs_sponsorship = Confirm.ask(
+        "Do you need visa sponsorship for your target country?",
+        default=False,
+    )
+    if not needs_sponsorship:
         return {
-            "email_to": email_to,
-            "provider": "sendgrid",
-            "sendgrid_api_key": sg_key,
+            "enabled": False,
+            "status": VisaStatus.NOT_APPLICABLE,
+            "work_authorization": "Authorized to work",
         }
 
+    status = Prompt.ask(
+        "Work authorization status",
+        choices=_SPONSORSHIP_STATUSES,
+        default="opt",
+    )
+    h1b = Confirm.ask("Will you need H1B sponsorship in the future?", default=True)
+    skip_no_sponsor = Confirm.ask(
+        "Auto-skip jobs that say 'no sponsorship'?", default=True
+    )
+    work_auth_default = (
+        f"{status.upper()} — open to H1B sponsorship" if h1b else f"{status.upper()}"
+    )
+    work_auth = Prompt.ask(
+        "Work authorization note [dim](used in cover letters)[/dim]",
+        default=work_auth_default,
+    )
+    return {
+        "enabled": True,
+        "status": status,
+        "h1b_future": h1b,
+        "skip_no_sponsorship": skip_no_sponsor,
+        "work_authorization": work_auth,
+        "include_keywords": ["OPT", "CPT", "H1B", "visa sponsorship", "sponsor"],
+        "exclude_keywords": [
+            "no sponsorship",
+            "citizen only",
+            "green card only",
+            "must be authorized",
+            "no visa",
+        ],
+    }
 
-def _setup_cv(api_key: str) -> None:
+
+def _step_cv(api_key: str, personal: dict, career: dict, visa: dict) -> None:
     cv_path = Path("cv/cv_base.json")
     if cv_path.exists():
         console.print("[green]Found cv/cv_base.json[/green]")
@@ -195,48 +261,109 @@ def _setup_cv(api_key: str) -> None:
     console.print(
         "cv/cv_base.json not found.\n"
         "Options:\n"
-        "  1. Provide path to your CV PDF (AI will convert it)\n"
-        "  2. Copy cv/cv_base.example.json and edit manually\n"
+        "  1. Provide path to your CV PDF (AI will extract it)\n"
+        "  2. Start with a blank template\n"
     )
     choice = Prompt.ask("Choice", choices=["1", "2"], default="2")
 
     if choice == "1":
         pdf_path = Prompt.ask("Path to your CV PDF")
         if Path(pdf_path).exists():
-            console.print("[dim]Extracting and converting CV...[/dim]")
-            _convert_pdf_to_cv_base(pdf_path, api_key)
+            console.print("[dim]Extracting CV with AI...[/dim]")
+            _extract_cv_from_pdf(pdf_path, api_key, personal, career, visa)
         else:
-            console.print(
-                f"[red]File not found: {pdf_path}[/red]\n"
-                "[yellow]Copy cv_base.example.json manually.[/yellow]"
-            )
+            console.print(f"[red]File not found: {pdf_path}[/red]")
+            _build_blank_cv(personal, career, visa, cv_path)
     else:
-        example = Path("cv/cv_base.example.json")
-        if example.exists():
-            import shutil
-
-            shutil.copy(example, cv_path)
-            console.print(
-                "[yellow]Copied cv_base.example.json → cv/cv_base.json[/yellow]\n"
-                "[dim]Edit it with your real information before running nj search.[/dim]"
-            )
-        else:
-            console.print(
-                "[yellow]Create cv/cv_base.json based on cv_base.example.json[/yellow]"
-            )
+        _build_blank_cv(personal, career, visa, cv_path)
+        console.print(
+            "[yellow]Blank CV created at cv/cv_base.json[/yellow]\n"
+            "[dim]Edit it with your real information before running nj search.[/dim]"
+        )
 
 
-def _convert_pdf_to_cv_base(pdf_path: str, api_key: str) -> None:
+def _build_blank_cv(personal: dict, career: dict, visa: dict, cv_path: Path) -> None:
+    now = datetime.utcnow().strftime("%Y-%m-%d")
+    cv = {
+        "personal": {
+            "name": personal.get("name", ""),
+            "email": personal.get("email", ""),
+            "phone": personal.get("phone", ""),
+            "location": personal.get("location", ""),
+            "linkedin": personal.get("linkedin", ""),
+            "github": personal.get("github", ""),
+            "website": personal.get("website", ""),
+            "visa_status": visa.get("status", "not_applicable"),
+            "work_authorization": visa.get("work_authorization", ""),
+            "graduation_date": personal.get("graduation_date", ""),
+            "target_country": career.get("target_country", "USA"),
+        },
+        "career_field": career.get("career_field", "software_engineering"),
+        "target_roles": career.get("target_roles", []),
+        "target_locations": [],
+        "seniority": career.get("seniority", "mid"),
+        "summary": "",
+        "skills": {},
+        "experience": [],
+        "projects": [],
+        "education": [],
+        "certifications": [],
+        "publications": [],
+        "languages": [],
+        "research_interests": [],
+        "soft_skills": [],
+        "cv_version": "1.0",
+        "created_at": now,
+        "last_updated": now,
+    }
+    with open(cv_path, "w") as f:
+        json.dump(cv, f, indent=2)
+    console.print("[green]Created cv/cv_base.json[/green]")
+
+
+def _extract_cv_from_pdf(
+    pdf_path: str,
+    api_key: str,
+    personal: dict,
+    career: dict,
+    visa: dict,
+) -> None:
     try:
         import base64
 
         import anthropic
 
+        cv_path = Path("cv/cv_base.json")
         with open(pdf_path, "rb") as f:
             pdf_data = base64.standard_b64encode(f.read()).decode("utf-8")
+
         client = anthropic.Anthropic(api_key=api_key)
-        with open("cv/cv_base.example.json") as f:
-            schema = f.read()
+        schema_str = json.dumps({
+            "personal": {
+                "name": "", "email": "", "phone": "", "location": "",
+                "linkedin": "", "github": "", "website": "",
+                "visa_status": "not_applicable", "work_authorization": "",
+                "graduation_date": "", "target_country": "USA",
+            },
+            "career_field": "software_engineering",
+            "target_roles": [],
+            "target_locations": [],
+            "seniority": "mid",
+            "summary": "",
+            "skills": {},
+            "experience": [],
+            "projects": [],
+            "education": [],
+            "certifications": [],
+            "publications": [],
+            "languages": [],
+            "research_interests": [],
+            "soft_skills": [],
+            "cv_version": "1.0",
+            "created_at": "",
+            "last_updated": "",
+        }, indent=2)
+
         msg = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
@@ -255,9 +382,9 @@ def _convert_pdf_to_cv_base(pdf_path: str, api_key: str) -> None:
                         {
                             "type": "text",
                             "text": (
-                                f"Extract this CV into the following JSON schema. "
-                                f"Return ONLY valid JSON, no other text.\n\n"
-                                f"Schema:\n{schema}"
+                                "Extract this CV/resume into the following JSON schema. "
+                                "Return ONLY valid JSON, no other text.\n\n"
+                                f"Schema:\n{schema_str}"
                             ),
                         },
                     ],
@@ -268,118 +395,112 @@ def _convert_pdf_to_cv_base(pdf_path: str, api_key: str) -> None:
         if raw.startswith("```"):
             raw = "\n".join(raw.split("\n")[1:-1])
         cv_data = json.loads(raw)
-        with open("cv/cv_base.json", "w") as f:
+
+        if "personal" not in cv_data:
+            cv_data["personal"] = {}
+        for k, v in {
+            "visa_status": visa.get("status", "not_applicable"),
+            "work_authorization": visa.get("work_authorization", ""),
+            "target_country": career.get("target_country", "USA"),
+        }.items():
+            if not cv_data["personal"].get(k):
+                cv_data["personal"][k] = v
+
+        if not cv_data.get("career_field"):
+            cv_data["career_field"] = career.get("career_field", "software_engineering")
+        if not cv_data.get("target_roles"):
+            cv_data["target_roles"] = career.get("target_roles", [])
+        if not cv_data.get("seniority"):
+            cv_data["seniority"] = career.get("seniority", "mid")
+
+        now = datetime.utcnow().strftime("%Y-%m-%d")
+        cv_data.setdefault("cv_version", "1.0")
+        cv_data["created_at"] = now
+        cv_data["last_updated"] = now
+
+        with open(cv_path, "w") as f:
             json.dump(cv_data, f, indent=2)
-        console.print("[green]CV converted and saved to cv/cv_base.json[/green]")
+        console.print("[green]CV extracted and saved to cv/cv_base.json[/green]")
         console.print("[dim]Review it before running nj search.[/dim]")
     except Exception as e:
-        logger.error("cv_conversion_failed", error=str(e))
-        console.print(
-            f"[red]CV conversion failed:[/red] {e}\n"
-            "[yellow]Copy cv_base.example.json and edit manually.[/yellow]"
+        logger.error("cv_extraction_failed", error=str(e))
+        console.print(f"[red]CV extraction failed:[/red] {e}")
+        _build_blank_cv(personal, career, visa, Path("cv/cv_base.json"))
+
+
+def _step_preferences(career: dict) -> dict:
+    console.print("[dim]Fine-tune your job search filters.[/dim]")
+    exclude_raw = Prompt.ask(
+        "Keywords to exclude from job titles [dim](comma-separated)[/dim]",
+        default="10+ years, Staff Engineer, Principal Engineer",
+    )
+    keywords_exclude = [k.strip() for k in exclude_raw.split(",") if k.strip()]
+    return {"keywords_exclude": keywords_exclude}
+
+
+def _step_notifications(env: dict) -> dict:
+    want_notify = Confirm.ask("Set up email notifications?", default=False)
+    if not want_notify:
+        return {"email_to": "", "provider": "smtp"}
+
+    provider = Prompt.ask(
+        "Email provider",
+        choices=["smtp", "sendgrid"],
+        default="smtp",
+    )
+    email_to = Prompt.ask("Send notifications to (your email)")
+
+    if provider == "smtp":
+        host = Prompt.ask("SMTP host", default="smtp.gmail.com")
+        port = int(Prompt.ask("SMTP port", default="587"))
+        user = Prompt.ask("SMTP username")
+        password = Prompt.ask(
+            "SMTP password [dim](Gmail: use App Password)[/dim]",
+            password=True,
         )
-
-
-def _setup_linkedin(env: dict) -> str | None:
-    existing = env.get("LINKEDIN_LI_AT", "")
-    if existing:
-        console.print("[dim]Found existing LinkedIn cookie.[/dim]")
-        keep = Confirm.ask("Keep existing cookie?", default=True)
-        if keep:
-            return None
-
-    console.print(
-        "To scrape LinkedIn you need your session cookie.\n"
-        "[dim]How to get it:\n"
-        "  1. Open LinkedIn in Chrome and log in\n"
-        "  2. Press F12 → Application tab → Cookies → linkedin.com\n"
-        "  3. Find 'li_at' and copy its value[/dim]"
-    )
-    skip = Confirm.ask("Skip LinkedIn setup? (Indeed only)", default=False)
-    if skip:
-        console.print("[yellow]LinkedIn scraper disabled. " "Indeed only.[/yellow]")
-        return None
-
-    cookie = Prompt.ask("li_at cookie value", password=True)
-    return cookie.strip() if cookie.strip() else None
-
-
-def _setup_search() -> dict:
-    console.print(
-        "[dim]Default roles: ML Engineer, Computer Vision Engineer, "
-        "AI Engineer[/dim]"
-    )
-    custom = Confirm.ask("Customise target roles?", default=False)
-    if custom:
-        roles_raw = Prompt.ask("Enter roles (comma-separated)")
-        roles = [r.strip() for r in roles_raw.split(",") if r.strip()]
+        env.update({
+            "SMTP_HOST": host,
+            "SMTP_PORT": str(port),
+            "SMTP_USER": user,
+            "SMTP_PASSWORD": password,
+        })
+        return {
+            "email_to": email_to,
+            "provider": "smtp",
+            "smtp_host": host,
+            "smtp_port": port,
+            "smtp_user": user,
+            "smtp_password": password,
+        }
     else:
-        roles = ["ML Engineer", "Computer Vision Engineer", "AI Engineer"]
-
-    region = Prompt.ask("Primary region", default="USA")
-    global_search = Confirm.ask("Also search globally?", default=False)
-    return {
-        "roles": roles,
-        "primary_region": region,
-        "include_global": global_search,
-        "keywords_exclude": ["10+ years", "Staff Engineer", "Principal Engineer"],
-    }
+        sg_key = Prompt.ask("SendGrid API key", password=True)
+        env["SENDGRID_API_KEY"] = sg_key
+        return {
+            "email_to": email_to,
+            "provider": "sendgrid",
+            "sendgrid_api_key": sg_key,
+        }
 
 
-def _setup_visa() -> dict:
-    has_visa_needs = Confirm.ask(
-        "Are you an international student or need visa sponsorship?",
-        default=True,
-    )
-    if not has_visa_needs:
-        return {"enabled": False}
-
-    status = Prompt.ask(
-        "Work authorization status",
-        choices=["OPT", "CPT", "H1B", "GC", "citizen"],
-        default="OPT",
-    )
-    h1b = Confirm.ask("Seeking H1B sponsorship in future?", default=True)
-    skip_no_sponsor = Confirm.ask(
-        "Auto-skip jobs that say 'no sponsorship'?", default=True
-    )
-    return {
-        "enabled": True,
-        "status": status,
-        "h1b_future": h1b,
-        "skip_no_sponsorship": skip_no_sponsor,
-        "include_keywords": ["OPT", "CPT", "H1B", "visa sponsorship", "sponsor"],
-        "exclude_keywords": [
-            "no sponsorship",
-            "citizen only",
-            "green card only",
-            "must be authorized",
-            "no visa",
-        ],
-    }
-
-
-def _setup_schedule() -> dict:
-    console.print("[dim]nj can run automatically on a schedule.[/dim]")
-    schedule = Confirm.ask("Set up automatic schedule?", default=True)
-    if not schedule:
-        return {"enabled": False, "every_days": 3, "time": "08:00"}
-
-    days = Prompt.ask(
-        "Run every N days [dim](1=daily, 3=every 3 days)[/dim]",
-        default="3",
-    )
+def _test_api_key(api_key: str) -> bool:
     try:
-        days_int = max(1, int(days))
-    except ValueError:
-        days_int = 3
+        import anthropic
 
-    time_str = Prompt.ask("Run at time (HH:MM)", default="08:00")
-    return {
-        "enabled": True,
-        "every_days": days_int,
-        "time": time_str,
-    }
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=10,
+            messages=[{"role": "user", "content": "Reply: READY"}],
+        )
+        return bool(msg.content)
+    except Exception as e:
+        logger.warning("api_key_test_failed", error=str(e))
+        return False
+
+
+def _test_anthropic(api_key: str) -> bool:
+    """Backward-compatible alias for _test_api_key."""
+    return _test_api_key(api_key)
 
 
 def _load_env() -> dict:
@@ -395,9 +516,7 @@ def _load_env() -> dict:
 
 
 def _write_env(env: dict) -> None:
-    lines = []
-    for k, v in env.items():
-        lines.append(f"{k}={v}")
+    lines = [f"{k}={v}" for k, v in env.items()]
     Path(".env").write_text("\n".join(lines) + "\n")
     console.print("[dim].env written.[/dim]")
 

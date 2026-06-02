@@ -15,11 +15,14 @@ logger = get_logger(__name__)
 console = Console()
 
 EDITABLE_SECTIONS = {
-    "summary": "3-line professional summary paragraph",
+    "summary": "Professional summary paragraph",
     "skills": "Technical skills by category",
-    "research_interests": "Research interest areas",
-    "soft_skills": "Soft skills list",
-    "personal": "Personal info (name, email, phone, location)",
+    "target_roles": "Roles you are targeting",
+    "research_interests": "Research interests (optional)",
+    "soft_skills": "Soft skills",
+    "personal": "Contact info and personal details",
+    "languages": "Spoken languages",
+    "certifications": "Certifications and licenses",
 }
 
 
@@ -108,7 +111,11 @@ def _update_section(cv_base: dict, section: str, cv_path: Path) -> None:
             cv_base[section] = [v.strip() for v in raw.split(",") if v.strip()]
 
     elif isinstance(current, dict) and section == "personal":
-        for field in ["name", "email", "phone", "location", "linkedin", "github"]:
+        for field in [
+            "name", "email", "phone", "location",
+            "linkedin", "github", "website",
+            "work_authorization", "graduation_date",
+        ]:
             old_val = current.get(field, "")
             new_val = Prompt.ask(f"  {field}", default=old_val)
             if new_val != old_val:

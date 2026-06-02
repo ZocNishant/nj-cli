@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
 
 from nj.cli.cmd_init import (
     _load_env,
-    _setup_schedule,
-    _setup_visa,
+    _test_anthropic,
     _write_config,
     _write_env,
 )
@@ -58,44 +57,6 @@ def test_write_config_creates_yaml(tmp_path):
     assert data["scoring"]["threshold"] == 68
 
 
-def test_setup_schedule_disabled():
-    with patch("nj.cli.cmd_init.Confirm.ask", return_value=False):
-        result = _setup_schedule()
-    assert result["enabled"] is False
-    assert result["every_days"] == 3
-
-
-def test_setup_schedule_custom_days():
-    with patch("nj.cli.cmd_init.Confirm.ask", side_effect=[True]), \
-         patch("nj.cli.cmd_init.Prompt.ask", side_effect=["5", "09:00"]):
-        result = _setup_schedule()
-    assert result["enabled"] is True
-    assert result["every_days"] == 5
-    assert result["time"] == "09:00"
-
-
-def test_setup_visa_disabled():
-    with patch("nj.cli.cmd_init.Confirm.ask", return_value=False):
-        result = _setup_visa()
-    assert result["enabled"] is False
-
-
-def test_setup_visa_opt():
-    with patch("nj.cli.cmd_init.Confirm.ask", side_effect=[True, True, True]), \
-         patch("nj.cli.cmd_init.Prompt.ask", return_value="OPT"):
-        result = _setup_visa()
-    assert result["enabled"] is True
-    assert result["status"] == "OPT"
-    assert result["h1b_future"] is True
-
-
-def test_test_anthropic_returns_false_on_exception():
-    from nj.cli.cmd_init import _test_anthropic
-    with patch("anthropic.Anthropic", side_effect=Exception("bad key")):
-        result = _test_anthropic("bad-key")
-    assert result is False
-
-
 def test_write_config_overwrites_existing(tmp_path):
     config_path = str(tmp_path / "config.yaml")
     _write_config({"scoring": {"threshold": 62}}, config_path)
@@ -103,3 +64,35 @@ def test_write_config_overwrites_existing(tmp_path):
     with open(config_path) as f:
         data = yaml.safe_load(f)
     assert data["scoring"]["threshold"] == 70
+
+
+def test_test_anthropic_returns_false_on_exception():
+    with patch("anthropic.Anthropic", side_effect=Exception("bad key")):
+        result = _test_anthropic("bad-key")
+    assert result is False
+
+
+def test_step_visa_not_needed():
+    from nj.cli.cmd_init import _step_visa
+    with patch("nj.cli.cmd_init.Confirm.ask", return_value=False):
+        result = _step_visa()
+    assert result["enabled"] is False
+    assert "work_authorization" in result
+
+
+def test_step_visa_with_sponsorship():
+    from nj.cli.cmd_init import _step_visa
+    with patch("nj.cli.cmd_init.Confirm.ask", side_effect=[True, True, True]), \
+         patch("nj.cli.cmd_init.Prompt.ask", side_effect=["opt", "OPT — open to H1B sponsorship"]):
+        result = _step_visa()
+    assert result["enabled"] is True
+    assert result["status"] == "opt"
+    assert result["h1b_future"] is True
+
+
+def test_step_preferences_parses_keywords():
+    from nj.cli.cmd_init import _step_preferences
+    with patch("nj.cli.cmd_init.Prompt.ask", return_value="10+ years, Director"):
+        result = _step_preferences({"career_field": "software_engineering"})
+    assert "10+ years" in result["keywords_exclude"]
+    assert "Director" in result["keywords_exclude"]

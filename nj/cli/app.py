@@ -217,8 +217,18 @@ def calibrate(
 
 
 @app.command()
+def update_role() -> None:
+    """Generate CV bullets for any experience entry from plain English."""
+    from nj.cli.cmd_update_role import run_update_role
+    from nj.models.config import Config
+
+    config = Config.load()
+    run_update_role(config=config)
+
+
+@app.command()
 def update_intern() -> None:
-    """Add internship bullets to CV from plain English."""
+    """Alias for update-role (backward-compatible)."""
     from nj.cli.cmd_update_intern import run_update_intern
     from nj.models.config import Config
 

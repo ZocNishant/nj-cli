@@ -15,7 +15,7 @@ def test_command_reference_has_expected_commands():
         "search", "enrich", "explain", "diagnose", "gaps", "frame",
         "diff", "postmortem", "intel", "graph", "ml", "prep", "review",
         "status", "calibrate", "watch", "tailor", "update-cv",
-        "update-intern", "init", "run", "demo", "logs", "config",
+        "update-role", "init", "run", "demo", "logs", "config",
         "quality", "label", "manual",
     ]
     for cmd in expected:
