@@ -8,7 +8,8 @@ from rich.console import Console
 
 from nj.cli.shell import (
     _dispatch, _get_flag, _show_help,
-    _render_splash, SHELL_COMMANDS, BANNERS, TAGLINES,
+    _render_splash, _print_command_header, _show_success,
+    SHELL_COMMANDS, BANNERS, TAGLINES,
 )
 from nj.models.config import Config
 
@@ -133,3 +134,41 @@ def test_dispatch_search_dry_run():
         mock_module.run_search = MagicMock()
         result = _dispatch("search", ["--dry-run"], config)
     assert result is True
+
+
+def test_boot_sequence_runs(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda x: None)
+    from nj.cli.shell import _boot_sequence
+    from io import StringIO
+    from rich.console import Console
+    from unittest.mock import patch
+    buf = StringIO()
+    c = Console(file=buf, highlight=False)
+    with patch("nj.cli.shell.console", c):
+        _boot_sequence()
+    assert len(buf.getvalue()) > 0
+
+
+def test_print_command_header_renders():
+    buf = StringIO()
+    c = Console(file=buf, highlight=False)
+    with patch("nj.cli.shell.console", c):
+        _print_command_header("search")
+    output = buf.getvalue()
+    assert "search" in output
+
+
+def test_show_success_known_command():
+    buf = StringIO()
+    c = Console(file=buf, highlight=False)
+    with patch("nj.cli.shell.console", c):
+        _show_success("search")
+    assert "search complete" in buf.getvalue()
+
+
+def test_show_success_unknown_command():
+    buf = StringIO()
+    c = Console(file=buf, highlight=False)
+    with patch("nj.cli.shell.console", c):
+        _show_success("review")
+    assert "done" in buf.getvalue()

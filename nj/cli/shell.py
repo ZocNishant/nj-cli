@@ -5,16 +5,21 @@ import random
 import readline
 import shlex
 import sys
+import threading
+import time
 from datetime import datetime, UTC
 from pathlib import Path
 
+from rich.align import Align
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.rule import Rule
-from rich.prompt import Prompt
+from rich.layout import Layout
 from rich.live import Live
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.rule import Rule
+from rich.spinner import Spinner
 from rich.table import Table
+from rich.text import Text
 from rich import box
 
 from nj.utils.logger import get_logger
@@ -120,6 +125,34 @@ class NJCompleter:
                 return [s for s in subs if s.startswith(current)]
 
         return []
+
+
+class LiveStatus:
+    """Shows animated status during long operations."""
+
+    SPINNERS = ["dots", "dots2", "dots3", "line", "pipe", "simpleDots"]
+
+    def __init__(self, title: str = "") -> None:
+        self.title = title
+        self.messages: list[str] = []
+        self.done = False
+        self._live = None
+        self._spinner_name = random.choice(self.SPINNERS)
+
+    def update(self, message: str) -> None:
+        self.messages.append(message)
+        if len(self.messages) > 6:
+            self.messages = self.messages[-6:]
+
+    def _render(self) -> Text:
+        text = Text()
+        text.append(f"\n  {self.title}\n\n", style="bold cyan")
+        for i, msg in enumerate(self.messages):
+            if i == len(self.messages) - 1:
+                text.append(f"  [cyan]►[/cyan] {msg}\n")
+            else:
+                text.append(f"  [dim]✓ {msg}[/dim]\n")
+        return text
 
 
 def _setup_readline(completer: NJCompleter) -> None:
@@ -242,18 +275,40 @@ TAGLINES = [
 ]
 
 
-def _boot_sequence() -> None:
-    import time
+def _matrix_flash() -> None:
+    """Brief matrix-style effect on boot."""
+    chars = "01アイウエオカキクケコサシスセソ"
+    width = min(console.width or 60, 60)
 
-    t_start = time.monotonic()
+    for _ in range(3):
+        line = "".join(random.choice(chars) for _ in range(width))
+        console.print(f"[bold green dim]{line}[/bold green dim]")
+        time.sleep(0.04)
+
+    for _ in range(3):
+        console.print("\033[1A\033[2K", end="")
+
+    time.sleep(0.1)
+
+
+def _boot_sequence() -> None:
+    _matrix_flash()
+
+    messages = [
+        ("initializing career intelligence engine", 0.06),
+        ("loading anti-hallucination validator", 0.05),
+        ("mounting cv_base.json", 0.05),
+        ("connecting to provider", 0.05),
+        ("warming up scoring models", 0.05),
+        ("indexing job sources", 0.04),
+        ("calibrating visa detection", 0.04),
+        ("ready", 0.03),
+    ]
+
     console.print()
-    for msg in BOOT_MESSAGES:
+    for msg, delay in messages:
         console.print(f"  [dim cyan][ * ][/dim cyan] [dim]{msg}[/dim]")
-        time.sleep(0.08)
-    t_elapsed = round(time.monotonic() - t_start, 1)
-    console.print(
-        f"  [dim cyan][ ✓ ][/dim cyan] [dim]ready in {t_elapsed}s[/dim]"
-    )
+        time.sleep(delay)
     console.print()
 
 
@@ -312,47 +367,41 @@ def _render_splash(stats: dict, version: str) -> None:
     banner = random.choice(BANNERS)
     tagline = random.choice(TAGLINES)
 
-    term_width = console.width or 80
+    lines = banner.strip().split("\n")
+    colors = ["bold cyan", "cyan", "bold cyan", "cyan", "bold cyan", "cyan"]
+    for i, line in enumerate(lines):
+        color = colors[i % len(colors)]
+        console.print(f"[{color}]{line}[/{color}]")
 
-    console.print(f"[bold cyan]{banner}[/bold cyan]")
+    console.print()
 
-    stats_parts = []
-    if stats["jobs"] > 0:
-        stats_parts.append(
-            f"[dim]jobs tracked:[/dim]  "
-            f"[cyan]{stats['jobs']}[/cyan]"
-        )
-    if stats["scored"] > 0:
-        stats_parts.append(
-            f"[dim]scored:[/dim]        "
-            f"[cyan]{stats['scored']}[/cyan]"
-        )
-    if stats["applied"] > 0:
-        stats_parts.append(
-            f"[dim]applied:[/dim]       "
-            f"[green]{stats['applied']}[/green]"
-        )
-    if stats["interviews"] > 0:
-        stats_parts.append(
-            f"[dim]interviews:[/dim]    "
-            f"[bold green]{stats['interviews']}[/bold green]"
-        )
-
-    if stats_parts:
-        console.print()
-        for part in stats_parts:
-            console.print(f"  {part}")
+    if stats.get("jobs", 0) > 0:
+        stat_parts = []
+        if stats["jobs"] > 0:
+            stat_parts.append(
+                f"[cyan]◆[/cyan] [bold]{stats['jobs']}[/bold] [dim]jobs[/dim]"
+            )
+        if stats.get("scored", 0) > 0:
+            stat_parts.append(
+                f"[cyan]◆[/cyan] [bold]{stats['scored']}[/bold] [dim]scored[/dim]"
+            )
+        if stats.get("applied", 0) > 0:
+            stat_parts.append(
+                f"[green]◆[/green] [bold]{stats['applied']}[/bold] [dim]applied[/dim]"
+            )
+        if stats.get("interviews", 0) > 0:
+            stat_parts.append(
+                f"[bold green]◆[/bold green] [bold]{stats['interviews']}[/bold] [dim]interviews[/dim]"
+            )
+        if stat_parts:
+            console.print("  " + "  ".join(stat_parts))
 
     console.print()
     console.print(f"  [dim italic]\"{tagline}\"[/dim italic]")
     console.print(
-        f"  [dim]v{version} · "
-        f"type [bold]help[/bold] to see commands · "
-        f"[bold]exit[/bold] to quit[/dim]"
-    )
-    console.print(
-        "  [dim]Tab to complete · ↑↓ for history · "
-        "[bold]help[/bold] for commands[/dim]"
+        f"\n  [dim]v{version}  ·  "
+        f"Tab complete  ·  ↑↓ history  ·  "
+        f"[bold]help[/bold] for commands[/dim]"
     )
     console.print()
 
@@ -433,6 +482,8 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "manual":        "nj.cli.cmd_help_full:run_manual",
     }
 
+    _print_command_header(command)
+
     if command not in COMMAND_MAP:
         console.print(
             f"  [red]Unknown command:[/red] {command}\n"
@@ -451,16 +502,19 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 console.print("  [red]Usage:[/red] tailor <url>")
                 return True
             func(url=url, config=config, output_dir="output")
+            _show_success(command)
             return True
 
         if command == "explain":
             job_id = args[0] if args else None
             func(config=config, job_id=job_id)
+            _show_success(command)
             return True
 
         if command == "diff":
             job_id = args[0] if args else None
             func(config=config, job_id=job_id)
+            _show_success(command)
             return True
 
         if command == "prep":
@@ -472,6 +526,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             )
             last = "--last" in args
             func(config=config, url=url, job_id=job_id, last=last)
+            _show_success(command)
             return True
 
         if command == "frame":
@@ -488,17 +543,20 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 audience=audience,
                 list_projects=list_projects,
             )
+            _show_success(command)
             return True
 
         if command == "search":
             dry_run = "--dry-run" in args
             func(config=config, dry_run=dry_run)
+            _show_success(command)
             return True
 
         if command == "run":
             dry_run = "--dry-run" in args
             silent = "--silent" in args
             func(config=config, dry_run=dry_run, silent=silent)
+            _show_success(command)
             return True
 
         if command == "calibrate":
@@ -548,6 +606,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 year=year,
                 job_id=jid,
             )
+            _show_success(command)
             return True
 
         if command == "graph":
@@ -562,6 +621,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 query=query_arg,
                 target=target,
             )
+            _show_success(command)
             return True
 
         if command == "enrich":
@@ -569,12 +629,14 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             no_score = "--no-score" in args
             from nj.cli.cmd_enrich import run_enrich
             run_enrich(config=config, url=url_arg, no_score=no_score)
+            _show_success(command)
             return True
 
         if command == "postmortem":
             min_apps = int(_get_flag(args, "--min") or 3)
             from nj.cli.cmd_postmortem import run_postmortem
             run_postmortem(config=config, min_applications=min_apps)
+            _show_success(command)
             return True
 
         if command == "manual":
@@ -611,9 +673,12 @@ def _dispatch(command: str, args: list[str], config) -> bool:
                 year=year,
                 limit=limit,
             )
+            _show_success(command)
             return True
 
         func(config=config)
+        if command in _HEAVY_COMMANDS:
+            _show_success(command)
 
     except SystemExit:
         pass
@@ -645,9 +710,58 @@ def _get_flag(args: list[str], flag: str) -> str | None:
     return None
 
 
-def _get_prompt_text(config) -> str:
-    provider = getattr(getattr(config, "llm", None), "provider", "?")
-    return f"[bold cyan]nj[/bold cyan] [dim]({provider})[/dim] > "
+_HEAVY_COMMANDS: frozenset[str] = frozenset({
+    "search", "run", "diagnose", "gaps", "frame", "prep",
+    "tailor", "enrich", "graph", "ml", "intel", "watch",
+    "postmortem", "diff", "explain",
+})
+
+_SUCCESS_MESSAGES: dict[str, str] = {
+    "search": "search complete",
+    "diagnose": "diagnosis ready",
+    "gaps": "gap analysis done",
+    "graph": "graph updated",
+    "ml": "models ready",
+    "intel": "intel loaded",
+    "enrich": "enrichment done",
+    "prep": "prep PDF ready",
+    "tailor": "CV tailored",
+}
+
+
+def _print_command_header(command: str) -> None:
+    """Print a subtle separator before command output."""
+    timestamp = time.strftime("%H:%M:%S")
+    console.print(
+        f"\n[dim]─── {command} "
+        f"{'─' * max(0, 40 - len(command))} "
+        f"{timestamp} ───[/dim]"
+    )
+
+
+def _show_success(command: str) -> None:
+    """Brief success indicator."""
+    msg = _SUCCESS_MESSAGES.get(command, "done")
+    console.print(f"\n  [dim green]✓ {msg}[/dim green]\n")
+
+
+def _get_prompt_text(config, stats: dict | None = None) -> str:
+    provider = getattr(getattr(config, "llm", None), "provider", "claude")
+    if stats and stats.get("jobs", 0) > 0:
+        jobs = stats["jobs"]
+        applied = stats.get("applied", 0)
+        state = f"{jobs}j·{applied}a" if applied > 0 else f"{jobs}j"
+        return (
+            f"[bold cyan]nj[/bold cyan]"
+            f"[dim]({provider})[/dim]"
+            f"[dim cyan][{state}][/dim cyan] "
+            f"[bold]>[/bold] "
+        )
+    return (
+        f"[bold cyan]nj[/bold cyan]"
+        f"[dim]({provider})[/dim] "
+        f"[bold]>[/bold] "
+    )
 
 
 def run_shell(version: str = "1.2.0") -> None:
@@ -676,7 +790,8 @@ def run_shell(version: str = "1.2.0") -> None:
     try:
         while True:
             try:
-                prompt_text = _get_prompt_text(config)
+                stats = _get_stats()
+                prompt_text = _get_prompt_text(config, stats)
                 raw = console.input(prompt_text)
                 raw = raw.strip()
 
