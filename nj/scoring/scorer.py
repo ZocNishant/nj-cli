@@ -31,36 +31,42 @@ def _build_full_cv_summary(cv_base: dict) -> dict:
     exp_summary = []
     for exp in experience:
         if isinstance(exp, dict):
-            exp_summary.append({
-                "title": exp.get("title", ""),
-                "company": exp.get("company", ""),
-                "start": exp.get("start", ""),
-                "end": exp.get("end", ""),
-                "status": exp.get("status", ""),
-                "bullets": exp.get("bullets", [])[:3],
-            })
+            exp_summary.append(
+                {
+                    "title": exp.get("title", ""),
+                    "company": exp.get("company", ""),
+                    "start": exp.get("start", ""),
+                    "end": exp.get("end", ""),
+                    "status": exp.get("status", ""),
+                    "bullets": exp.get("bullets", [])[:3],
+                }
+            )
 
     projects = cv_base.get("projects", [])
     sorted_projects = sorted(projects, key=lambda p: p.get("priority", 99))
     proj_summary = []
     for p in sorted_projects:
-        proj_summary.append({
-            "name": p.get("name", ""),
-            "tech": p.get("tech", []),
-            "bullets": p.get("bullets", [])[:2],
-            "anchor": p.get("anchor", False),
-        })
+        proj_summary.append(
+            {
+                "name": p.get("name", ""),
+                "tech": p.get("tech", []),
+                "bullets": p.get("bullets", [])[:2],
+                "anchor": p.get("anchor", False),
+            }
+        )
 
     education = cv_base.get("education", [])
     edu_summary = []
     for edu in education:
         if isinstance(edu, dict):
-            edu_summary.append({
-                "degree": edu.get("degree", ""),
-                "institution": edu.get("institution", ""),
-                "end": edu.get("end", ""),
-                "courses": edu.get("courses", []),
-            })
+            edu_summary.append(
+                {
+                    "degree": edu.get("degree", ""),
+                    "institution": edu.get("institution", ""),
+                    "end": edu.get("end", ""),
+                    "courses": edu.get("courses", []),
+                }
+            )
 
     return {
         "personal": {
@@ -163,7 +169,7 @@ async def score_job(
     provider: BaseLLMProvider,
     repo: ScoreRepo | None = None,
 ) -> ScoreResult:
-    logger.info("scoring_job", job_id=job.id, title=job.title, company=job.company)
+    logger.debug("scoring_job", job_id=job.id, title=job.title, company=job.company)
 
     cv_summary = _build_full_cv_summary(cv_base)
     weights = config.scoring.weights
@@ -175,6 +181,7 @@ async def score_job(
         top_projects=cv_summary["projects"],
         weights=weights,
         cv_base=cv_base,
+        target_roles=list(config.search.roles),
     )
 
     request = LLMRequest(
@@ -188,13 +195,13 @@ async def score_job(
     result = None
     for attempt in range(1, 3):
         try:
-            logger.info("llm_call", attempt=attempt, job_id=job.id)
+            logger.debug("llm_call", attempt=attempt, job_id=job.id)
             response = await provider.complete(request)
             result = _parse_response(response.content, job.id)
             if result:
                 result.provider = provider.name()
                 result.raw_response = response.content[:2000]
-                logger.info(
+                logger.debug(
                     "scoring_complete",
                     job_id=job.id,
                     score=result.total_score,

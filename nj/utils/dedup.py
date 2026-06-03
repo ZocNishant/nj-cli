@@ -15,7 +15,7 @@ class JobDeduplicator:
         new_jobs = []
         for job in jobs:
             if self.repo.job_exists(job.id):
-                logger.debug("duplicate_skipped", job_id=job.id, title=job.title)
+                pass
             else:
                 new_jobs.append(job)
         logger.info(

@@ -13,7 +13,7 @@ class LLMConfig(BaseModel):
     model: str = "claude-sonnet-4-20250514"
     api_key: str = ""
     freellmapi_base_url: str = "http://localhost:3001/v1"
-    freellmapi_api_key: str = "freellmapi-your-key-here"
+    freellmapi_api_key: str = ""
     freellmapi_model: str = "auto"
 
 

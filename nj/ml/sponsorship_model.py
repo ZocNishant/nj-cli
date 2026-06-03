@@ -6,6 +6,7 @@ Predicts likelihood a company sponsors a given role.
 Stack: scikit-learn RandomForest + TF-IDF
 Training data: h1b_petitions table (loaded via nj intel sync)
 """
+
 from __future__ import annotations
 
 import pickle
@@ -205,6 +206,8 @@ class SponsorshipModel:
 
     def _save(self) -> None:
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if MODEL_PATH.exists():
+            MODEL_PATH.unlink()
         with open(MODEL_PATH, "wb") as f:
             pickle.dump(
                 {

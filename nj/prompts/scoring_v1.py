@@ -14,14 +14,33 @@ SCORING CATEGORIES AND WEIGHTS:
 the JD requirements? Look at exact matches, related skills, and depth.
 - experience_relevance (25%): How relevant is the candidate's work history \
 and projects to this role? Weight ML/CV projects heavily.
-- role_alignment (20%): Does the seniority, scope, and focus of the role \
-match the candidate's background and trajectory?
+- role_alignment (20%): Does the job title and scope match the candidate's \
+target roles and career trajectory? Use the strict rules below.
 - sponsorship_compatibility (15%): Based on visa keywords in the JD, how \
 compatible is this role for the candidate's visa/work authorization status?
 - location_fit (5%): Does the job location work for the candidate \
 (USA preferred, remote acceptable, international possible)?
 - resume_strength (5%): How strong is the candidate's overall profile \
 presentation for this specific role?
+
+ROLE_ALIGNMENT STRICT SCORING RULES:
+- Target roles are listed in the CANDIDATE CONTEXT section below.
+- Job title clearly in the candidate's target role family → 70-100
+- Adjacent or related role (e.g. Data Scientist for ML Engineer) → 40-69
+- Tangentially related role (e.g. Backend Eng for ML candidate) → 25-39
+- Unrelated role (e.g. DevOps/Infrastructure for ML candidate) → 0-25
+- STRICT: DevOps, SRE, Platform, or Infrastructure role for an ML/AI \
+candidate → 0-20
+- STRICT: Marketing, Sales, Growth, or non-technical role for any \
+engineering candidate → 0-15
+- STRICT: Intern, Werkstudent, or Apprentice role for a mid-level or \
+senior candidate → 0-20
+
+SCORE CAP RULE (MANDATORY):
+If role_alignment score is below 30, the total_score MUST NOT exceed 50, \
+regardless of skills_match or experience_relevance scores. \
+A strong ML engineer is not a good fit for a DevOps role even if they \
+know Linux. Enforce this cap strictly before returning your JSON.
 
 ANTI-HALLUCINATION RULE:
 Only score based on what is explicitly present in the candidate profile \
@@ -59,7 +78,9 @@ skills_match, experience_relevance, role_alignment, \
 sponsorship_compatibility, location_fit, resume_strength"""
 
 
-def _build_candidate_context(cv_base: dict) -> str:
+def _build_candidate_context(
+    cv_base: dict, target_roles: list[str] | None = None
+) -> str:
     personal = cv_base.get("personal", {})
     name = personal.get("name", "Candidate")
     visa_status = personal.get("visa_status", "")
@@ -86,11 +107,18 @@ def _build_candidate_context(cv_base: dict) -> str:
     context = f"CANDIDATE: {name}\n"
     if seniority:
         context += f"Seniority: {seniority}\n"
-    _no_sponsorship_needed = visa_status in ("citizen", "permanent_resident", "not_applicable")
+    _no_sponsorship_needed = visa_status in (
+        "citizen",
+        "permanent_resident",
+        "not_applicable",
+    )
     if work_auth and not _no_sponsorship_needed:
         context += f"Work auth: {work_auth}\n"
     if grad_date:
         context += f"Graduation: {grad_date}\n"
+    effective_roles = target_roles or cv_base.get("target_roles", [])
+    if effective_roles:
+        context += f"Target roles: {', '.join(effective_roles)}\n"
     if anchor_name:
         context += f"Strongest project: {anchor_name}"
         if anchor_summary:
@@ -107,6 +135,7 @@ def build_user_prompt(
     top_projects: list[dict],
     weights: dict[str, float] | None = None,
     cv_base: dict | None = None,
+    target_roles: list[str] | None = None,
 ) -> str:
     from nj.utils.text import truncate
 
@@ -119,7 +148,9 @@ def build_user_prompt(
         "resume_strength": 0.05,
     }
 
-    candidate_context = _build_candidate_context(cv_base) if cv_base else ""
+    candidate_context = (
+        _build_candidate_context(cv_base, target_roles) if cv_base else ""
+    )
 
     profile_sections = []
 
@@ -179,9 +210,7 @@ def build_user_prompt(
     if cv_base:
         interests = cv_base.get("research_interests", [])
         if interests:
-            profile_sections.append(
-                "RESEARCH INTERESTS:\n  " + ", ".join(interests)
-            )
+            profile_sections.append("RESEARCH INTERESTS:\n  " + ", ".join(interests))
 
     full_profile = "\n\n".join(profile_sections)
 

@@ -5,6 +5,7 @@ Replaces/augments keyword-based scoring with semantic matching.
 Model: all-MiniLM-L6-v2 (80MB, runs locally, fast)
 No training needed — pre-trained embeddings.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -14,6 +15,7 @@ from nj.utils.logger import get_logger
 logger = get_logger(__name__)
 
 MODEL_NAME = "all-MiniLM-L6-v2"
+_semantic_warned = False
 
 
 class SemanticModel:
@@ -22,6 +24,7 @@ class SemanticModel:
         self.is_loaded = False
 
     def load(self) -> bool:
+        global _semantic_warned
         try:
             from sentence_transformers import SentenceTransformer
 
@@ -31,10 +34,12 @@ class SemanticModel:
             logger.info("semantic_model_loaded")
             return True
         except ImportError:
-            logger.warning(
-                "sentence_transformers_not_installed",
-                hint="pip install sentence-transformers",
-            )
+            if not _semantic_warned:
+                logger.warning(
+                    "sentence_transformers_not_installed",
+                    hint="pip install sentence-transformers",
+                )
+                _semantic_warned = True
             return False
         except Exception as e:
             logger.warning("semantic_model_load_failed", error=str(e))
@@ -65,9 +70,7 @@ class SemanticModel:
         for section_name, section_text in sections.items():
             if not section_text.strip():
                 continue
-            emb_section = self.model.encode(
-                [section_text], convert_to_numpy=True
-            )
+            emb_section = self.model.encode([section_text], convert_to_numpy=True)
             similarity = float(
                 self._cosine_similarity(emb_section[0], embeddings_jd[0])
             )
@@ -115,9 +118,7 @@ class SemanticModel:
                 return []
 
         jd_sentences = [
-            s.strip()
-            for s in job_description.split(".")
-            if len(s.strip()) > 20
+            s.strip() for s in job_description.split(".") if len(s.strip()) > 20
         ][:20]
         cv_text = self._cv_to_text(cv_base)
         if not jd_sentences or not cv_text:

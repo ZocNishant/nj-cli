@@ -82,7 +82,7 @@ class LinkedInScraper(BaseScraper):
                     role_jobs = await self._scrape_role(page, role, location)
                     jobs.extend(role_jobs)
                     delay = random.uniform(8, 15)
-                    logger.info(
+                    logger.debug(
                         "linkedin_role_done",
                         role=role,
                         count=len(role_jobs),
@@ -94,7 +94,7 @@ class LinkedInScraper(BaseScraper):
 
             await browser.close()
 
-        logger.info("linkedin_scrape_complete", total=len(jobs), roles=len(roles))
+        logger.debug("linkedin_scrape_complete", total=len(jobs), roles=len(roles))
         return jobs
 
     async def _scrape_role(self, page, role: str, location: str) -> list[Job]:
@@ -120,7 +120,7 @@ class LinkedInScraper(BaseScraper):
             return []
 
         job_links = await self._collect_job_links(page)
-        logger.info("linkedin_links_found", role=role, count=len(job_links))
+        logger.debug("linkedin_links_found", role=role, count=len(job_links))
 
         for link in job_links[: self.MAX_JOBS_PER_ROLE]:
             try:

@@ -28,9 +28,17 @@ class WeWorkRemotelyScraper(BaseScraper):
         "data_science": "https://weworkremotely.com/categories/remote-data-science-jobs.rss",
     }
     ML_KEYWORDS = {
-        "machine learning", "ml engineer", "ai engineer",
-        "computer vision", "deep learning", "data scientist",
-        "pytorch", "tensorflow", "nlp", "llm", "neural",
+        "machine learning",
+        "ml engineer",
+        "ai engineer",
+        "computer vision",
+        "deep learning",
+        "data scientist",
+        "pytorch",
+        "tensorflow",
+        "nlp",
+        "llm",
+        "neural",
     }
 
     def __init__(self, visa_config: VisaConfig):
@@ -51,7 +59,7 @@ class WeWorkRemotelyScraper(BaseScraper):
                     if job.id not in seen_ids:
                         seen_ids.add(job.id)
                         jobs.append(job)
-                logger.info(
+                logger.debug(
                     "wwr_feed_done",
                     category=category,
                     total=len(feed_jobs),
@@ -61,7 +69,7 @@ class WeWorkRemotelyScraper(BaseScraper):
             except Exception as e:
                 logger.warning("wwr_feed_failed", category=category, error=str(e))
 
-        logger.info("wwr_scrape_complete", total=len(jobs))
+        logger.debug("wwr_scrape_complete", total=len(jobs))
         return jobs
 
     def _fetch_feed(self, url: str, category: str) -> list[Job]:
@@ -120,6 +128,9 @@ class WeWorkRemotelyScraper(BaseScraper):
     def _filter_relevant(self, jobs: list[Job], roles: list[str]) -> list[Job]:
         role_words = {w.lower() for r in roles for w in r.split()} | self.ML_KEYWORDS
         return [
-            job for job in jobs
-            if any(kw in (job.title + " " + job.description).lower() for kw in role_words)
+            job
+            for job in jobs
+            if any(
+                kw in (job.title + " " + job.description).lower() for kw in role_words
+            )
         ]

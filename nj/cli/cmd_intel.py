@@ -11,16 +11,16 @@ logger = get_logger(__name__)
 console = Console()
 
 TIER_COLORS = {
-    "STRONG":  "bold green",
+    "STRONG": "bold green",
     "MODERATE": "yellow",
-    "WEAK":    "red",
+    "WEAK": "red",
     "UNKNOWN": "dim",
 }
 
 TIER_ICONS = {
-    "STRONG":  "[bold green]+++[/bold green]",
+    "STRONG": "[bold green]+++[/bold green]",
     "MODERATE": "[yellow]++[/yellow]",
-    "WEAK":    "[red]+[/red]",
+    "WEAK": "[red]+[/red]",
     "UNKNOWN": "[dim]?[/dim]",
 }
 
@@ -40,12 +40,12 @@ def _show_intel_help() -> None:
     table = Table(box=box.SIMPLE, show_header=False, pad_edge=False, padding=(0, 2))
     table.add_column("Subcommand", style="bold cyan", width=20)
     table.add_column("Description", style="dim")
-    table.add_row("sync",    "Download USCIS H1B data (2022–2024)")
+    table.add_row("sync", "Download USCIS H1B data (2022–2024)")
     table.add_row("company", "Profile a company's H1B history")
-    table.add_row("top",     "Top ML/AI H1B sponsors")
-    table.add_row("role",    "Which companies sponsor a role")
-    table.add_row("search",  "Search companies by name fragment")
-    table.add_row("stats",   "Overall dataset stats")
+    table.add_row("top", "Top ML/AI H1B sponsors")
+    table.add_row("role", "Which companies sponsor a role")
+    table.add_row("search", "Search companies by name fragment")
+    table.add_row("stats", "Overall dataset stats")
     console.print(table)
     console.print(
         "[dim]  Examples:\n"
@@ -255,7 +255,9 @@ def _run_stats(db_path: str) -> None:
     stats = repo.get_stats()
 
     if stats["total_petitions"] == 0:
-        console.print("\n[yellow]No H1B data loaded.[/yellow] Run [bold]intel sync[/bold] first.\n")
+        console.print(
+            "\n[yellow]No H1B data loaded.[/yellow] Run [bold]intel sync[/bold] first.\n"
+        )
         return
 
     console.print()
@@ -280,6 +282,10 @@ def run_intel(
     limit: int = 20,
     db_path: str = "data/nj.db",
 ) -> None:
+    from nj.db.engine import init_db
+
+    init_db(db_path)
+
     if not subcommand or subcommand == "help":
         _show_intel_help()
         return

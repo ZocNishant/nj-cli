@@ -11,10 +11,11 @@ Ghost job signals:
 - Generic/vague descriptions
 - Missing key information
 """
+
 from __future__ import annotations
 
 import re
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, UTC
 
 from nj.models.job import Job
 from nj.utils.logger import get_logger
@@ -63,7 +64,10 @@ SPAM_PATTERNS = [
 
 UNREALISTIC_PATTERNS = [
     (r"(junior|entry.?level|associate).*(\d{2})\+?\s+years?", "junior_role_senior_exp"),
-    (r"(react|angular|vue).*(django|rails|spring).*(ios|android).*(ml|ai|data)", "impossible_stack"),
+    (
+        r"(react|angular|vue).*(django|rails|spring).*(ios|android).*(ml|ai|data)",
+        "impossible_stack",
+    ),
 ]
 
 VAGUE_INDICATORS = [
@@ -141,14 +145,6 @@ class GhostJobFilter:
         is_ghost = final_conf >= 0.6
         reason = self._build_reason(signals, job)
 
-        logger.debug(
-            "ghost_check",
-            job_id=job.id,
-            is_ghost=is_ghost,
-            confidence=round(final_conf, 2),
-            signals=signals,
-        )
-
         return GhostJobResult(
             is_ghost=is_ghost,
             confidence=round(final_conf, 2),
@@ -204,14 +200,20 @@ class GhostJobFilter:
         if len(job.description) < self.min_description_length:
             return True, 0.7
         desc_lower = job.description.lower()
-        vague_count = sum(1 for indicator in VAGUE_INDICATORS if indicator in desc_lower)
+        vague_count = sum(
+            1 for indicator in VAGUE_INDICATORS if indicator in desc_lower
+        )
         if vague_count >= 2:
             return True, 0.5 + vague_count * 0.05
         return False, 0.0
 
     def _check_no_company(self, job: Job) -> tuple[bool, float]:
         if not job.company or job.company.lower() in (
-            "unknown", "confidential", "undisclosed", "n/a", ""
+            "unknown",
+            "confidential",
+            "undisclosed",
+            "n/a",
+            "",
         ):
             return True, 0.6
         return False, 0.0
@@ -222,9 +224,12 @@ class GhostJobFilter:
             if re.search(pattern, text, re.IGNORECASE):
                 return True, 0.7
         ml_role = any(
-            kw in text for kw in [
-                "machine learning", "ml engineer",
-                "computer vision", "ai engineer",
+            kw in text
+            for kw in [
+                "machine learning",
+                "ml engineer",
+                "computer vision",
+                "ai engineer",
             ]
         )
         if ml_role:

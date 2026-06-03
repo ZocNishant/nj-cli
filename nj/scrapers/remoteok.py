@@ -49,12 +49,12 @@ class RemoteOKScraper(BaseScraper):
                     if job.id not in seen_ids:
                         seen_ids.add(job.id)
                         jobs.append(job)
-                logger.info("remoteok_tag_done", tag=tag, count=len(fetched))
+                logger.debug("remoteok_tag_done", tag=tag, count=len(fetched))
                 time.sleep(2)
             except Exception as e:
                 logger.warning("remoteok_tag_failed", tag=tag, error=str(e))
 
-        logger.info("remoteok_scrape_complete", total=len(jobs))
+        logger.debug("remoteok_scrape_complete", total=len(jobs))
         return jobs
 
     def _fetch_tag(self, tag: str) -> list[Job]:

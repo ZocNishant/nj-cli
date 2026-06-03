@@ -45,12 +45,12 @@ class ArbeitnowScraper(BaseScraper):
                         seen_ids.add(job.id)
                         jobs.append(job)
                 delay = random.uniform(1.0, 2.0)
-                logger.info("arbeitnow_tag_done", tag=tag, count=len(tag_jobs))
+                logger.debug("arbeitnow_tag_done", tag=tag, count=len(tag_jobs))
                 time.sleep(delay)
             except Exception as e:
                 logger.warning("arbeitnow_tag_failed", tag=tag, error=str(e))
 
-        logger.info("arbeitnow_scrape_complete", total=len(jobs))
+        logger.debug("arbeitnow_scrape_complete", total=len(jobs))
         return jobs
 
     def _roles_to_tags(self, roles: list[str]) -> list[str]:

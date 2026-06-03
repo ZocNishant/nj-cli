@@ -8,6 +8,7 @@ Enriches each job with:
 - Semantic CV-JD similarity
 - Career graph context
 """
+
 from __future__ import annotations
 
 import re
@@ -65,13 +66,6 @@ class JobEnrichment:
         except Exception as e:
             logger.debug("enrichment_graph_failed", error=str(e))
 
-        logger.debug(
-            "job_enriched",
-            job_id=job.id,
-            has_sponsorship=enrichment["sponsorship"] is not None,
-            has_salary=enrichment["salary"] is not None,
-            has_semantic=enrichment["semantic"] is not None,
-        )
         return enrichment
 
     def enrich_batch(
@@ -159,11 +153,7 @@ class JobEnrichment:
             return None
         companies = repo.get_nodes_by_type("company")
         company_match = next(
-            (
-                c
-                for c in companies
-                if repo.normalize(job.company) in c.label_normalized
-            ),
+            (c for c in companies if repo.normalize(job.company) in c.label_normalized),
             None,
         )
         if company_match:

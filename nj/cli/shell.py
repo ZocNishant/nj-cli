@@ -5,19 +5,11 @@ import random
 import readline
 import shlex
 import sys
-import threading
 import time
-from datetime import datetime, UTC
 from pathlib import Path
 
-from rich.align import Align
 from rich.console import Console
-from rich.layout import Layout
-from rich.live import Live
 from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.rule import Rule
-from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 from rich import box
@@ -45,7 +37,18 @@ class NJCompleter:
         "calibrate": ["--from-outcomes"],
         "logs": ["--stats", "--last"],
         "status": ["--no-trajectory"],
-        "search": ["--dry-run", "--verbose"],
+        "search": [
+            "--dry-run",
+            "--verbose",
+            "--level junior",
+            "--level mid",
+            "--level senior",
+            "--level staff",
+            "--limit",
+            "--all-langs",
+            "--visa sponsor",
+            "--visa any",
+        ],
         "run": ["--dry-run", "--silent"],
         "diagnose": ["--no-pdf"],
         "gaps": ["--top"],
@@ -85,13 +88,38 @@ class NJCompleter:
         "update-intern": [],
         "postmortem": [],
         "demo": [],
-        "manual": list({
-            "search", "enrich", "explain", "diagnose", "gaps", "frame",
-            "diff", "postmortem", "intel", "graph", "ml", "prep", "review",
-            "status", "calibrate", "watch", "tailor", "update-cv",
-            "update-role", "update-intern", "init", "run", "demo", "logs",
-            "config", "quality", "label", "manual",
-        }),
+        "manual": list(
+            {
+                "search",
+                "enrich",
+                "explain",
+                "diagnose",
+                "gaps",
+                "frame",
+                "diff",
+                "postmortem",
+                "intel",
+                "graph",
+                "ml",
+                "prep",
+                "review",
+                "status",
+                "calibrate",
+                "watch",
+                "tailor",
+                "update-cv",
+                "update-role",
+                "update-intern",
+                "init",
+                "run",
+                "demo",
+                "logs",
+                "config",
+                "quality",
+                "label",
+                "manual",
+            }
+        ),
         "help": [],
         "clear": [],
         "exit": [],
@@ -157,54 +185,60 @@ class LiveStatus:
         return text
 
 
-def _setup_readline(completer: NJCompleter) -> None:
+def _setup_readline() -> None:
     try:
-        readline.set_completer(completer.complete)
-        readline.set_completer_delims(" \t\n")
-        doc = getattr(readline, "__doc__", "") or ""
-        if "libedit" in doc:
-            readline.parse_and_bind("bind ^I rl_complete")
-        else:
-            readline.parse_and_bind("tab: complete")
-        readline.parse_and_bind('"\\e[A": history-search-backward')
-        readline.parse_and_bind('"\\e[B": history-search-forward')
-        logger.debug("readline_setup_complete")
+        import gnureadline as _rl
+    except ImportError:
+        import readline as _rl  # type: ignore[no-redef]
+
+    try:
+        completer_instance = NJCompleter(list(SHELL_COMMANDS.keys()))
+        _rl.set_completer(completer_instance.complete)
+        _rl.set_completer_delims(" \t\n")
+        _rl.parse_and_bind("tab: complete")
+        _rl.parse_and_bind('"\\e[A": history-search-backward')
+        _rl.parse_and_bind('"\\e[B": history-search-forward')
+
+        history_path = Path.home() / ".nj_history"
+        if history_path.exists():
+            _rl.read_history_file(str(history_path))
+        _rl.set_history_length(500)
     except Exception as e:
         logger.debug("readline_setup_failed", error=str(e))
 
 
 SHELL_COMMANDS = {
-    "search":        "Scrape and score jobs",
-    "run":           "Full pipeline — scrape, score, tailor, apply",
-    "review":        "Review scored jobs interactively",
-    "explain":       "Explain why a job scored the way it did",
-    "diff":          "Show what changed in your tailored CV",
-    "diagnose":      "Diagnose your CV — find root causes",
-    "gaps":          "Skill gap analysis ranked by ROI",
-    "frame":         "Reframe a project for a specific audience",
-    "prep":          "Generate interview prep PDF",
-    "tailor":        "Tailor CV for a specific job URL",
-    "status":        "Application tracker dashboard",
-    "calibrate":     "Tune score threshold",
-    "label":         "Label jobs for calibration dataset",
-    "quality":       "Run quality gate on tailored applications",
-    "watch":         "Check Gmail for interview callbacks",
-    "ml":            "ML models — sponsorship, salary, semantic",
-    "graph":         "Career knowledge graph — visualize your career",
-    "intel":         "H1B sponsorship intelligence — who sponsors ML/AI roles",
-    "enrich":        "Full intelligence report for any job URL",
-    "postmortem":    "Analyse why applications are failing",
-    "init":          "First-time setup wizard",
-    "update-cv":     "Update CV sections interactively",
-    "update-role":   "Add any new role/job to your CV",
+    "search": "Scrape and score jobs",
+    "run": "Full pipeline — scrape, score, tailor, apply",
+    "review": "Review scored jobs interactively",
+    "explain": "Explain why a job scored the way it did",
+    "diff": "Show what changed in your tailored CV",
+    "diagnose": "Diagnose your CV — find root causes",
+    "gaps": "Skill gap analysis ranked by ROI",
+    "frame": "Reframe a project for a specific audience",
+    "prep": "Generate interview prep PDF",
+    "tailor": "Tailor CV for a specific job URL",
+    "status": "Application tracker dashboard",
+    "calibrate": "Tune score threshold",
+    "label": "Label jobs for calibration dataset",
+    "quality": "Run quality gate on tailored applications",
+    "watch": "Check Gmail for interview callbacks",
+    "ml": "ML models — sponsorship, salary, semantic",
+    "graph": "Career knowledge graph — visualize your career",
+    "intel": "H1B sponsorship intelligence — who sponsors ML/AI roles",
+    "enrich": "Full intelligence report for any job URL",
+    "postmortem": "Analyse why applications are failing",
+    "init": "First-time setup wizard",
+    "update-cv": "Update CV sections interactively",
+    "update-role": "Add any new role/job to your CV",
     "update-intern": "Alias for update-role (backward-compatible)",
-    "logs":          "View logs or reliability stats",
-    "config":        "View or edit configuration",
-    "manual":        "Full command reference with examples",
-    "demo":          "Run interactive demo",
-    "help":          "Show all commands",
-    "clear":         "Clear the screen",
-    "exit":          "Exit nj shell",
+    "logs": "View logs or reliability stats",
+    "config": "View or edit configuration",
+    "manual": "Full command reference with examples",
+    "demo": "Run interactive demo",
+    "help": "Show all commands",
+    "clear": "Clear the screen",
+    "exit": "Exit nj shell",
 }
 
 BOOT_MESSAGES = [
@@ -226,19 +260,16 @@ BANNERS = [
    ██║╚██╗██║██   ██║
    ██║ ╚████║╚█████╔╝
    ╚═╝  ╚═══╝ ╚════╝ """,
-
     r"""
   ┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐
   │n││j││ ││c││a││r││e││e││r││ │
   └─┘└─┘└─┘└─┘└─┘└─┘└─┘└─┘└─┘└─┘""",
-
     r"""
    _  _     _
   | \| |   (_)
   | .` |    _
   |_|\_|   (_)
   career intelligence""",
-
     r"""
   ╔═╗╔═╗╦═╗╔═╗╔═╗╦═╗
   ║  ╠═╣╠╦╝║╣ ║╣ ╠╦╝
@@ -246,14 +277,12 @@ BANNERS = [
    ║║║╔═╗╦═╗╦╔═╔═╗
    ║║║║ ║╠╦╝╠╩╗╚═╗
    ╚╩╝╚═╝╩╚═╩ ╩╚═╝""",
-
     r"""
   +-+-+
   |n|j|
   +-+-+
   career operating system
   anti-hallucination by design""",
-
     r"""
   ░░░░░░░░░░░░░░░░░░░░
   ░░███╗░░██╗░░░░░██╗░
@@ -281,6 +310,8 @@ TAGLINES = [
 
 def _matrix_flash() -> None:
     """Brief matrix-style effect on boot."""
+    if not (hasattr(sys.stdout, "isatty") and sys.stdout.isatty()):
+        return
     chars = "01アイウエオカキクケコサシスセソ"
     width = min(console.width or 60, 60)
 
@@ -288,9 +319,6 @@ def _matrix_flash() -> None:
         line = "".join(random.choice(chars) for _ in range(width))
         console.print(f"[bold green dim]{line}[/bold green dim]")
         time.sleep(0.04)
-
-    for _ in range(3):
-        console.print("\033[1A\033[2K", end="")
 
     time.sleep(0.1)
 
@@ -334,14 +362,11 @@ def _get_stats() -> dict:
         with engine.connect() as conn:
             try:
                 stats["jobs"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM jobs")
-                    ).scalar() or 0
+                    conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar() or 0
                 )
                 stats["scored"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM score_results")
-                    ).scalar() or 0
+                    conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar()
+                    or 0
                 )
                 stats["applied"] = (
                     conn.execute(
@@ -349,7 +374,8 @@ def _get_stats() -> dict:
                             "SELECT COUNT(*) FROM applications "
                             "WHERE status='submitted'"
                         )
-                    ).scalar() or 0
+                    ).scalar()
+                    or 0
                 )
                 stats["interviews"] = (
                     conn.execute(
@@ -358,7 +384,8 @@ def _get_stats() -> dict:
                             "WHERE outcome='interview' "
                             "OR outcome='offer'"
                         )
-                    ).scalar() or 0
+                    ).scalar()
+                    or 0
                 )
             except Exception:
                 pass
@@ -401,7 +428,7 @@ def _render_splash(stats: dict, version: str) -> None:
             console.print("  " + "  ".join(stat_parts))
 
     console.print()
-    console.print(f"  [dim italic]\"{tagline}\"[/dim italic]")
+    console.print(f'  [dim italic]"{tagline}"[/dim italic]')
     console.print(
         f"\n  [dim]v{version}  ·  "
         f"Tab complete  ·  ↑↓ history  ·  "
@@ -421,8 +448,17 @@ def _show_help() -> None:
     table.add_column("Description", style="dim")
 
     sections = {
-        "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame", "graph", "intel", "ml"],
-        "Job hunting":  ["search", "run", "review", "tailor", "quality"],
+        "Intelligence": [
+            "diagnose",
+            "gaps",
+            "explain",
+            "diff",
+            "frame",
+            "graph",
+            "intel",
+            "ml",
+        ],
+        "Job hunting": ["search", "run", "review", "tailor", "quality"],
         "Applications": ["status", "calibrate", "label", "watch", "prep"],
         "CV management": ["update-cv", "update-role"],
         "System": ["logs", "config", "manual", "demo", "help", "clear", "exit"],
@@ -459,36 +495,44 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         return True
 
     COMMAND_MAP = {
-        "search":        "nj.cli.cmd_search:run_search",
-        "run":           "nj.cli.cmd_run:run_pipeline",
-        "review":        "nj.cli.cmd_review:run_review",
-        "explain":       "nj.cli.cmd_explain:run_explain",
-        "diff":          "nj.cli.cmd_diff:run_diff",
-        "diagnose":      "nj.cli.cmd_diagnose:run_diagnose",
-        "gaps":          "nj.cli.cmd_gaps:run_gaps",
-        "frame":         "nj.cli.cmd_frame:run_frame",
-        "prep":          "nj.cli.cmd_prep:run_prep",
-        "tailor":        "nj.cli.cmd_tailor:run_tailor",
-        "status":        "nj.cli.cmd_status:run_status",
-        "calibrate":     "nj.cli.cmd_calibrate:run_calibrate",
-        "label":         "nj.cli.cmd_label:run_label",
-        "quality":       "nj.cli.cmd_quality:run_quality_check",
-        "watch":         "nj.cli.cmd_watch:run_watch",
-        "ml":            "nj.cli.cmd_ml:run_ml",
-        "graph":         "nj.cli.cmd_graph:run_graph",
-        "intel":         "nj.cli.cmd_intel:run_intel",
-        "enrich":        "nj.cli.cmd_enrich:run_enrich",
-        "postmortem":    "nj.cli.cmd_postmortem:run_postmortem",
-        "update-cv":     "nj.cli.cmd_update_cv:run_update_cv",
-        "init":          "nj.cli.cmd_init:run_init",
-        "update-role":   "nj.cli.cmd_update_role:run_update_role",
+        "search": "nj.cli.cmd_search:run_search",
+        "run": "nj.cli.cmd_run:run_pipeline",
+        "review": "nj.cli.cmd_review:run_review",
+        "explain": "nj.cli.cmd_explain:run_explain",
+        "diff": "nj.cli.cmd_diff:run_diff",
+        "diagnose": "nj.cli.cmd_diagnose:run_diagnose",
+        "gaps": "nj.cli.cmd_gaps:run_gaps",
+        "frame": "nj.cli.cmd_frame:run_frame",
+        "prep": "nj.cli.cmd_prep:run_prep",
+        "tailor": "nj.cli.cmd_tailor:run_tailor",
+        "status": "nj.cli.cmd_status:run_status",
+        "calibrate": "nj.cli.cmd_calibrate:run_calibrate",
+        "label": "nj.cli.cmd_label:run_label",
+        "quality": "nj.cli.cmd_quality:run_quality_check",
+        "watch": "nj.cli.cmd_watch:run_watch",
+        "ml": "nj.cli.cmd_ml:run_ml",
+        "graph": "nj.cli.cmd_graph:run_graph",
+        "intel": "nj.cli.cmd_intel:run_intel",
+        "enrich": "nj.cli.cmd_enrich:run_enrich",
+        "postmortem": "nj.cli.cmd_postmortem:run_postmortem",
+        "update-cv": "nj.cli.cmd_update_cv:run_update_cv",
+        "init": "nj.cli.cmd_init:run_init",
+        "update-role": "nj.cli.cmd_update_role:run_update_role",
         "update-intern": "nj.cli.cmd_update_intern:run_update_intern",
-        "logs":          "nj.cli.cmd_logs:run_logs",
-        "demo":          "nj.cli.cmd_demo:run_demo",
-        "manual":        "nj.cli.cmd_help_full:run_manual",
+        "logs": "nj.cli.cmd_logs:run_logs",
+        "demo": "nj.cli.cmd_demo:run_demo",
+        "manual": "nj.cli.cmd_help_full:run_manual",
     }
 
     _print_command_header(command)
+
+    if command == "config":
+        show = "--show" in args
+        check = "--check-provider" in args
+        from nj.cli.cmd_config import run_config
+
+        run_config(config=config, show=show, check_provider=check)
+        return True
 
     if command not in COMMAND_MAP:
         console.print(
@@ -526,9 +570,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         if command == "prep":
             url = _get_flag(args, "--url")
             job_id = _get_flag(args, "--job-id") or (
-                args[0]
-                if args and not args[0].startswith("--")
-                else None
+                args[0] if args and not args[0].startswith("--") else None
             )
             last = "--last" in args
             func(config=config, url=url, job_id=job_id, last=last)
@@ -536,12 +578,8 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             return True
 
         if command == "frame":
-            project_id = _get_flag(args, "--project") or _get_flag(
-                args, "-p"
-            )
-            audience = _get_flag(args, "--audience") or _get_flag(
-                args, "-a"
-            )
+            project_id = _get_flag(args, "--project") or _get_flag(args, "-p")
+            audience = _get_flag(args, "--audience") or _get_flag(args, "-a")
             list_projects = "--list" in args or "-l" in args
             func(
                 config=config,
@@ -554,7 +592,19 @@ def _dispatch(command: str, args: list[str], config) -> bool:
 
         if command == "search":
             dry_run = "--dry-run" in args
-            func(config=config, dry_run=dry_run)
+            level_arg = _get_flag(args, "--level") or _get_flag(args, "-l")
+            limit_s = _get_flag(args, "--limit") or _get_flag(args, "-n")
+            limit = int(limit_s) if limit_s else 50
+            all_langs = "--all-langs" in args
+            visa_mode = _get_flag(args, "--visa") or "any"
+            func(
+                config=config,
+                dry_run=dry_run,
+                level=level_arg,
+                limit=limit,
+                all_langs=all_langs,
+                visa_mode=visa_mode,
+            )
             _show_success(command)
             return True
 
@@ -583,14 +633,6 @@ def _dispatch(command: str, args: list[str], config) -> bool:
 
         if command == "status":
             func(config=config)
-            return True
-
-        if command == "config":
-            show = "--show" in args
-            check = "--check-provider" in args
-            from nj.cli.cmd_config import run_config
-
-            run_config(config=config, show=show, check_provider=check)
             return True
 
         if command == "ml":
@@ -634,6 +676,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             url_arg = args[0] if args else None
             no_score = "--no-score" in args
             from nj.cli.cmd_enrich import run_enrich
+
             run_enrich(config=config, url=url_arg, no_score=no_score)
             _show_success(command)
             return True
@@ -641,6 +684,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         if command == "postmortem":
             min_apps = int(_get_flag(args, "--min") or 3)
             from nj.cli.cmd_postmortem import run_postmortem
+
             run_postmortem(config=config, min_applications=min_apps)
             _show_success(command)
             return True
@@ -648,6 +692,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         if command == "manual":
             cmd_arg = args[0] if args else None
             from nj.cli.cmd_help_full import run_manual
+
             run_manual(command=cmd_arg)
             return True
 
@@ -655,10 +700,9 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             sub = args[0] if args else None
             # Collect remaining positional args (non-flag) as query
             query_parts = [
-                a for i, a in enumerate(args[1:])
-                if not a.startswith("-") and (
-                    i == 0 or not args[i].startswith("-")
-                )
+                a
+                for i, a in enumerate(args[1:])
+                if not a.startswith("-") and (i == 0 or not args[i].startswith("-"))
             ]
             query_arg = " ".join(query_parts)
             state = _get_flag(args, "--state") or _get_flag(args, "-s") or ""
@@ -684,12 +728,14 @@ def _dispatch(command: str, args: list[str], config) -> bool:
 
         if command == "init":
             from nj.cli.cmd_init import run_init
+
             force = "--force" in args
             run_init(force=force)
             return True
 
         if command == "update-role":
             from nj.cli.cmd_update_role import run_update_role
+
             run_update_role(config=config)
             return True
 
@@ -702,10 +748,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
     except KeyboardInterrupt:
         console.print("\n  [dim]Interrupted.[/dim]")
     except Exception as e:
-        console.print(
-            f"  [red]Error:[/red] {e}\n"
-            f"  [dim]{type(e).__name__}[/dim]"
-        )
+        console.print(f"  [red]Error:[/red] {e}\n" f"  [dim]{type(e).__name__}[/dim]")
         logger.warning(
             "shell_command_failed",
             command=command,
@@ -727,11 +770,25 @@ def _get_flag(args: list[str], flag: str) -> str | None:
     return None
 
 
-_HEAVY_COMMANDS: frozenset[str] = frozenset({
-    "search", "run", "diagnose", "gaps", "frame", "prep",
-    "tailor", "enrich", "graph", "ml", "intel", "watch",
-    "postmortem", "diff", "explain",
-})
+_HEAVY_COMMANDS: frozenset[str] = frozenset(
+    {
+        "search",
+        "run",
+        "diagnose",
+        "gaps",
+        "frame",
+        "prep",
+        "tailor",
+        "enrich",
+        "graph",
+        "ml",
+        "intel",
+        "watch",
+        "postmortem",
+        "diff",
+        "explain",
+    }
+)
 
 _SUCCESS_MESSAGES: dict[str, str] = {
     "search": "search complete",
@@ -774,14 +831,42 @@ def _get_prompt_text(config, stats: dict | None = None) -> str:
             f"[dim cyan][{state}][/dim cyan] "
             f"[bold]>[/bold] "
         )
-    return (
-        f"[bold cyan]nj[/bold cyan]"
-        f"[dim]({provider})[/dim] "
-        f"[bold]>[/bold] "
-    )
+    return f"[bold cyan]nj[/bold cyan]" f"[dim]({provider})[/dim] " f"[bold]>[/bold] "
+
+
+def _get_prompt_plain(config, stats: dict | None = None) -> str:
+    provider = getattr(getattr(config, "llm", None), "provider", "claude")
+    if stats and stats.get("jobs", 0) > 0:
+        jobs = stats["jobs"]
+        applied = stats.get("applied", 0)
+        state = f"{jobs}j·{applied}a" if applied > 0 else f"{jobs}j"
+        return f"nj({provider})[{state}] > "
+    return f"nj({provider}) > "
+
+
+def _get_input(prompt: str) -> str:
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    line = sys.stdin.readline()
+    return line.rstrip("\n")
 
 
 def run_shell(version: str = "1.2.0") -> None:
+    db_path = "data/nj.db"
+    try:
+        from nj.db.engine import init_db
+
+        init_db(db_path)
+    except Exception:
+        pass
+
+    try:
+        from nj.utils.logger import setup_logger
+
+        setup_logger()
+    except Exception:
+        pass
+
     from nj.models.config import Config
 
     try:
@@ -789,16 +874,7 @@ def run_shell(version: str = "1.2.0") -> None:
     except Exception:
         config = Config()
 
-    completer = NJCompleter(list(SHELL_COMMANDS.keys()))
-    _setup_readline(completer)
-
-    history_path = Path.home() / ".nj_history"
-    try:
-        if history_path.exists():
-            readline.read_history_file(str(history_path))
-        readline.set_history_length(500)
-    except Exception:
-        pass
+    _setup_readline()
 
     _boot_sequence()
     stats = _get_stats()
@@ -808,8 +884,8 @@ def run_shell(version: str = "1.2.0") -> None:
         while True:
             try:
                 stats = _get_stats()
-                prompt_text = _get_prompt_text(config, stats)
-                raw = console.input(prompt_text)
+                prompt_plain = _get_prompt_plain(config, stats)
+                raw = _get_input(prompt_plain)
                 raw = raw.strip()
 
                 if not raw:
@@ -826,11 +902,10 @@ def run_shell(version: str = "1.2.0") -> None:
                 should_continue = _dispatch(command, args, config)
                 if not should_continue:
                     break
+                print()  # blank line between command output and next prompt
 
             except KeyboardInterrupt:
-                console.print(
-                    "\n  [dim]Use [bold]exit[/bold] to quit.[/dim]"
-                )
+                console.print("\n  [dim]Use [bold]exit[/bold] to quit.[/dim]")
                 continue
             except EOFError:
                 break
@@ -839,16 +914,22 @@ def run_shell(version: str = "1.2.0") -> None:
         console.print(f"[red]Shell error:[/red] {e}")
 
     try:
-        readline.write_history_file(str(history_path))
+        try:
+            import gnureadline as _rl_write
+        except ImportError:
+            import readline as _rl_write  # type: ignore[no-redef]
+        _rl_write.write_history_file(str(Path.home() / ".nj_history"))
     except Exception:
         pass
 
     console.print()
-    console.print(Panel(
-        "[dim]session ended.[/dim]\n\n"
-        "[dim]your data stays local. "
-        "your cv stays yours.[/dim]",
-        border_style="dim",
-        width=40,
-    ))
+    console.print(
+        Panel(
+            "[dim]session ended.[/dim]\n\n"
+            "[dim]your data stays local. "
+            "your cv stays yours.[/dim]",
+            border_style="dim",
+            width=40,
+        )
+    )
     console.print()

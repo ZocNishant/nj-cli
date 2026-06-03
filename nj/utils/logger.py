@@ -17,6 +17,15 @@ def is_verbose() -> bool:
     return _verbose
 
 
+def _level_filter(logger, method, event_dict):
+    """Drop debug/info events when not verbose."""
+    if not _verbose:
+        level = event_dict.get("level", "info")
+        if level in ("debug", "info"):
+            raise structlog.DropEvent()
+    return event_dict
+
+
 def setup_logger(
     level: str = "INFO",
     log_file: str = "logs/nj.log",
@@ -43,16 +52,33 @@ def setup_logger(
     ch.setFormatter(logging.Formatter("%(message)s"))
     root.addHandler(ch)
 
-    structlog.configure(
-        processors=[
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
-            structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
-            structlog.dev.ConsoleRenderer(),
-        ],
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-    )
+    if _verbose:
+        structlog.configure(
+            processors=[
+                _level_filter,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.add_logger_name,
+                structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
+                structlog.dev.ConsoleRenderer(),
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=False,
+        )
+    else:
+        structlog.configure(
+            processors=[
+                _level_filter,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.add_logger_name,
+                structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
+                structlog.processors.JSONRenderer(),
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=False,
+            context_class=dict,
+        )
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:

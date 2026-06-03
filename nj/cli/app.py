@@ -16,6 +16,9 @@ app = typer.Typer(
 def main_entry() -> None:
     """Entry point: bare 'nj' launches the interactive shell; anything
     with arguments delegates to the Typer app as usual."""
+    from nj.utils.secrets import bootstrap
+
+    bootstrap()
     if len(sys.argv) == 1:
         from nj.cli.shell import run_shell
 
@@ -122,13 +125,43 @@ def run(
 def search(
     dry_run: bool = typer.Option(False, "--dry-run"),
     db_path: str = typer.Option("data/nj.db", "--db"),
+    level: str = typer.Option(
+        None,
+        "--level",
+        "-l",
+        help="Seniority filter: junior, mid, senior, staff",
+    ),
+    limit: int = typer.Option(
+        50,
+        "--limit",
+        "-n",
+        help="Max jobs to score (default: 50, use 0 for all)",
+    ),
+    all_langs: bool = typer.Option(
+        False,
+        "--all-langs",
+        help="Include non-English job listings",
+    ),
+    visa: str = typer.Option(
+        "any",
+        "--visa",
+        help="sponsor=confirmed/likely only, any=all (default: any)",
+    ),
 ) -> None:
     """Scrape and score jobs without applying — review first."""
     from nj.cli.cmd_search import run_search
     from nj.models.config import Config
 
     config = Config.load()
-    run_search(config=config, db_path=db_path, dry_run=dry_run)
+    run_search(
+        config=config,
+        db_path=db_path,
+        dry_run=dry_run,
+        level=level,
+        limit=limit,
+        all_langs=all_langs,
+        visa_mode=visa,
+    )
 
 
 @app.command()
@@ -209,7 +242,9 @@ def calibrate(
     if from_outcomes:
         from nj.cli.cmd_calibrate import run_calibrate_from_outcomes
 
-        run_calibrate_from_outcomes(config=config, db_path=db_path, config_path=config_path)
+        run_calibrate_from_outcomes(
+            config=config, db_path=db_path, config_path=config_path
+        )
     else:
         from nj.cli.cmd_calibrate import run_calibrate
 
@@ -284,7 +319,9 @@ def logs(
 def prep(
     job_id: str = typer.Option(None, "--job-id", "-j", help="Job ID from nj status"),
     url: str = typer.Option(None, "--url", "-u", help="Job URL to prep for"),
-    last: bool = typer.Option(False, "--last", "-l", help="Prep for most recently applied job"),
+    last: bool = typer.Option(
+        False, "--last", "-l", help="Prep for most recently applied job"
+    ),
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
 ) -> None:
@@ -305,7 +342,9 @@ def prep(
 
 @app.command()
 def quality(
-    job_id: str = typer.Option(None, "--job-id", "-j", help="Check a specific job by ID"),
+    job_id: str = typer.Option(
+        None, "--job-id", "-j", help="Check a specific job by ID"
+    ),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
     """Run pre-submit quality gate on tailored applications."""
@@ -330,7 +369,9 @@ def frame(
     role_description: str = typer.Option(
         "", "--role", help="Role description for custom audience"
     ),
-    list_projects: bool = typer.Option(False, "--list", "-l", help="List available projects"),
+    list_projects: bool = typer.Option(
+        False, "--list", "-l", help="List available projects"
+    ),
 ) -> None:
     """Reframe a project for a specific audience or role type."""
     from nj.cli.cmd_frame import run_frame
@@ -382,25 +423,39 @@ def diagnose(
 def watch(
     days_back: int = typer.Option(7, "--days", "-d", help="Days back to scan Gmail"),
     db_path: str = typer.Option("data/nj.db", "--db"),
-    setup: bool = typer.Option(False, "--setup", help="Show Gmail OAuth2 setup instructions"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Detect callbacks without updating DB"),
+    setup: bool = typer.Option(
+        False, "--setup", help="Show Gmail OAuth2 setup instructions"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Detect callbacks without updating DB"
+    ),
 ) -> None:
     """Check Gmail for interview callbacks and offer signals."""
     from nj.cli.cmd_watch import run_watch
     from nj.models.config import Config
 
     config = Config.load()
-    run_watch(config=config, db_path=db_path, days_back=days_back, setup=setup, dry_run=dry_run)
+    run_watch(
+        config=config,
+        db_path=db_path,
+        days_back=days_back,
+        setup=setup,
+        dry_run=dry_run,
+    )
 
 
 @app.command()
 def diff(
     job_id: str = typer.Option(
-        None, "--job-id", "-j",
+        None,
+        "--job-id",
+        "-j",
         help="Job ID to diff (first 8 chars work)",
     ),
     section: str = typer.Option(
-        None, "--section", "-s",
+        None,
+        "--section",
+        "-s",
         help="Section to diff: summary, skills, experience, projects",
     ),
     db_path: str = typer.Option("data/nj.db", "--db"),
@@ -421,11 +476,15 @@ def diff(
 @app.command()
 def explain(
     job_id: str = typer.Option(
-        None, "--job-id", "-j",
+        None,
+        "--job-id",
+        "-j",
         help="Job ID to explain (first 8 chars work too)",
     ),
     top_n: int = typer.Option(
-        10, "--top", "-n",
+        10,
+        "--top",
+        "-n",
         help="Show top N scored jobs when no ID given",
     ),
     db_path: str = typer.Option("data/nj.db", "--db"),
@@ -505,7 +564,9 @@ def intel(
         None, help="sync | company | top | role | search | stats"
     ),
     query: str = typer.Argument("", help="Company name, role query, or search term"),
-    state: str = typer.Option("", "--state", "-s", help="Filter by state (e.g. CA, NY)"),
+    state: str = typer.Option(
+        "", "--state", "-s", help="Filter by state (e.g. CA, NY)"
+    ),
     year: int = typer.Option(0, "--year", "-y", help="Filter by year (2022–2024)"),
     limit: int = typer.Option(20, "--limit", "-n", help="Max results to show"),
     db_path: str = typer.Option("data/nj.db", "--db"),
@@ -543,7 +604,8 @@ def enrich(
 def postmortem(
     db_path: str = typer.Option("data/nj.db", "--db"),
     min_applications: int = typer.Option(
-        3, "--min",
+        3,
+        "--min",
         help="Minimum applications needed for analysis",
     ),
 ) -> None:

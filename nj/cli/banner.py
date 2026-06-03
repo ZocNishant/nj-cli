@@ -1,10 +1,8 @@
 import random
-from datetime import datetime, UTC
+import sys
 
 from rich.console import Console
 from rich.text import Text
-from rich.panel import Panel
-from rich import box
 
 console = Console()
 
@@ -16,33 +14,28 @@ BANNERS = [
    ██║╚██╗██║██   ██║
    ██║ ╚████║╚█████╔╝
    ╚═╝  ╚═══╝ ╚════╝ """,
-
     r"""
     ___ ___
    |   |   |
    | n | j |
    |___|___|
    career intelligence""",
-
     r"""
    ┌──────────────────┐
    │  nj :: v{version}  │
    │  career engine   │
    └──────────────────┘""",
-
     r"""
     ███╗
    ██╔██╗  nj
    ██║╚██╗ career
    ██║ ╚██╗operating
    ╚═╝  ╚═╝system""",
-
     r"""
    ╔╗╔      ╦
    ║║║      ║
    ╝╚╝ ██╗  ╩
        ╚═╝     """,
-
     r"""
   ______  __
  /      \/  |
@@ -52,13 +45,11 @@ BANNERS = [
  $$    $$ $$ |
   $$$$$$  $$/
    """,
-
     r"""
   ┌─┐
   │n│  job hunter
   │j│  career os
   └─┘  v{version}""",
-
     r"""
    _  _
   | \| |
@@ -69,17 +60,15 @@ BANNERS = [
 
 TAGLINES = [
     "quality over quantity.",
-    "never invents your experience.",
-    "your career. your data. your machine.",
-    "explainable AI for technical careers.",
-    "anti-hallucination by design.",
     "trust the score. question the threshold.",
-    "built for the ones who build things.",
-    "OPT to offer. one command at a time.",
-    "find the right job. not just any job.",
-    "career intelligence. not career spam.",
-    "your resume. validated. not fabricated.",
     "signal over noise.",
+    "explainable AI for technical careers.",
+    "your career. your data. your machine.",
+    "built for the ones who build things.",
+    "anti-hallucination by design.",
+    "never invents your experience.",
+    "score it. understand it. own it.",
+    "the job search, engineered.",
 ]
 
 TIPS = [
@@ -100,6 +89,10 @@ TIPS = [
     "nj postmortem → find out exactly why applications are failing",
     "nj enrich <url> → instant intelligence on any job URL",
 ]
+
+
+def _is_tty() -> bool:
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
 def get_banner(version: str = "1.2.0") -> str:
@@ -134,23 +127,29 @@ def show_banner(
 def _get_quick_stats(db_path: str) -> str:
     try:
         from pathlib import Path
+
         if not Path(db_path).exists():
             return ""
         from nj.db.engine import get_engine
         from sqlalchemy import text
+
         engine = get_engine(db_path)
         with engine.connect() as conn:
             try:
-                jobs = conn.execute(
-                    text("SELECT COUNT(*) FROM jobs")
-                ).scalar() or 0
-                apps = conn.execute(
-                    text("SELECT COUNT(*) FROM applications "
-                         "WHERE status='submitted'")
-                ).scalar() or 0
-                scores = conn.execute(
-                    text("SELECT COUNT(*) FROM score_results")
-                ).scalar() or 0
+                jobs = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar() or 0
+                apps = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM applications "
+                            "WHERE status='submitted'"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                scores = (
+                    conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar()
+                    or 0
+                )
                 if jobs == 0 and apps == 0:
                     return ""
                 parts = []
