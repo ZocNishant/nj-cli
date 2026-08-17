@@ -63,6 +63,7 @@ Last verified: 2026-08-17 (CV template restored; application status split).
 | Secrets never committed | Met | `.env`, `config.yaml`, `cv/*.json` gitignored; CI runs gitleaks over full history and asserts those paths stay untracked. |
 | Mocked LLM calls in unit tests | Met | No unit test performs a live call. `tests/integration/test_prompt_regression.py` is opt-in via `NJ_RUN_REGRESSION_TESTS`. |
 | Visa matching regression coverage | Met | `tests/unit/test_visa_filter.py` pins both historical failure directions. |
+| Stored visa labels | Met, but **re-run after any classifier change** | `jobs.visa_label` is written once at scrape time and `should_skip`/`nj search` read the stored value, so fixing `visa_filter.py` does not touch a single row. On 2026-08-17 the DB still held labels from the old substring matcher: 224 jobs read CONFIRMED when only 7 contained the word "sponsor", and two — Anduril (security clearance) and itD Tech ("unable to offer sponsorship") — were outright refusals stored as confirmed. `nj reclassify` re-derives every label, is read-only until `--apply`, and is idempotent. 247 of 470 labels changed. Run it after touching the classifier. |
 | Anti-hallucination regression coverage | Met | `tests/unit/test_anti_hallucination.py` — 19 cases over realistic CV shapes, asserting reorder/drop/reword pass and invented employer, title, institution, degree, project, certification, skill, and free-text claims fail. `tests/unit/test_drafter_reviewer.py` covers the pipeline around it, including a dead reviewer and a revision that regresses. |
 | **LinkedIn automation** | **Deliberately disabled** | `nj/scrapers/linkedin.py` was a cookie-authenticated Playwright scraper of the operator's own account; `nj/applying/linkedin_easy.py` was a placeholder for Easy Apply. Both are now inert stubs. Cookie-driven automation risks a checkpoint or a permanent ban on the account the operator job-hunts from, and an auto-submitted application cannot be retracted. `LinkedInScraper.scrape()` returns `[]` and keeps the `BaseScraper` contract; the constructor accepts `session_cookie` and drops it rather than storing it. `NJ_ENABLE_LINKEDIN_SCRAPER` is an opt-in gate for a *future* implementation and does not resurrect anything on its own. Do not reinstate this without asking. |
 
@@ -91,21 +92,23 @@ output.
   441 jobs and is now disabled. Adzuna and JSearch supply the US roles and both
   return nothing until `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`/`JSEARCH_API_KEY` are set
   in `.env`.
-- **`ANTHROPIC_API_KEY` in `.env` is empty**, so every scoring, tailoring, and
-  review call fails with "Could not resolve authentication method". `nj search`
-  still completes and renders its table — the failure is per-job and handled —
-  so it looks like a scoring result of zero rather than an outage. Set the key
-  before reading any score as meaningful.
-  `GROQ_API_KEY` *is* set and works: `provider: freellmapi` with
-  `freellmapi_base_url: https://api.groq.com/openai/v1` and
-  `freellmapi_model: openai/gpt-oss-120b` completes end to end. Two caveats
-  before relying on it — `registry.py` reads the single `freellmapi_model`
-  field and ignores `resolve_model()`, so all four tiers collapse to one model
-  and the reviewer stops being a different model from the drafter; and
-  `OpenAICompatibleProvider.complete()` ignores `json_schema`,
-  `response_format`, and `cache_system`, so `SCORE_SCHEMA`/`REVIEW_SCHEMA` stop
-  being guarantees. Avoid `qwen/qwen3.6-27b` — it emits raw `<think>` blocks
-  into `content`.
+- **The project runs on OpenAI as of 2026-08-17**, not Claude.
+  `ANTHROPIC_API_KEY` is still empty; `OPENAI_API_KEY` is set and verified.
+  `config.yaml` is `provider: openai` with `gpt-5.5` for tailoring and
+  reasoning and `gpt-5.4-mini` for scoring and review. Every one of those IDs
+  was verified with a real completion through nj's own provider, not a
+  `models.list` lookup. `gpt-5.5-pro` is **not** a chat model and 404s on
+  `v1/chat/completions` — do not set it as a tier.
+  One caveat remains on this path: `OpenAICompatibleProvider.complete()` still
+  ignores `json_schema`, `response_format` and `cache_system`, so
+  `SCORE_SCHEMA`/`REVIEW_SCHEMA` are not enforced and scoring falls back to
+  salvaging JSON out of prose. Outstanding.
+  `GROQ_API_KEY` also works as a fallback (`provider: freellmapi`,
+  `freellmapi_base_url: https://api.groq.com/openai/v1`,
+  `freellmapi_model: openai/gpt-oss-120b`), but `registry.py` reads the single
+  `freellmapi_model` field for every task, so that path still collapses all
+  four tiers onto one model. Avoid `qwen/qwen3.6-27b` — it emits raw `<think>`
+  blocks into `content`.
 
 ### Working agreements
 - Run `ruff check nj/ tests/`, `ruff format --check nj/ tests/`, and `pytest` after
