@@ -21,3 +21,6 @@ dist/
 data/
 *.db
 .git-secret-replacements.txt
+.coverage
+coverage.xml
+htmlcov/
