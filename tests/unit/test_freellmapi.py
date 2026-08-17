@@ -139,6 +139,44 @@ def test_registry_raises_for_unknown():
     assert "claude" in str(exc.value)
 
 
+def test_registry_openai_honours_the_model_tiers():
+    """The OpenAI path must tier like the Claude path.
+
+    It used to read config.model for every task, which collapsed scoring,
+    tailoring, review and reasoning onto one model — and made the reviewer the
+    same model as the drafter it is meant to audit.
+    """
+    config = LLMConfig(
+        provider="openai",
+        api_key="sk-test",
+        model="fallback-model",
+        scoring_model="scoring-model",
+        tailoring_model="tailoring-model",
+        review_model="review-model",
+        reasoning_model="reasoning-model",
+    )
+    assert get_provider(config, task="scoring").model == "scoring-model"
+    assert get_provider(config, task="tailoring").model == "tailoring-model"
+    assert get_provider(config, task="review").model == "review-model"
+    assert get_provider(config, task="reasoning").model == "reasoning-model"
+    # An unrecognised task still falls back to the generic model.
+    assert get_provider(config, task="nonsense").model == "fallback-model"
+    assert get_provider(config).model == "fallback-model"
+
+
+def test_registry_openai_drafter_and_reviewer_are_different_models():
+    """The asymmetry the drafter-reviewer split depends on, on the OpenAI path."""
+    config = LLMConfig(
+        provider="openai",
+        api_key="sk-test",
+        tailoring_model="big-model",
+        review_model="cheap-model",
+    )
+    drafter = get_provider(config, task="tailoring")
+    reviewer = get_provider(config, task="review")
+    assert drafter.model != reviewer.model
+
+
 def test_openai_alias_works():
     assert OpenAIProvider is OpenAICompatibleProvider
 
@@ -153,3 +191,117 @@ async def test_import_error_on_missing_openai():
         provider._client = None
         with pytest.raises((ImportError, Exception)):
             provider._get_client()
+
+
+# --- parameter adaptation ---
+#
+# Newer OpenAI models reject `max_tokens` (requiring `max_completion_tokens`)
+# and some reject `temperature`. Groq and older models want the old spelling.
+# The provider learns the shape from the first 400 rather than carrying a
+# model-family list that goes stale on every release.
+
+
+def _param_error(param: str):
+    return Exception(
+        f"Error code: 400 - {{'error': {{'message': \"Unsupported parameter: "
+        f"'{param}' is not supported with this model.\"}}}}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_provider_switches_to_max_completion_tokens_on_rejection():
+    provider = OpenAICompatibleProvider(api_key="k", base_url="https://x/v1", model="gpt-5.5")
+    calls: list[dict] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs)
+        if "max_tokens" in kwargs:
+            raise _param_error("max_tokens")
+        return make_openai_response('{"ok": true}', model="gpt-5.5")
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=create)
+    with patch.object(provider, "_get_client", return_value=client):
+        result = await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+
+    assert result.content == '{"ok": true}'
+    assert "max_tokens" in calls[0]
+    assert calls[1]["max_completion_tokens"] == 500
+    assert provider._token_param == "max_completion_tokens"
+
+
+@pytest.mark.asyncio
+async def test_provider_drops_temperature_when_rejected():
+    provider = OpenAICompatibleProvider(api_key="k", base_url="https://x/v1", model="o3")
+    calls: list[dict] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs)
+        if "temperature" in kwargs:
+            raise _param_error("temperature")
+        return make_openai_response('{"ok": true}', model="o3")
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=create)
+    with patch.object(provider, "_get_client", return_value=client):
+        await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+
+    assert "temperature" not in calls[-1]
+    assert provider._send_temperature is False
+
+
+@pytest.mark.asyncio
+async def test_provider_remembers_the_shape_across_calls():
+    """The adaptation must be paid once, not on all 200 scoring calls in a run."""
+    provider = OpenAICompatibleProvider(api_key="k", base_url="https://x/v1", model="gpt-5.5")
+    calls: list[dict] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs)
+        if "max_tokens" in kwargs:
+            raise _param_error("max_tokens")
+        return make_openai_response('{"ok": true}', model="gpt-5.5")
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=create)
+    with patch.object(provider, "_get_client", return_value=client):
+        await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+        await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+
+    # 2 for the first call (one rejected, one accepted), 1 for the second.
+    assert len(calls) == 3
+    assert "max_tokens" not in calls[2]
+
+
+@pytest.mark.asyncio
+async def test_provider_keeps_max_tokens_when_the_model_accepts_it():
+    """Groq and older OpenAI models must be unaffected by the adaptation."""
+    provider = OpenAICompatibleProvider(api_key="k", base_url="https://x/v1", model="gpt-4o-mini")
+    calls: list[dict] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs)
+        return make_openai_response('{"ok": true}', model="gpt-4o-mini")
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=create)
+    with patch.object(provider, "_get_client", return_value=client):
+        await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+
+    assert len(calls) == 1
+    assert calls[0]["max_tokens"] == 500
+    assert provider._token_param == "max_tokens"
+
+
+@pytest.mark.asyncio
+async def test_provider_reraises_an_error_it_cannot_adapt_to():
+    """A 404 for a non-chat model must surface, not spin through retries."""
+    provider = OpenAICompatibleProvider(api_key="k", base_url="https://x/v1", model="gpt-5.5-pro")
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(
+        side_effect=Exception("Error code: 404 - This is not a chat model")
+    )
+    with patch.object(provider, "_get_client", return_value=client):
+        with pytest.raises(Exception, match="not a chat model"):
+            await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
+    assert client.chat.completions.create.await_count == 1

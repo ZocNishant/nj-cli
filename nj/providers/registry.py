@@ -51,8 +51,15 @@ def get_provider(config: LLMConfig, task: str | None = None) -> BaseLLMProvider:
         else:
             base_url = "https://api.openai.com/v1"
             api_key = os.getenv("OPENAI_API_KEY") or config.api_key
-            model = config.model
+            # Tiered like the Claude path. This used to read config.model for
+            # every task, which silently collapsed scoring, tailoring, review
+            # and reasoning onto one model — and made the reviewer the same
+            # model as the drafter, which is the one thing the drafter-reviewer
+            # split exists to prevent.
+            model = resolve_model(config, task)
 
         return OpenAICompatibleProvider(api_key=api_key, base_url=base_url, model=model)
 
-    raise ValueError(f"Unknown LLM provider: '{config.provider}'. Available: claude, freellmapi")
+    raise ValueError(
+        f"Unknown LLM provider: '{config.provider}'. Available: claude, openai, freellmapi"
+    )
