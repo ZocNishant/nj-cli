@@ -21,15 +21,13 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
+
                 self._client = AsyncOpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url,
                 )
             except ImportError:
-                raise ImportError(
-                    "openai package required for FreeLLMAPI: "
-                    "pip install openai"
-                )
+                raise ImportError("openai package required for FreeLLMAPI: pip install openai")
         return self._client
 
     def name(self) -> str:

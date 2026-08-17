@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
-from rich import box
 
 from nj.models.config import Config
 from nj.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from nj.models.job import Job
 
 logger = get_logger(__name__)
 console = Console()
@@ -24,30 +28,29 @@ def run_enrich(
 ) -> None:
     if not url:
         console.print(
-            "[red]Usage:[/red] enrich <url>\n"
-            "Example: enrich https://jobs.lever.co/company/job-id"
+            "[red]Usage:[/red] enrich <url>\nExample: enrich https://jobs.lever.co/company/job-id"
         )
         return
 
     from nj.db.engine import init_db
+
     init_db(db_path)
 
     console.print("\n[dim]Fetching job from URL...[/dim]")
 
     job = _fetch_job_from_url(url, config)
     if not job:
-        console.print(
-            "[red]Failed to fetch job.[/red]\n"
-            "Check the URL and try again."
-        )
+        console.print("[red]Failed to fetch job.[/red]\nCheck the URL and try again.")
         return
 
-    console.print(Panel(
-        f"[bold]{job.title}[/bold] @ [cyan]{job.company}[/cyan]\n"
-        f"[dim]{job.location} · {job.source}[/dim]",
-        title="Job fetched",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]{job.title}[/bold] @ [cyan]{job.company}[/cyan]\n"
+            f"[dim]{job.location} · {job.source}[/dim]",
+            title="Job fetched",
+            border_style="cyan",
+        )
+    )
 
     cv_base = None
     cv_path = Path("cv/cv_base.json")
@@ -58,6 +61,7 @@ def run_enrich(
     console.print("[dim]Running intelligence layers...[/dim]\n")
 
     from nj.intel.enrichment import JobEnrichment
+
     enricher = JobEnrichment(db_path=db_path)
     enrichment = enricher.enrich(job, cv_base)
 
@@ -65,6 +69,7 @@ def run_enrich(
 
     if not no_score and cv_base:
         import os
+
         api_key = config.llm.api_key or os.getenv("ANTHROPIC_API_KEY", "")
         if api_key:
             console.print("\n[dim]Scoring with Claude...[/dim]")
@@ -76,8 +81,9 @@ def run_enrich(
             )
 
     try:
-        from nj.db.repos.job_repo import JobRepo
         from nj.db.repos.enrichment_repo import EnrichmentRepo
+        from nj.db.repos.job_repo import JobRepo
+
         job_repo = JobRepo(db_path)
         enrich_repo = EnrichmentRepo(db_path)
         if not job_repo.job_exists(job.id):
@@ -88,10 +94,12 @@ def run_enrich(
         logger.debug("enrich_save_failed", error=str(e))
 
 
-def _fetch_job_from_url(url: str, config) -> "Job | None":
+def _fetch_job_from_url(url: str, config) -> Job | None:
+    from datetime import datetime
+
     import httpx
-    from datetime import datetime, timezone
-    from nj.models.job import Job, JobStatus
+
+    from nj.models.job import Job
     from nj.scoring.visa_filter import VisaFilter
     from nj.utils.text import clean_html, truncate
 
@@ -117,7 +125,7 @@ def _fetch_job_from_url(url: str, config) -> "Job | None":
             location="",
             source="direct",
             visa_label=visa_label,
-            scraped_at=datetime.now(timezone.utc),
+            scraped_at=datetime.now(UTC),
             description_hash=Job.generate_hash(description),
         )
     except Exception as e:
@@ -147,8 +155,12 @@ def _extract_title_company(html: str, url: str) -> tuple[str, str]:
     domain = parsed.netloc.replace("www.", "")
 
     known_boards = {
-        "linkedin.com", "lever.co", "greenhouse.io",
-        "workday.com", "jobs.lever.co", "boards.greenhouse.io",
+        "linkedin.com",
+        "lever.co",
+        "greenhouse.io",
+        "workday.com",
+        "jobs.lever.co",
+        "boards.greenhouse.io",
     }
 
     if domain in known_boards:
@@ -187,9 +199,7 @@ def _display_enrich_report(job, enrichment: dict, config) -> None:
         "unknown": "yellow",
         "blocked": "red",
     }.get(job.visa_label.value, "dim")
-    lines.append(
-        f"Visa signal:     [{visa_color}]{job.visa_label.value.upper()}[/{visa_color}]"
-    )
+    lines.append(f"Visa signal:     [{visa_color}]{job.visa_label.value.upper()}[/{visa_color}]")
 
     if sponsor and sponsor.get("probability") is not None:
         prob = sponsor["probability"]
@@ -218,9 +228,7 @@ def _display_enrich_report(job, enrichment: dict, config) -> None:
         pred = salary["predicted_salary"]
         low = salary["range"]["low"]
         high = salary["range"]["high"]
-        lines.append(
-            f"Salary estimate: [green]${pred:,}[/green] [dim](${low:,} – ${high:,})[/dim]"
-        )
+        lines.append(f"Salary estimate: [green]${pred:,}[/green] [dim](${low:,} – ${high:,})[/dim]")
 
     if semantic and semantic.get("score") is not None:
         score = semantic["score"]
@@ -245,21 +253,23 @@ def _score_and_display(job, cv_base: dict, config) -> None:
     from nj.scoring.scorer import score_job
 
     try:
-        provider = get_provider(config.llm)
+        provider = get_provider(config.llm, task="scoring")
         result = asyncio.run(
             score_job(job=job, cv_base=cv_base, config=config, provider=provider, repo=None)
         )
         total = result.total_score
         color = "green" if total >= 75 else "yellow" if total >= 60 else "red"
-        console.print(Panel(
-            f"Total score: [{color}][bold]{total}/100[/bold][/{color}]  "
-            f"Confidence: {result.confidence:.2f}\n\n"
-            f"{result.overall_rationale}\n\n"
-            f"[bold]Matched:[/bold] [green]{', '.join(result.matched_skills[:6])}[/green]\n"
-            f"[bold]Missing:[/bold] [red]{', '.join(result.missing_skills[:4])}[/red]\n\n"
-            f"[bold]Lead with:[/bold] [cyan]{', '.join(result.recommended_emphasis[:3])}[/cyan]",
-            title="AI Score",
-            border_style=color,
-        ))
+        console.print(
+            Panel(
+                f"Total score: [{color}][bold]{total}/100[/bold][/{color}]  "
+                f"Confidence: {result.confidence:.2f}\n\n"
+                f"{result.overall_rationale}\n\n"
+                f"[bold]Matched:[/bold] [green]{', '.join(result.matched_skills[:6])}[/green]\n"
+                f"[bold]Missing:[/bold] [red]{', '.join(result.missing_skills[:4])}[/red]\n\n"
+                f"[bold]Lead with:[/bold] [cyan]{', '.join(result.recommended_emphasis[:3])}[/cyan]",
+                title="AI Score",
+                border_style=color,
+            )
+        )
     except Exception as e:
         console.print(f"[yellow]Scoring failed:[/yellow] {e}")

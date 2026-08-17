@@ -35,18 +35,15 @@ def run_diagnose(
     output_dir: str = "output",
     no_pdf: bool = False,
 ) -> None:
-    from nj.diagnostics.engine import DiagnosticsError, diagnose_cv
-    from nj.diagnostics.renderer import render_diagnosis_pdf
     from nj.db.repos.job_repo import JobRepo
     from nj.db.repos.score_repo import ScoreRepo
+    from nj.diagnostics.engine import DiagnosticsError, diagnose_cv
+    from nj.diagnostics.renderer import render_diagnosis_pdf
     from nj.providers.registry import get_provider
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -64,7 +61,7 @@ def run_diagnose(
     except Exception:
         pass
 
-    provider = get_provider(config.llm)
+    provider = get_provider(config.llm, task="reasoning")
 
     console.print(
         Panel(

@@ -4,7 +4,6 @@ import asyncio
 import json
 from pathlib import Path
 
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -26,10 +25,7 @@ def run_frame(
 ) -> None:
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -59,7 +55,7 @@ def run_frame(
     from nj.providers.registry import get_provider
     from nj.tailoring.anti_hallucination import validate_tailored_cv
 
-    provider = get_provider(config.llm)
+    provider = get_provider(config.llm, task="reasoning")
 
     console.print(
         f"\n[dim]Reframing [bold]{project.get('name', '')}[/bold] "
@@ -86,9 +82,7 @@ def run_frame(
     reframed_text = {"bullets": result.get("reframed_bullets", [])}
     is_valid, violations = validate_tailored_cv(original_text, reframed_text)
     if not is_valid:
-        console.print(
-            "[yellow]Warning: potential invented content detected:[/yellow]"
-        )
+        console.print("[yellow]Warning: potential invented content detected:[/yellow]")
         for v in violations[:3]:
             console.print(f"  [yellow]• {v}[/yellow]")
         console.print("[dim]Review reframed bullets carefully.[/dim]\n")
@@ -141,10 +135,7 @@ def _list_projects(projects: list) -> None:
             f"{p.get('name', '')} "
             f"[dim]({', '.join(p.get('tech', [])[:3])})[/dim]"
         )
-    console.print(
-        "\nUse [bold]nj frame --project PROJECT_ID[/bold] "
-        "to frame a specific project."
-    )
+    console.print("\nUse [bold]nj frame --project PROJECT_ID[/bold] to frame a specific project.")
 
 
 def _select_project(projects: list, project_id: str | None) -> dict | None:
@@ -179,7 +170,7 @@ def _select_audience() -> str:
         "early_stage_startup": "Early startup — cares about breadth, speed, ownership",
         "custom": "Custom — describe the role yourself",
     }
-    for i, (key, desc) in enumerate(audience_descriptions.items(), 1):
+    for i, desc in enumerate(audience_descriptions.values(), 1):
         console.print(f"  [bold]{i}.[/bold] {desc}")
 
     choice = Prompt.ask("\nEnter number or audience name", default="1")
@@ -212,9 +203,7 @@ def _display_framing(project: dict, result: dict, audience: str) -> None:
 
     what_changed = result.get("what_changed", "")
     if what_changed:
-        console.print(
-            Panel(what_changed, title="What changed and why", border_style="dim")
-        )
+        console.print(Panel(what_changed, title="What changed and why", border_style="dim"))
 
     verbal = result.get("what_to_emphasize_verbally", "")
     if verbal:
@@ -268,14 +257,10 @@ def _offer_save(
         }
         existing_ids = [p.get("id") for p in existing]
         if variant_id in existing_ids:
-            existing = [
-                variant if p.get("id") == variant_id else p for p in existing
-            ]
+            existing = [variant if p.get("id") == variant_id else p for p in existing]
         else:
             existing.append(variant)
         cv_base["projects"] = existing
         with open(cv_path, "w") as f:
             json.dump(cv_base, f, indent=2)
-        console.print(
-            f"[green]Saved variant '{variant_id}' to cv_base.json[/green]"
-        )
+        console.print(f"[green]Saved variant '{variant_id}' to cv_base.json[/green]")

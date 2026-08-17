@@ -34,9 +34,7 @@ def run_tailor(
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] " "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -66,7 +64,7 @@ def run_tailor(
         description_hash=Job.generate_hash(description),
     )
 
-    provider = get_provider(config.llm)
+    provider = get_provider(config.llm, task="tailoring")
     console.print("[dim]Scoring...[/dim]")
     result = asyncio.run(score_job(job, cv_base, config, provider, repo=None))
 

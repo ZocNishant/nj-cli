@@ -171,25 +171,23 @@ async def score_job(
 ) -> ScoreResult:
     logger.debug("scoring_job", job_id=job.id, title=job.title, company=job.company)
 
-    cv_summary = _build_full_cv_summary(cv_base)
-    weights = config.scoring.weights
-
-    user_prompt = scoring_v1.build_user_prompt(
-        job_title=job.title,
-        job_description=job.description,
-        skills=cv_summary["all_skills"],
-        top_projects=cv_summary["projects"],
-        weights=weights,
-        cv_base=cv_base,
-        target_roles=list(config.search.roles),
-    )
-
     request = LLMRequest(
-        system=scoring_v1.SYSTEM_PROMPT,
-        user=user_prompt,
+        # Rubric + candidate profile: identical for every job in a run, so it is
+        # marked as a cache prefix and only paid for once.
+        system=scoring_v1.build_system_prompt(
+            cv_base=cv_base,
+            target_roles=list(config.search.roles),
+            weights=config.scoring.weights,
+        ),
+        # Only the scraped posting varies per call, and it is fenced as data.
+        user=scoring_v1.build_job_prompt(
+            job_title=job.title,
+            job_description=job.description,
+        ),
         max_tokens=1200,
-        temperature=0.2,
         response_format="json",
+        json_schema=scoring_v1.SCORE_SCHEMA,
+        cache_system=True,
     )
 
     result = None
@@ -209,17 +207,11 @@ async def score_job(
                 )
                 break
             else:
-                logger.warning(
-                    "score_parse_failed_attempt", attempt=attempt, job_id=job.id
-                )
+                logger.warning("score_parse_failed_attempt", attempt=attempt, job_id=job.id)
                 if attempt == 1:
-                    request.user += (
-                        "\n\nIMPORTANT: Return ONLY the JSON object. No other text."
-                    )
+                    request.user += "\n\nIMPORTANT: Return ONLY the JSON object. No other text."
         except Exception as e:
-            logger.warning(
-                "llm_call_failed", attempt=attempt, job_id=job.id, error=str(e)
-            )
+            logger.warning("llm_call_failed", attempt=attempt, job_id=job.id, error=str(e))
 
     if result is None:
         logger.error("scoring_failed_all_attempts", job_id=job.id)
