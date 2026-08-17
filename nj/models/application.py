@@ -9,6 +9,13 @@ from pydantic import BaseModel
 
 class ApplicationStatus(str, Enum):
     PENDING = "pending"
+    # A tailored CV and cover letter exist on disk and nothing has been sent.
+    # This is where `nj run` leaves every application, because nj cannot submit:
+    # nj.applying.linkedin_easy raises rather than auto-apply, deliberately.
+    # Only a human moves a row from GENERATED to SUBMITTED, via
+    # `nj status --update-id <id> --update-status submitted`.
+    GENERATED = "generated"
+    # Actually sent, by a human. Never written by the pipeline.
     SUBMITTED = "submitted"
     FAILED = "failed"
     CAPTCHA_BLOCKED = "captcha_blocked"
@@ -18,6 +25,17 @@ class ApplicationStatus(str, Enum):
     INTERVIEWING = "interviewing"
     OFFERED = "offered"
     REJECTED = "rejected"
+
+
+# Statuses that represent real work produced for a specific job — a rendered CV
+# and letter exist, whether or not a human has sent them yet. Defined once
+# because several unrelated call sites need the same answer: the daily
+# rate-limit budget, the status dashboard, and the shell/banner counters. A
+# status added to this tuple counts against `apply.max_per_day`.
+ACTIVE_APPLICATION_STATUSES = (
+    ApplicationStatus.GENERATED,
+    ApplicationStatus.SUBMITTED,
+)
 
 
 class OutcomeType(str, Enum):

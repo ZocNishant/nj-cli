@@ -12,7 +12,7 @@ from nj.db.repos.application_repo import ApplicationRepo
 from nj.db.repos.job_repo import JobRepo
 from nj.db.repos.label_repo import LabelRepo
 from nj.db.repos.score_repo import ScoreRepo
-from nj.models.application import ApplicationRecord
+from nj.models.application import ApplicationRecord, ApplicationStatus
 from nj.models.job import Job, JobStatus
 from nj.models.label import JobLabel, LabelValue
 from nj.models.score import ScoreCategory, ScoreResult, SubScore
@@ -135,6 +135,34 @@ def test_count_today_returns_zero_when_no_submitted(db_path):
     repo = ApplicationRepo(db_path)
     record = ApplicationRecord.create(job_id="job-xyz", score=80)
     repo.save_application(record)  # status is PENDING, not SUBMITTED
+    assert repo.count_today() == 0
+
+
+def test_count_today_counts_generated(db_path):
+    """The daily cap must count rendered-but-unsent work.
+
+    nj never writes SUBMITTED on its own, so a count_today() that only matched
+    SUBMITTED would return 0 forever and apply.max_per_day would never throttle
+    a run.
+    """
+    repo = ApplicationRepo(db_path)
+    record = ApplicationRecord.create(job_id="job-gen", score=80)
+    record.status = ApplicationStatus.GENERATED
+    record.applied_at = datetime.now(UTC).replace(tzinfo=None)
+    repo.save_application(record)
+    assert repo.count_today() == 1
+
+
+def test_count_today_ignores_rows_with_no_timestamp(db_path):
+    """A GENERATED row with applied_at unset must not count.
+
+    Regression guard: cmd_run once saved records without stamping applied_at,
+    so count_today()'s date filter matched nothing and the cap was decorative.
+    """
+    repo = ApplicationRepo(db_path)
+    record = ApplicationRecord.create(job_id="job-nots", score=80)
+    record.status = ApplicationStatus.GENERATED
+    repo.save_application(record)  # applied_at left None
     assert repo.count_today() == 0
 
 

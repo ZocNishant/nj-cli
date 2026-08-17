@@ -372,6 +372,14 @@ def _get_stats() -> dict:
                     ).scalar()
                     or 0
                 )
+                # Rendered but not sent. Kept out of "applied" deliberately —
+                # see ApplicationStatus.GENERATED.
+                stats["ready"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM applications WHERE status='generated'")
+                    ).scalar()
+                    or 0
+                )
                 stats["interviews"] = (
                     conn.execute(
                         text(
@@ -407,6 +415,10 @@ def _render_splash(stats: dict, version: str) -> None:
             stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['jobs']}[/bold] [dim]jobs[/dim]")
         if stats.get("scored", 0) > 0:
             stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['scored']}[/bold] [dim]scored[/dim]")
+        if stats.get("ready", 0) > 0:
+            stat_parts.append(
+                f"[yellow]◆[/yellow] [bold]{stats['ready']}[/bold] [dim]ready to send[/dim]"
+            )
         if stats.get("applied", 0) > 0:
             stat_parts.append(
                 f"[green]◆[/green] [bold]{stats['applied']}[/bold] [dim]applied[/dim]"

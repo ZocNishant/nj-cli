@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rich.console import Console
@@ -111,6 +112,9 @@ def run_pipeline(
     # different models rather than paying tailoring rates to rank the long tail.
     scoring_provider = get_provider(config.llm, task="scoring")
     provider = get_provider(config.llm, task="tailoring")
+    # The adversarial reviewer audits the drafter's output. Narrow task, cheap
+    # tier — see nj/tailoring/reviewer.py for why it advises rather than gates.
+    review_provider = get_provider(config.llm, task="review")
     visa_filter = VisaFilter(config.visa)
     notifier = EmailNotifier(config.notify)
     rate_limiter = RateLimiter(
@@ -285,7 +289,9 @@ def run_pipeline(
 
         if not silent:
             console.print(f"  [dim]Tailoring CV for {job.title[:30]} @ {job.company[:20]}...[/dim]")
-        tailored_cv, _ = asyncio.run(tailor_cv(job, result, cv_base, config, provider))
+        tailored_cv, cover_letter = asyncio.run(
+            tailor_cv(job, result, cv_base, config, provider, review_provider=review_provider)
+        )
         job_repo.update_job_status(job.id, JobStatus.TAILORED)
 
         template_path = "templates/cv_template.tex"
@@ -304,8 +310,11 @@ def run_pipeline(
 
         cover_path = None
         if not dry_run:
+            # The reviewed letter from tailor_cv, not a second unreviewed one.
             cover_path = asyncio.run(
-                generate_and_save_cover_letter(job, result, cv_base, provider, "output")
+                generate_and_save_cover_letter(
+                    job, result, cv_base, provider, "output", content=cover_letter
+                )
             )
 
         from nj.models.quality import GateDecision
@@ -344,7 +353,16 @@ def run_pipeline(
                 break
             record.cv_path = pdf_path
             record.cover_letter_path = cover_path
-            record.status = ApplicationStatus.SUBMITTED
+            # GENERATED, not SUBMITTED: the CV and letter are on disk and
+            # nothing has been sent. nj has no submit path — linkedin_easy
+            # raises by design — so claiming SUBMITTED here would put a row in
+            # the DB asserting an application that does not exist. A human
+            # promotes it with `nj status --update-id <id> --update-status
+            # submitted` once they actually send it.
+            record.status = ApplicationStatus.GENERATED
+            # Stamped here because count_today() filters on it. Left unset, the
+            # daily cap silently counts zero and apply.max_per_day never fires.
+            record.applied_at = datetime.now(UTC).replace(tzinfo=None)
             app_repo.save_application(record)
 
             # Auto-update career graph
@@ -382,7 +400,7 @@ def run_pipeline(
             applications.append(
                 {
                     "score": result.total_score,
-                    "status": "submitted",
+                    "status": ApplicationStatus.GENERATED.value,
                     "company": job.company,
                     "title": job.title,
                     "visa_label": job.visa_label.value,
