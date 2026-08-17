@@ -3,12 +3,11 @@ Salary estimator for ML/AI roles.
 Rule-based approach using 2023-2024 ML job market benchmarks.
 No training data required — USCIS aggregated data has no wage info.
 """
+
 from __future__ import annotations
 
 import pickle
 from pathlib import Path
-
-import numpy as np
 
 from nj.utils.logger import get_logger
 
@@ -96,13 +95,13 @@ class SalaryModel:
         state_tier = STATE_TIERS.get(state.upper(), 1.0)
 
         BASE_SALARIES = {
-            "ml_engineer":        155000,
+            "ml_engineer": 155000,
             "research_scientist": 170000,
-            "data_scientist":     135000,
-            "cv_engineer":        150000,
-            "nlp_engineer":       160000,
-            "data_engineer":      130000,
-            "software_engineer":  145000,
+            "data_scientist": 135000,
+            "cv_engineer": 150000,
+            "nlp_engineer": 160000,
+            "data_engineer": 130000,
+            "software_engineer": 145000,
         }
 
         base = BASE_SALARIES.get(role_cat, 140000)
@@ -139,9 +138,7 @@ class SalaryModel:
     ) -> list[float]:
         role_cat = self._get_role_category(job_title)
         role_cats = list(ROLE_CATEGORIES.keys())
-        role_idx = float(
-            role_cats.index(role_cat) if role_cat in role_cats else 0
-        )
+        role_idx = float(role_cats.index(role_cat) if role_cat in role_cats else 0)
         state_tier = float(STATE_TIERS.get(state.upper(), 1.0))
         year_norm = (year - 2020) / 5
         return [role_idx, state_tier, year_norm, 1.0 if is_ml else 0.0]

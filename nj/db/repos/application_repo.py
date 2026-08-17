@@ -30,9 +30,7 @@ class ApplicationRepo:
                 )
             )
 
-    def get_applications(
-        self, status: ApplicationStatus | None = None
-    ) -> list[ApplicationRecord]:
+    def get_applications(self, status: ApplicationStatus | None = None) -> list[ApplicationRecord]:
         with get_session(self.db_path) as session:
             q = session.query(ApplicationRecordORM)
             if status:
@@ -41,9 +39,7 @@ class ApplicationRepo:
 
     def get_applications_with_outcomes(self) -> list[ApplicationRecord]:
         with get_session(self.db_path) as session:
-            q = session.query(ApplicationRecordORM).filter(
-                ApplicationRecordORM.outcome.isnot(None)
-            )
+            q = session.query(ApplicationRecordORM).filter(ApplicationRecordORM.outcome.isnot(None))
             return [self._to_model(r) for r in q.all()]
 
     def count_today(self) -> int:

@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import json
 from io import StringIO
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from nj.cli.cmd_frame import _list_projects, _select_project
 from nj.models.config import Config
 from nj.prompts.frame_v1 import AUDIENCE_PROFILES, PROMPT_VERSION, build_user_prompt
-from nj.providers.base import LLMResponse
 
 
 def make_project() -> dict:

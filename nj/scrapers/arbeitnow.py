@@ -8,8 +8,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -81,9 +81,7 @@ class ArbeitnowScraper(BaseScraper):
                 results = data.get("data", [])
                 if not results:
                     break
-                page_jobs = [
-                    j for j in (self._parse(r) for r in results) if j is not None
-                ]
+                page_jobs = [j for j in (self._parse(r) for r in results) if j is not None]
                 jobs.extend(page_jobs)
                 if not data.get("links", {}).get("next"):
                     break

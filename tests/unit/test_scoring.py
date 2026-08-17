@@ -48,30 +48,62 @@ def make_cv_base() -> dict:
 
 
 def make_valid_llm_response() -> str:
-    return json.dumps({
-        "total_score": 78,
-        "confidence": 0.85,
-        "sub_scores": [
-            {"category": "skills_match", "score": 85, "weight": 0.30,
-             "rationale": "Strong PyTorch match", "evidence": ["PyTorch expertise"]},
-            {"category": "experience_relevance", "score": 70, "weight": 0.25,
-             "rationale": "GastroVision is relevant", "evidence": ["computer vision"]},
-            {"category": "role_alignment", "score": 75, "weight": 0.20,
-             "rationale": "Good alignment", "evidence": ["ML Engineer"]},
-            {"category": "sponsorship_compatibility", "score": 90, "weight": 0.15,
-             "rationale": "H1B sponsorship offered", "evidence": ["H1B sponsorship"]},
-            {"category": "location_fit", "score": 80, "weight": 0.05,
-             "rationale": "USA location", "evidence": ["San Francisco"]},
-            {"category": "resume_strength", "score": 75, "weight": 0.05,
-             "rationale": "Strong profile", "evidence": []},
-        ],
-        "matched_skills": ["PyTorch", "OpenCV"],
-        "missing_skills": ["Kubernetes"],
-        "recommended_emphasis": ["GastroVision project"],
-        "visa_compatible": True,
-        "visa_notes": "H1B sponsorship explicitly offered.",
-        "overall_rationale": "Strong match on CV skills and GastroVision project.",
-    })
+    return json.dumps(
+        {
+            "total_score": 78,
+            "confidence": 0.85,
+            "sub_scores": [
+                {
+                    "category": "skills_match",
+                    "score": 85,
+                    "weight": 0.30,
+                    "rationale": "Strong PyTorch match",
+                    "evidence": ["PyTorch expertise"],
+                },
+                {
+                    "category": "experience_relevance",
+                    "score": 70,
+                    "weight": 0.25,
+                    "rationale": "GastroVision is relevant",
+                    "evidence": ["computer vision"],
+                },
+                {
+                    "category": "role_alignment",
+                    "score": 75,
+                    "weight": 0.20,
+                    "rationale": "Good alignment",
+                    "evidence": ["ML Engineer"],
+                },
+                {
+                    "category": "sponsorship_compatibility",
+                    "score": 90,
+                    "weight": 0.15,
+                    "rationale": "H1B sponsorship offered",
+                    "evidence": ["H1B sponsorship"],
+                },
+                {
+                    "category": "location_fit",
+                    "score": 80,
+                    "weight": 0.05,
+                    "rationale": "USA location",
+                    "evidence": ["San Francisco"],
+                },
+                {
+                    "category": "resume_strength",
+                    "score": 75,
+                    "weight": 0.05,
+                    "rationale": "Strong profile",
+                    "evidence": [],
+                },
+            ],
+            "matched_skills": ["PyTorch", "OpenCV"],
+            "missing_skills": ["Kubernetes"],
+            "recommended_emphasis": ["GastroVision project"],
+            "visa_compatible": True,
+            "visa_notes": "H1B sponsorship explicitly offered.",
+            "overall_rationale": "Strong match on CV skills and GastroVision project.",
+        }
+    )
 
 
 def test_parse_response_valid_json() -> None:
@@ -99,13 +131,15 @@ def test_parse_response_returns_none_on_invalid_json() -> None:
 
 def test_parse_response_ignores_unknown_categories() -> None:
     data = json.loads(make_valid_llm_response())
-    data["sub_scores"].append({
-        "category": "unknown_category_xyz",
-        "score": 50,
-        "weight": 0.1,
-        "rationale": "test",
-        "evidence": [],
-    })
+    data["sub_scores"].append(
+        {
+            "category": "unknown_category_xyz",
+            "score": 50,
+            "weight": 0.1,
+            "rationale": "test",
+            "evidence": [],
+        }
+    )
     result = _parse_response(json.dumps(data), "test-id")
     assert result is not None
     assert all(s.category != "unknown_category_xyz" for s in result.sub_scores)
@@ -121,10 +155,16 @@ def test_build_failed_result() -> None:
 
 def test_compute_total_uses_weights() -> None:
     sub_scores = [
-        SubScore(category=ScoreCategory.SKILLS_MATCH, score=80,
-                 weight=0.5, rationale="test", evidence=[]),
-        SubScore(category=ScoreCategory.ROLE_ALIGNMENT, score=60,
-                 weight=0.5, rationale="test", evidence=[]),
+        SubScore(
+            category=ScoreCategory.SKILLS_MATCH, score=80, weight=0.5, rationale="test", evidence=[]
+        ),
+        SubScore(
+            category=ScoreCategory.ROLE_ALIGNMENT,
+            score=60,
+            weight=0.5,
+            rationale="test",
+            evidence=[],
+        ),
     ]
     total = ScoreResult.compute_total(sub_scores)
     assert total == 70
@@ -137,14 +177,16 @@ async def test_score_job_success() -> None:
     config = Config()
     mock_provider = MagicMock()
     mock_provider.name.return_value = "claude"
-    mock_provider.complete = AsyncMock(return_value=LLMResponse(
-        content=make_valid_llm_response(),
-        provider="claude",
-        model="claude-sonnet-4-20250514",
-        input_tokens=500,
-        output_tokens=200,
-        latency_ms=1200,
-    ))
+    mock_provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content=make_valid_llm_response(),
+            provider="claude",
+            model="claude-sonnet-4-20250514",
+            input_tokens=500,
+            output_tokens=200,
+            latency_ms=1200,
+        )
+    )
     result = await score_job(job, cv_base, config, mock_provider, repo=None)
     assert result.total_score > 0
     assert result.provider == "claude"
@@ -159,12 +201,26 @@ async def test_score_job_retries_on_bad_json() -> None:
     config = Config()
     mock_provider = MagicMock()
     mock_provider.name.return_value = "claude"
-    mock_provider.complete = AsyncMock(side_effect=[
-        LLMResponse(content="not json", provider="claude",
-                    model="test", input_tokens=10, output_tokens=5, latency_ms=100),
-        LLMResponse(content=make_valid_llm_response(), provider="claude",
-                    model="test", input_tokens=10, output_tokens=5, latency_ms=100),
-    ])
+    mock_provider.complete = AsyncMock(
+        side_effect=[
+            LLMResponse(
+                content="not json",
+                provider="claude",
+                model="test",
+                input_tokens=10,
+                output_tokens=5,
+                latency_ms=100,
+            ),
+            LLMResponse(
+                content=make_valid_llm_response(),
+                provider="claude",
+                model="test",
+                input_tokens=10,
+                output_tokens=5,
+                latency_ms=100,
+            ),
+        ]
+    )
     result = await score_job(job, cv_base, config, mock_provider, repo=None)
     assert result.total_score > 0
     assert mock_provider.complete.call_count == 2
@@ -177,14 +233,16 @@ async def test_score_job_returns_failed_result_on_all_attempts_failing() -> None
     config = Config()
     mock_provider = MagicMock()
     mock_provider.name.return_value = "claude"
-    mock_provider.complete = AsyncMock(return_value=LLMResponse(
-        content="invalid json always",
-        provider="claude",
-        model="test",
-        input_tokens=10,
-        output_tokens=5,
-        latency_ms=100,
-    ))
+    mock_provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="invalid json always",
+            provider="claude",
+            model="test",
+            input_tokens=10,
+            output_tokens=5,
+            latency_ms=100,
+        )
+    )
     result = await score_job(job, cv_base, config, mock_provider, repo=None)
     assert result.total_score == 0
     assert result.confidence == 0.0

@@ -8,8 +8,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -76,25 +76,15 @@ class USAJobsScraper(BaseScraper):
                     "User-Agent": self.user_agent,
                     "Host": "data.usajobs.gov",
                 }
-                response = httpx.get(
-                    self.BASE_URL, params=params, headers=headers, timeout=15
-                )
+                response = httpx.get(self.BASE_URL, params=params, headers=headers, timeout=15)
                 response.raise_for_status()
                 data = response.json()
-                results = (
-                    data.get("SearchResult", {})
-                    .get("SearchResultItems", [])
-                )
+                results = data.get("SearchResult", {}).get("SearchResultItems", [])
                 if not results:
                     break
-                page_jobs = [
-                    j for j in (self._parse(r) for r in results) if j is not None
-                ]
+                page_jobs = [j for j in (self._parse(r) for r in results) if j is not None]
                 jobs.extend(page_jobs)
-                total = int(
-                    data.get("SearchResult", {})
-                    .get("SearchResultCountAll", 0)
-                )
+                total = int(data.get("SearchResult", {}).get("SearchResultCountAll", 0))
                 if len(jobs) >= total or len(results) < 25:
                     break
                 time.sleep(random.uniform(0.5, 1.0))
@@ -109,9 +99,7 @@ class USAJobsScraper(BaseScraper):
             title = descriptor.get("PositionTitle", "").strip()
             company = descriptor.get("OrganizationName", "Unknown").strip()
             url = descriptor.get("PositionURI", "").strip()
-            description = truncate(
-                clean_html(descriptor.get("QualificationSummary", "")), 3000
-            )
+            description = truncate(clean_html(descriptor.get("QualificationSummary", "")), 3000)
 
             locations = descriptor.get("PositionLocation", [])
             if locations:
@@ -122,12 +110,8 @@ class USAJobsScraper(BaseScraper):
             else:
                 location = "USA"
 
-            salary_min = descriptor.get("PositionRemuneration", [{}])[0].get(
-                "MinimumRange", ""
-            )
-            salary_max = descriptor.get("PositionRemuneration", [{}])[0].get(
-                "MaximumRange", ""
-            )
+            salary_min = descriptor.get("PositionRemuneration", [{}])[0].get("MinimumRange", "")
+            salary_max = descriptor.get("PositionRemuneration", [{}])[0].get("MaximumRange", "")
             salary_raw = None
             if salary_min and salary_max:
                 try:

@@ -1,21 +1,18 @@
 """Unit tests for application postmortem analysis."""
+
 from __future__ import annotations
 
-from datetime import datetime, UTC
-from unittest.mock import patch
+from datetime import UTC, datetime
 from io import StringIO
+from unittest.mock import patch
 
-import pytest
-
-from nj.models.application import ApplicationRecord, ApplicationStatus, OutcomeType
-from nj.models.score import ScoreResult, SubScore, ScoreCategory
-from nj.models.job import Job, VisaLabel, JobStatus
 from nj.analytics.outcomes_analysis import (
-    analyze_postmortem,
-    PostmortemReport,
     _categorize_role,
-    _detect_patterns,
+    analyze_postmortem,
 )
+from nj.models.application import ApplicationRecord, ApplicationStatus, OutcomeType
+from nj.models.job import Job, JobStatus, VisaLabel
+from nj.models.score import ScoreCategory, ScoreResult, SubScore
 
 
 def make_app(
@@ -187,14 +184,17 @@ def test_role_type_analysis_populated():
 
 def test_run_postmortem_no_applications(tmp_path, monkeypatch):
     from rich.console import Console
+
     from nj.cli.cmd_postmortem import run_postmortem
     from nj.models.config import Config
 
     monkeypatch.chdir(tmp_path)
     import nj.db.engine as eng
+
     eng._engine = None
     db_path = str(tmp_path / "test.db")
     from nj.db.engine import init_db
+
     init_db(db_path)
 
     buf = StringIO()

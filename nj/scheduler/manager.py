@@ -55,8 +55,7 @@ def show_schedule() -> None:
         console.print(f"[green]Active schedule:[/green] {schedule}")
     else:
         console.print(
-            "[yellow]No schedule set.[/yellow] "
-            "Use [bold]nj --schedule N[/bold] to set one."
+            "[yellow]No schedule set.[/yellow] Use [bold]nj --schedule N[/bold] to set one."
         )
 
 

@@ -18,9 +18,7 @@ console = Console()
 def run_update_role(config: Config, experience_id: str | None = None) -> None:
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -45,8 +43,7 @@ def run_update_role(config: Config, experience_id: str | None = None) -> None:
             company = exp.get("company", "Unknown")
             exp_id = exp.get("id", "")
             console.print(
-                f"  {i}. {title} @ {company}"
-                + (f" [dim](id: {exp_id})[/dim]" if exp_id else "")
+                f"  {i}. {title} @ {company}" + (f" [dim](id: {exp_id})[/dim]" if exp_id else "")
             )
         choice = Prompt.ask("Which entry to update? (number)", default="1")
         try:
@@ -96,10 +93,7 @@ def run_update_role(config: Config, experience_id: str | None = None) -> None:
             target["status"] = "active"
         with open(cv_path, "w") as f:
             json.dump(cv_base, f, indent=2)
-        console.print(
-            "[green]cv_base.json updated.[/green] "
-            "Next nj run will use these bullets."
-        )
+        console.print("[green]cv_base.json updated.[/green] Next nj run will use these bullets.")
     else:
         console.print("[dim]Discarded. Run again to retry.[/dim]")
 
@@ -117,7 +111,7 @@ async def _generate_bullets(
     from nj.providers.registry import get_provider
 
     try:
-        provider = get_provider(config.llm)
+        provider = get_provider(config.llm, task="reasoning")
         request = LLMRequest(
             system=SYSTEM_PROMPT,
             user=build_user_prompt(description, title, company),

@@ -1,9 +1,8 @@
 """Unit tests for nj shell tab completion."""
+
 from __future__ import annotations
 
-import pytest
-
-from nj.cli.shell import NJCompleter, SHELL_COMMANDS
+from nj.cli.shell import SHELL_COMMANDS, NJCompleter
 
 
 def make_completer() -> NJCompleter:
@@ -54,7 +53,6 @@ def test_subcommands_defined_for_key_commands():
 
 
 def test_subcommand_completion():
-    c = make_completer()
     subs = NJCompleter.SUBCOMMANDS.get("intel", [])
     assert "sync" in subs
     assert "top" in subs

@@ -28,16 +28,13 @@ def run_prep(
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
         cv_base = json.load(f)
 
-    provider = get_provider(config.llm)
+    provider = get_provider(config.llm, task="reasoning")
     job = None
     score = None
 
@@ -49,10 +46,7 @@ def run_prep(
         job, score = _prep_from_last(db_path)
 
     if not job:
-        console.print(
-            "[red]No job found.[/red] "
-            "Provide --job-id, --url, or --last."
-        )
+        console.print("[red]No job found.[/red] Provide --job-id, --url, or --last.")
         return
 
     console.print(
@@ -99,16 +93,13 @@ def run_prep(
     tech_qs = prep_data.get("technical_questions", [])
     if tech_qs:
         console.print(
-            f"\n[bold]{len(tech_qs)} technical questions[/bold] "
-            f"generated. Full details in PDF.\n"
+            f"\n[bold]{len(tech_qs)} technical questions[/bold] generated. Full details in PDF.\n"
         )
         console.print("[bold]Top 3 likely questions:[/bold]")
         for q in tech_qs[:3]:
             conf = q.get("confidence", "medium")
             color = "green" if conf == "high" else "yellow" if conf == "medium" else "red"
-            console.print(
-                f"  [{color}][{conf}][/{color}] {q.get('question', '')}"
-            )
+            console.print(f"  [{color}][{conf}][/{color}] {q.get('question', '')}")
 
     if config.notify.email_to:
         from nj.notify.email import EmailNotifier

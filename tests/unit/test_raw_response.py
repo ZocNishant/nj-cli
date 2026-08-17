@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from sqlalchemy import create_engine
 
 import pytest
+from sqlalchemy import create_engine
 
 import nj.db.engine as engine_module
 from nj.db.models import Base as ModelBase
@@ -61,6 +61,7 @@ def test_parse_failure_rate_zero_when_empty(
     monkeypatch.setattr(engine_module, "_engine", engine)
 
     from nj.db.repos.score_repo import ScoreRepo
+
     repo = ScoreRepo(db_path)
     stats = repo.get_parse_failure_rate()
     assert stats["total"] == 0

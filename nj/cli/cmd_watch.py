@@ -44,8 +44,7 @@ def run_watch(
     )
 
     if not callbacks:
-        console.print("[yellow]No job callbacks detected in the last "
-                      f"{days_back} days.[/yellow]")
+        console.print(f"[yellow]No job callbacks detected in the last {days_back} days.[/yellow]")
         return
 
     _display_callbacks(callbacks)
@@ -53,9 +52,7 @@ def run_watch(
     if not dry_run:
         updated = update_application_statuses(callbacks, db_path=db_path)
         if updated:
-            console.print(
-                f"\n[green]Updated {updated} application status(es).[/green]"
-            )
+            console.print(f"\n[green]Updated {updated} application status(es).[/green]")
 
     if config.notify.email_to:
         _send_notifications(callbacks, config)

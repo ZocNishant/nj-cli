@@ -1,7 +1,6 @@
 """Unit tests for the Career Knowledge Graph."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 def make_cv() -> dict:

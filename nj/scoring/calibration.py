@@ -62,9 +62,7 @@ def display_calibration_table(
 def prompt_threshold(current: int = 62) -> int | None:
     console.print(f"\nCurrent threshold: [bold]{current}[/bold]")
     console.print("Jobs above threshold will proceed to tailoring and review.")
-    raw = console.input(
-        f"\nEnter new threshold [50-90] or press Enter to keep {current}: "
-    ).strip()
+    raw = console.input(f"\nEnter new threshold [50-90] or press Enter to keep {current}: ").strip()
     if not raw:
         return None
     try:

@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
 
 import nj.db.engine as engine_module
+from nj.analytics.outcomes import analyze_outcomes
 from nj.db.models import Base as ModelBase
 from nj.db.repos.application_repo import ApplicationRepo
-from nj.db.repos.score_repo import ScoreRepo
 from nj.models.application import ApplicationRecord, ApplicationStatus, OutcomeType
-from nj.models.score import ScoreResult, SubScore
-from nj.analytics.outcomes import OutcomeReport, analyze_outcomes
+from nj.models.score import ScoreResult
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _make_score(job_id: str, total: int) -> ScoreResult:
@@ -55,6 +55,7 @@ def db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 # --- analyze_outcomes unit tests ---
+
 
 class TestAnalyzeOutcomesEmpty:
     def test_empty_applications(self):

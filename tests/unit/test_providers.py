@@ -1,40 +1,128 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch
 
 from nj.models.config import LLMConfig
 from nj.providers.base import LLMRequest
 from nj.providers.claude import ClaudeProvider
 from nj.providers.openai import OpenAICompatibleProvider, OpenAIProvider
-from nj.providers.registry import get_provider
+from nj.providers.registry import get_provider, resolve_model
+
+
+def _text_block(text: str) -> MagicMock:
+    """A content block that satisfies `block.type == "text"`.
+
+    A bare MagicMock returns a MagicMock for `.type`, which never equals
+    "text", so the provider would treat the response as empty.
+    """
+    block = MagicMock()
+    block.type = "text"
+    block.text = text
+    return block
+
+
+def _message(
+    text: str = '{"score": 85}',
+    stop_reason: str = "end_turn",
+    cache_read: int = 0,
+) -> MagicMock:
+    message = MagicMock()
+    message.stop_reason = stop_reason
+    message.content = [_text_block(text)] if text else []
+    message.usage.input_tokens = 100
+    message.usage.output_tokens = 50
+    message.usage.cache_read_input_tokens = cache_read
+    return message
 
 
 @pytest.fixture
-def mock_anthropic_response() -> MagicMock:
-    response = MagicMock()
-    response.content = [MagicMock(text='{"score": 85}')]
-    response.usage.input_tokens = 100
-    response.usage.output_tokens = 50
-    return response
+def mock_async_client():
+    """Patch AsyncAnthropic and yield (client, captured create kwargs).
+
+    Every test in this module goes through here — no unit test may reach the
+    network. `messages.create` is awaited, so it has to be an AsyncMock.
+    """
+    with patch("nj.providers.claude.anthropic.AsyncAnthropic") as client_class:
+        client = MagicMock()
+        client.messages.create = AsyncMock(return_value=_message())
+        client_class.return_value = client
+        yield client
 
 
-@pytest.mark.asyncio
-async def test_claude_provider_complete(mock_anthropic_response: MagicMock) -> None:
-    with patch("nj.providers.claude.anthropic.Anthropic") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_anthropic_response
-        mock_client_class.return_value = mock_client
-
-        provider = ClaudeProvider(api_key="test-key")
-        request = LLMRequest(system="You are helpful", user="Score this job")
-        response = await provider.complete(request)
+async def test_claude_provider_complete(mock_async_client) -> None:
+    provider = ClaudeProvider(api_key="test-key")
+    response = await provider.complete(LLMRequest(system="You are helpful", user="Score this job"))
 
     assert response.content == '{"score": 85}'
     assert response.provider == "claude"
     assert response.input_tokens == 100
     assert response.output_tokens == 50
     assert response.latency_ms >= 0
+
+
+async def test_claude_provider_never_sends_temperature(mock_async_client) -> None:
+    """Sonnet 5 and Opus 5 reject sampling parameters with a 400."""
+    provider = ClaudeProvider(api_key="test-key")
+    await provider.complete(LLMRequest(system="s", user="u", temperature=0.7))
+
+    kwargs = mock_async_client.messages.create.call_args.kwargs
+    assert "temperature" not in kwargs
+    assert "top_p" not in kwargs
+    assert "top_k" not in kwargs
+
+
+async def test_json_schema_becomes_output_config(mock_async_client) -> None:
+    schema = {"type": "object", "properties": {}, "additionalProperties": False}
+    provider = ClaudeProvider(api_key="test-key")
+    await provider.complete(LLMRequest(system="s", user="u", json_schema=schema))
+
+    kwargs = mock_async_client.messages.create.call_args.kwargs
+    assert kwargs["output_config"]["format"]["type"] == "json_schema"
+    # Compared by value, not identity: Pydantic copies the dict on validation.
+    assert kwargs["output_config"]["format"]["schema"] == schema
+
+
+async def test_no_output_config_without_schema(mock_async_client) -> None:
+    provider = ClaudeProvider(api_key="test-key")
+    await provider.complete(LLMRequest(system="s", user="u"))
+
+    assert "output_config" not in mock_async_client.messages.create.call_args.kwargs
+
+
+async def test_cache_system_marks_the_system_block(mock_async_client) -> None:
+    provider = ClaudeProvider(api_key="test-key")
+    await provider.complete(LLMRequest(system="rubric + CV", user="u", cache_system=True))
+
+    system = mock_async_client.messages.create.call_args.kwargs["system"]
+    assert system[0]["text"] == "rubric + CV"
+    assert system[0]["cache_control"] == {"type": "ephemeral"}
+
+
+async def test_system_block_uncached_by_default(mock_async_client) -> None:
+    provider = ClaudeProvider(api_key="test-key")
+    await provider.complete(LLMRequest(system="s", user="u"))
+
+    system = mock_async_client.messages.create.call_args.kwargs["system"]
+    assert "cache_control" not in system[0]
+
+
+async def test_refusal_raises_rather_than_indexing_empty_content(mock_async_client) -> None:
+    """A refusal is HTTP 200 with no text block; content[0] would raise IndexError."""
+    mock_async_client.messages.create.return_value = _message(text="", stop_reason="refusal")
+    provider = ClaudeProvider(api_key="test-key")
+
+    with pytest.raises(RuntimeError, match="refusal"):
+        await provider.complete(LLMRequest(system="s", user="u"))
+
+
+async def test_empty_response_raises(mock_async_client) -> None:
+    mock_async_client.messages.create.return_value = _message(text="", stop_reason="end_turn")
+    provider = ClaudeProvider(api_key="test-key")
+
+    with pytest.raises(RuntimeError, match="no text block"):
+        await provider.complete(LLMRequest(system="s", user="u"))
 
 
 def test_openai_compatible_provider_has_correct_name() -> None:
@@ -45,11 +133,37 @@ def test_openai_compatible_provider_has_correct_name() -> None:
     assert provider.name() == "freellmapi"
 
 
-def test_registry_returns_claude_provider() -> None:
-    config = LLMConfig(provider="claude", api_key="test-key", model="claude-sonnet-4-20250514")
-    with patch("nj.providers.claude.anthropic.Anthropic"):
-        provider = get_provider(config)
+def test_registry_returns_claude_provider(mock_async_client) -> None:
+    config = LLMConfig(provider="claude", api_key="test-key")
+    provider = get_provider(config)
     assert provider.name() == "claude"
+
+
+def test_registry_routes_tasks_to_their_model_tier(mock_async_client) -> None:
+    config = LLMConfig(provider="claude", api_key="test-key")
+    assert get_provider(config, task="scoring").model == config.scoring_model
+    assert get_provider(config, task="tailoring").model == config.tailoring_model
+    assert get_provider(config, task="reasoning").model == config.reasoning_model
+    assert get_provider(config, task=None).model == config.model
+
+
+def test_resolve_model_falls_back_for_unknown_task() -> None:
+    config = LLMConfig(provider="claude", model="fallback-model")
+    assert resolve_model(config, task="does-not-exist") == "fallback-model"
+    assert resolve_model(config) == "fallback-model"
+
+
+def test_default_models_are_current() -> None:
+    """Guards against a retired ID silently becoming the default again."""
+    config = LLMConfig()
+    for model in (
+        config.model,
+        config.scoring_model,
+        config.tailoring_model,
+        config.reasoning_model,
+    ):
+        assert not model.startswith("claude-sonnet-4-2025"), f"{model} is retired"
+        assert "-2025" not in model, f"{model} pins a dated snapshot"
 
 
 def test_registry_returns_freellmapi_provider() -> None:
@@ -70,16 +184,12 @@ def test_registry_raises_for_unknown_provider() -> None:
     assert "claude" in str(exc_info.value)
 
 
-def test_claude_provider_name() -> None:
-    with patch("nj.providers.claude.anthropic.Anthropic"):
-        provider = ClaudeProvider(api_key="test")
-    assert provider.name() == "claude"
+def test_claude_provider_name(mock_async_client) -> None:
+    assert ClaudeProvider(api_key="test").name() == "claude"
 
 
-def test_claude_supports_json_mode() -> None:
-    with patch("nj.providers.claude.anthropic.Anthropic"):
-        provider = ClaudeProvider(api_key="test")
-    assert provider.supports_json_mode() is True
+def test_claude_supports_json_mode(mock_async_client) -> None:
+    assert ClaudeProvider(api_key="test").supports_json_mode() is True
 
 
 def test_openai_alias_is_compatible_provider() -> None:

@@ -9,8 +9,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -130,7 +130,5 @@ class WeWorkRemotelyScraper(BaseScraper):
         return [
             job
             for job in jobs
-            if any(
-                kw in (job.title + " " + job.description).lower() for kw in role_words
-            )
+            if any(kw in (job.title + " " + job.description).lower() for kw in role_words)
         ]

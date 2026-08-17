@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 import nj.db.engine as engine_module
 from nj.db.models import Base as ModelBase
-from nj.db.repos.job_repo import JobRepo
-from nj.db.repos.score_repo import ScoreRepo
 from nj.db.repos.application_repo import ApplicationRepo
+from nj.db.repos.job_repo import JobRepo
 from nj.db.repos.label_repo import LabelRepo
-from nj.models.job import Job, JobStatus, VisaLabel
-from nj.models.score import ScoreResult, ScoreCategory, SubScore
-from nj.models.application import ApplicationRecord, ApplicationStatus
+from nj.db.repos.score_repo import ScoreRepo
+from nj.models.application import ApplicationRecord
+from nj.models.job import Job, JobStatus
 from nj.models.label import JobLabel, LabelValue
+from nj.models.score import ScoreCategory, ScoreResult, SubScore
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @pytest.fixture()
@@ -49,6 +49,7 @@ def _make_job(job_id: str | None = None) -> Job:
 
 
 # --- JobRepo ---
+
 
 def test_save_job_then_job_exists(db_path):
     repo = JobRepo(db_path)
@@ -84,6 +85,7 @@ def test_update_job_status(db_path):
 
 # --- ScoreRepo ---
 
+
 def test_save_score_then_get_score(db_path):
     repo = ScoreRepo(db_path)
     result = ScoreResult(
@@ -118,6 +120,7 @@ def test_save_score_then_get_score(db_path):
 
 # --- ApplicationRepo ---
 
+
 def test_save_application_then_get_applications(db_path):
     repo = ApplicationRepo(db_path)
     record = ApplicationRecord.create(job_id="job-xyz", score=80)
@@ -136,6 +139,7 @@ def test_count_today_returns_zero_when_no_submitted(db_path):
 
 
 # --- LabelRepo ---
+
 
 def test_save_label_then_get_labels(db_path):
     repo = LabelRepo(db_path)

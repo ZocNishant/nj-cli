@@ -41,8 +41,7 @@ def analyze_outcomes(
             avg_score_interviews=0.0,
             avg_score_rejections=0.0,
             recommendation=(
-                "No outcome data yet. "
-                "Run nj watch after applying to collect callbacks."
+                "No outcome data yet. Run nj watch after applying to collect callbacks."
             ),
         )
 
@@ -96,20 +95,10 @@ def analyze_outcomes(
             interviews = sum(1 for o in outcomes if o in interview_outcomes)
             rate_by_band[band] = round(interviews / len(outcomes) * 100, 1)
 
-    interview_scores = [
-        p["score"] for p in pairs if p["outcome"] in interview_outcomes
-    ]
-    rejection_scores = [
-        p["score"]
-        for p in pairs
-        if p["outcome"] == OutcomeType.REJECTION.value
-    ]
-    avg_interviews = (
-        sum(interview_scores) / len(interview_scores) if interview_scores else 0.0
-    )
-    avg_rejections = (
-        sum(rejection_scores) / len(rejection_scores) if rejection_scores else 0.0
-    )
+    interview_scores = [p["score"] for p in pairs if p["outcome"] in interview_outcomes]
+    rejection_scores = [p["score"] for p in pairs if p["outcome"] == OutcomeType.REJECTION.value]
+    avg_interviews = sum(interview_scores) / len(interview_scores) if interview_scores else 0.0
+    avg_rejections = sum(rejection_scores) / len(rejection_scores) if rejection_scores else 0.0
 
     optimal = None
     band_order = ["50-59", "60-69", "70-79", "80-89", "90-100"]
@@ -134,9 +123,7 @@ def analyze_outcomes(
             f"Keep applying and checking nj watch."
         )
     else:
-        recommendation = (
-            "Insufficient interview callbacks to identify optimal threshold yet."
-        )
+        recommendation = "Insufficient interview callbacks to identify optimal threshold yet."
 
     logger.info(
         "outcome_analysis_complete",

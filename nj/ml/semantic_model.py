@@ -71,9 +71,7 @@ class SemanticModel:
             if not section_text.strip():
                 continue
             emb_section = self.model.encode([section_text], convert_to_numpy=True)
-            similarity = float(
-                self._cosine_similarity(emb_section[0], embeddings_jd[0])
-            )
+            similarity = float(self._cosine_similarity(emb_section[0], embeddings_jd[0]))
             scores[section_name] = round(similarity, 3)
 
         if not scores:
@@ -117,9 +115,7 @@ class SemanticModel:
             if not self.load():
                 return []
 
-        jd_sentences = [
-            s.strip() for s in job_description.split(".") if len(s.strip()) > 20
-        ][:20]
+        jd_sentences = [s.strip() for s in job_description.split(".") if len(s.strip()) > 20][:20]
         cv_text = self._cv_to_text(cv_base)
         if not jd_sentences or not cv_text:
             return []
@@ -154,10 +150,7 @@ class SemanticModel:
 
         skills = cv_base.get("skills", {})
         skill_text = " ".join(
-            item
-            for items in skills.values()
-            if isinstance(items, list)
-            for item in items
+            item for items in skills.values() if isinstance(items, list) for item in items
         )
         if skill_text:
             sections["skills"] = skill_text

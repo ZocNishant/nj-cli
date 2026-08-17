@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.rule import Rule
-from rich.text import Text
-from rich import box
+from rich.table import Table
 
 from nj.db.repos.job_repo import JobRepo
 from nj.db.repos.score_repo import ScoreRepo
@@ -65,10 +61,7 @@ def run_explain(
 def _show_top_jobs(job_repo, score_repo, top_n: int) -> None:
     jobs = job_repo.get_jobs()
     if not jobs:
-        console.print(
-            "[yellow]No jobs found.[/yellow] "
-            "Run [bold]nj search[/bold] first."
-        )
+        console.print("[yellow]No jobs found.[/yellow] Run [bold]nj search[/bold] first.")
         return
 
     scored = []
@@ -79,8 +72,7 @@ def _show_top_jobs(job_repo, score_repo, top_n: int) -> None:
 
     if not scored:
         console.print(
-            "[yellow]No scored jobs found.[/yellow] "
-            "Run [bold]nj search[/bold] (without --dry-run)."
+            "[yellow]No scored jobs found.[/yellow] Run [bold]nj search[/bold] (without --dry-run)."
         )
         return
 
@@ -101,15 +93,14 @@ def _show_top_jobs(job_repo, score_repo, top_n: int) -> None:
 
     for job, score in scored[:top_n]:
         s = score.total_score
-        color = (
-            "green" if s >= 75
-            else "yellow" if s >= 60
-            else "red"
-        )
+        color = "green" if s >= 75 else "yellow" if s >= 60 else "red"
         visa_color = (
-            "green" if job.visa_label.value == "confirmed"
-            else "yellow" if job.visa_label.value == "likely"
-            else "red" if job.visa_label.value == "blocked"
+            "green"
+            if job.visa_label.value == "confirmed"
+            else "yellow"
+            if job.visa_label.value == "likely"
+            else "red"
+            if job.visa_label.value == "blocked"
             else "dim"
         )
         table.add_row(
@@ -124,31 +115,28 @@ def _show_top_jobs(job_repo, score_repo, top_n: int) -> None:
 
     console.print(table)
     console.print(
-        "\n[dim]Run [bold]nj explain --job-id ID[/bold] "
-        "for full explanation of any job.[/dim]"
+        "\n[dim]Run [bold]nj explain --job-id ID[/bold] for full explanation of any job.[/dim]"
     )
 
 
 def _display_full_explanation(job, score) -> None:
     total = score.total_score
-    color = (
-        "green" if total >= 75
-        else "yellow" if total >= 60
-        else "red"
-    )
+    color = "green" if total >= 75 else "yellow" if total >= 60 else "red"
 
-    console.print(Panel(
-        f"[bold]{job.title}[/bold] @ "
-        f"[cyan]{job.company}[/cyan]\n"
-        f"[dim]{job.location} · {job.source} · "
-        f"visa: {job.visa_label.value}[/dim]\n\n"
-        f"Score: [{color}][bold]{total}/100[/bold][/{color}]  "
-        f"Confidence: {score.confidence:.2f}  "
-        f"Prompt: [dim]{score.prompt_version}[/dim]\n\n"
-        f"[bold]Why:[/bold] {score.overall_rationale}",
-        title="nj explain",
-        border_style=color,
-    ))
+    console.print(
+        Panel(
+            f"[bold]{job.title}[/bold] @ "
+            f"[cyan]{job.company}[/cyan]\n"
+            f"[dim]{job.location} · {job.source} · "
+            f"visa: {job.visa_label.value}[/dim]\n\n"
+            f"Score: [{color}][bold]{total}/100[/bold][/{color}]  "
+            f"Confidence: {score.confidence:.2f}  "
+            f"Prompt: [dim]{score.prompt_version}[/dim]\n\n"
+            f"[bold]Why:[/bold] {score.overall_rationale}",
+            title="nj explain",
+            border_style=color,
+        )
+    )
 
     if score.sub_scores:
         console.print(Rule("[dim]Score breakdown[/dim]"))
@@ -169,11 +157,7 @@ def _display_full_explanation(job, score) -> None:
             reverse=True,
         ):
             s = sub.score
-            sc = (
-                "green" if s >= 75
-                else "yellow" if s >= 60
-                else "red"
-            )
+            sc = "green" if s >= 75 else "yellow" if s >= 60 else "red"
             contribution = round(sub.score * sub.weight)
             bar_len = sub.score // 10
             bar = "█" * bar_len + "░" * (10 - bar_len)
@@ -195,28 +179,18 @@ def _display_full_explanation(job, score) -> None:
             reverse=True,
         ):
             s = sub.score
-            sc = (
-                "green" if s >= 75
-                else "yellow" if s >= 60
-                else "red"
-            )
+            sc = "green" if s >= 75 else "yellow" if s >= 60 else "red"
             bar_len = s // 5
             bar = "█" * bar_len + "░" * (20 - bar_len)
             label = sub.category.value.replace("_", " ").title()
-            console.print(
-                f"  [dim]{label:<26}[/dim] "
-                f"[{sc}]{bar}[/{sc}] "
-                f"[{sc}]{s}[/{sc}]"
-            )
+            console.print(f"  [dim]{label:<26}[/dim] [{sc}]{bar}[/{sc}] [{sc}]{s}[/{sc}]")
 
     if score.sub_scores:
         evidence_items = []
         for sub in score.sub_scores:
             for e in sub.evidence[:2]:
                 if e:
-                    evidence_items.append(
-                        f"[dim]{sub.category.value.split('_')[0]}:[/dim] {e}"
-                    )
+                    evidence_items.append(f"[dim]{sub.category.value.split('_')[0]}:[/dim] {e}")
         if evidence_items:
             console.print(Rule("[dim]JD evidence that drove scoring[/dim]"))
             for item in evidence_items[:8]:
@@ -224,22 +198,14 @@ def _display_full_explanation(job, score) -> None:
 
     console.print(Rule("[dim]Skill analysis[/dim]"))
     if score.matched_skills:
-        matched_str = "  ".join(
-            f"[green]{s}[/green]"
-            for s in score.matched_skills[:8]
-        )
+        matched_str = "  ".join(f"[green]{s}[/green]" for s in score.matched_skills[:8])
         console.print(f"[bold]Matched:[/bold] {matched_str}")
     if score.missing_skills:
-        missing_str = "  ".join(
-            f"[red]{s}[/red]"
-            for s in score.missing_skills[:6]
-        )
+        missing_str = "  ".join(f"[red]{s}[/red]" for s in score.missing_skills[:6])
         console.print(f"[bold]Missing:[/bold] {missing_str}")
     if score.recommended_emphasis:
         emphasis_str = ", ".join(score.recommended_emphasis[:4])
-        console.print(
-            f"[bold]Lead with:[/bold] [cyan]{emphasis_str}[/cyan]"
-        )
+        console.print(f"[bold]Lead with:[/bold] [cyan]{emphasis_str}[/cyan]")
 
     console.print(Rule("[dim]Visa compatibility[/dim]"))
     visa_icon = "✓" if score.visa_compatible else "✗"
@@ -259,16 +225,10 @@ def _display_full_explanation(job, score) -> None:
 
     if score.recommended_emphasis:
         emphasis = score.recommended_emphasis[0]
-        action += (
-            f"\n  Lead your tailored CV with: "
-            f"[cyan]{emphasis}[/cyan]"
-        )
+        action += f"\n  Lead your tailored CV with: [cyan]{emphasis}[/cyan]"
 
     console.print(f"  {action}")
-    console.print(
-        f"\n  [dim]Job ID: {job.id}[/dim]\n"
-        f"  [dim]Run: nj tailor --url {job.url}[/dim]"
-    )
+    console.print(f"\n  [dim]Job ID: {job.id}[/dim]\n  [dim]Run: nj tailor --url {job.url}[/dim]")
 
 
 def _display_enrichment(enrichment: dict | None) -> None:
@@ -304,9 +264,7 @@ def _display_enrichment(enrichment: dict | None) -> None:
     uscis = enrichment.get("uscis_profile")
     if uscis and uscis.get("total_petitions", 0) > 0:
         tier = uscis.get("sponsor_tier", "UNKNOWN")
-        color = {"STRONG": "green", "MODERATE": "yellow", "WEAK": "red"}.get(
-            tier, "dim"
-        )
+        color = {"STRONG": "green", "MODERATE": "yellow", "WEAK": "red"}.get(tier, "dim")
         approval = uscis.get("approval_rate", 0)
         ml_count = uscis.get("ml_ai_petitions", 0)
         console.print(

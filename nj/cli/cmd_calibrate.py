@@ -43,7 +43,7 @@ def run_calibrate(
         console.print("[yellow]No score results found.[/yellow]")
         return
 
-    console.print(f"\n[bold]nj calibrate[/bold] — " f"{len(results)} scored jobs\n")
+    console.print(f"\n[bold]nj calibrate[/bold] — {len(results)} scored jobs\n")
     display_calibration_table(scored_jobs, results)
 
     scores = sorted([r.total_score for r in results])
@@ -54,7 +54,7 @@ def run_calibrate(
             f"\n[dim]Score distribution: "
             f"min={scores[0]}  "
             f"p40={p40}  "
-            f"median={scores[len(scores)//2]}  "
+            f"median={scores[len(scores) // 2]}  "
             f"max={scores[-1]}[/dim]"
         )
 
@@ -63,9 +63,7 @@ def run_calibrate(
 
     if new_threshold and new_threshold != current:
         _save_threshold(new_threshold, config_path)
-        console.print(
-            f"\n[green]Threshold updated:[/green] " f"{current} → {new_threshold}"
-        )
+        console.print(f"\n[green]Threshold updated:[/green] {current} → {new_threshold}")
         console.print(f"[dim]Saved to {config_path}[/dim]")
     else:
         console.print(f"\n[dim]Threshold unchanged: {current}[/dim]")
@@ -116,10 +114,14 @@ def run_calibrate_from_outcomes(
             if rate is None:
                 continue
             color = "green" if rate >= 25 else "yellow" if rate >= 10 else "red"
-            marker = "✓ optimal" if (
-                report.optimal_threshold is not None
-                and band.startswith(str(report.optimal_threshold))
-            ) else ""
+            marker = (
+                "✓ optimal"
+                if (
+                    report.optimal_threshold is not None
+                    and band.startswith(str(report.optimal_threshold))
+                )
+                else ""
+            )
             table.add_row(
                 band,
                 f"[{color}]{rate}%[/{color}]",
@@ -143,9 +145,8 @@ def run_calibrate_from_outcomes(
             f"Suggested: [bold green]{report.optimal_threshold}[/bold green]"
         )
         from rich.prompt import Confirm
-        if Confirm.ask(
-            f"Update threshold to {report.optimal_threshold}?", default=False
-        ):
+
+        if Confirm.ask(f"Update threshold to {report.optimal_threshold}?", default=False):
             _save_threshold(report.optimal_threshold, config_path)
             console.print(
                 f"[green]Threshold updated:[/green] {current} → {report.optimal_threshold}"

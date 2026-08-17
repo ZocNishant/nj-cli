@@ -5,6 +5,7 @@ from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 def rank_projects(
     projects: list[dict],
     score: ScoreResult,

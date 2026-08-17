@@ -8,8 +8,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -86,17 +86,13 @@ class JSearchScraper(BaseScraper):
                     **self.HEADERS,
                     "X-RapidAPI-Key": self.api_key,
                 }
-                response = httpx.get(
-                    self.BASE_URL, params=params, headers=headers, timeout=15
-                )
+                response = httpx.get(self.BASE_URL, params=params, headers=headers, timeout=15)
                 response.raise_for_status()
                 data = response.json()
                 results = data.get("data", [])
                 if not results:
                     break
-                page_jobs = [
-                    j for j in (self._parse_result(r) for r in results) if j is not None
-                ]
+                page_jobs = [j for j in (self._parse_result(r) for r in results) if j is not None]
                 jobs.extend(page_jobs)
                 if len(results) < 10:
                     break

@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import pytest
-
-from nj.models.config import Config
 from nj.models.job import Job, JobStatus, VisaLabel
 from nj.models.score import ScoreResult
 from nj.tailoring.anti_hallucination import extract_entities, validate_tailored_cv
@@ -55,30 +52,45 @@ def make_cv_base() -> dict:
         },
         "projects": [
             {
-                "id": "gastrovision", "name": "GastroVision",
-                "tech": ["PyTorch"], "priority": 1, "tags": ["ml"],
+                "id": "gastrovision",
+                "name": "GastroVision",
+                "tech": ["PyTorch"],
+                "priority": 1,
+                "tags": ["ml"],
                 "bullets": ["Achieved 96.11% accuracy."],
             },
             {
-                "id": "covid", "name": "COVID Tracker",
-                "tech": ["React"], "priority": 3, "tags": ["web"],
+                "id": "covid",
+                "name": "COVID Tracker",
+                "tech": ["React"],
+                "priority": 3,
+                "tags": ["web"],
                 "bullets": ["Built web app."],
             },
             {
-                "id": "portfolio", "name": "Portfolio",
-                "tech": ["HTML"], "priority": 4, "tags": ["web"],
+                "id": "portfolio",
+                "name": "Portfolio",
+                "tech": ["HTML"],
+                "priority": 4,
+                "tags": ["web"],
                 "bullets": ["Deployed site."],
             },
         ],
         "experience": [
             {
-                "id": "usd", "title": "Grad Assistant",
-                "company": "USD", "location": "SD",
-                "start": "Feb 2026", "end": "Present",
-                "status": "active", "tags": ["it", "infrastructure"],
+                "id": "usd",
+                "title": "Grad Assistant",
+                "company": "USD",
+                "location": "SD",
+                "start": "Feb 2026",
+                "end": "Present",
+                "status": "active",
+                "tags": ["it", "infrastructure"],
                 "bullets": [
-                    "Managed network.", "Resolved alerts.",
-                    "Configured Cisco.", "Used SolarWinds.",
+                    "Managed network.",
+                    "Resolved alerts.",
+                    "Configured Cisco.",
+                    "Used SolarWinds.",
                 ],
             },
         ],
@@ -86,6 +98,7 @@ def make_cv_base() -> dict:
 
 
 # --- section_ranker ---
+
 
 def test_gastrovision_always_first_after_rank() -> None:
     projects = make_cv_base()["projects"]
@@ -106,6 +119,7 @@ def test_rank_projects_empty_list() -> None:
 
 
 # --- suppressor ---
+
 
 def test_security_tools_suppressed_for_ml_role() -> None:
     cv = make_cv_base()
@@ -135,6 +149,7 @@ def test_suppress_does_not_mutate_original() -> None:
 
 # --- keyword_align ---
 
+
 def test_extract_keywords_returns_list() -> None:
     jd = "We need PyTorch expertise and TensorFlow skills for deep learning"
     keywords = extract_keywords(jd, ["Python"])
@@ -161,10 +176,10 @@ def test_flatten_skills() -> None:
 
 # --- anti_hallucination ---
 
+
 def test_anti_hallucination_passes_on_same_entities() -> None:
     original = {"name": "Nishant", "skills": ["PyTorch", "96.11%"]}
-    tailored = {"name": "Nishant", "skills": ["PyTorch", "96.11%"],
-                "summary": "Expert in PyTorch"}
+    tailored = {"name": "Nishant", "skills": ["PyTorch", "96.11%"], "summary": "Expert in PyTorch"}
     is_valid, violations = validate_tailored_cv(original, tailored)
     assert is_valid is True
     assert violations == []
@@ -172,8 +187,7 @@ def test_anti_hallucination_passes_on_same_entities() -> None:
 
 def test_anti_hallucination_fails_on_invented_company() -> None:
     original = {"company": "USD", "skills": ["PyTorch"]}
-    tailored = {"company": "USD", "skills": ["PyTorch"],
-                "extra": "Previously worked at Google"}
+    tailored = {"company": "USD", "skills": ["PyTorch"], "extra": "Previously worked at Google"}
     is_valid, violations = validate_tailored_cv(original, tailored)
     assert is_valid is False
     assert any("Google" in v for v in violations)
@@ -181,8 +195,7 @@ def test_anti_hallucination_fails_on_invented_company() -> None:
 
 def test_anti_hallucination_fails_on_invented_metric() -> None:
     original = {"bullets": ["Achieved 96.11% accuracy"]}
-    tailored = {"bullets": ["Achieved 96.11% accuracy",
-                             "Improved performance by 99.5%"]}
+    tailored = {"bullets": ["Achieved 96.11% accuracy", "Improved performance by 99.5%"]}
     is_valid, violations = validate_tailored_cv(original, tailored)
     assert is_valid is False
 

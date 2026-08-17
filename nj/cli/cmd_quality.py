@@ -35,14 +35,10 @@ def run_quality_check(
 ) -> None:
     from nj.db.repos.job_repo import JobRepo
     from nj.db.repos.score_repo import ScoreRepo
-    from nj.scoring.quality_gate import check_application_quality
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -56,8 +52,7 @@ def run_quality_check(
         job = next((j for j in jobs if j.id == job_id), None)
         if not job:
             console.print(
-                f"[red]Job '{job_id}' not found.[/red] "
-                "Run [bold]nj status[/bold] to see job IDs."
+                f"[red]Job '{job_id}' not found.[/red] Run [bold]nj status[/bold] to see job IDs."
             )
             return
         score = score_repo.get_score(job_id)

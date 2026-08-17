@@ -110,6 +110,7 @@ def make_template() -> str:
 
 # --- _fill_template ---
 
+
 def test_fill_template_replaces_name() -> None:
     result = _fill_template(make_template(), make_cv())
     assert "Nishant Joshi" in result
@@ -123,6 +124,7 @@ def test_fill_template_no_placeholders_remain() -> None:
 
 # --- _render_summary ---
 
+
 def test_render_summary_empty_returns_empty() -> None:
     assert _render_summary("") == ""
     assert _render_summary("   ") == ""
@@ -135,6 +137,7 @@ def test_render_summary_wraps_in_section() -> None:
 
 
 # --- _render_skills ---
+
 
 def test_render_skills_includes_labels() -> None:
     skills = {"ml_frameworks": ["PyTorch", "TensorFlow"]}
@@ -152,6 +155,7 @@ def test_render_skills_skips_empty_categories() -> None:
 
 # --- _render_experience ---
 
+
 def test_moffitt_incoming_renders_without_bullets() -> None:
     exp = [make_cv()["experience"][0]]
     result = _render_experience(exp)
@@ -167,6 +171,7 @@ def test_active_experience_renders_bullets() -> None:
 
 # --- _render_projects ---
 
+
 def test_render_projects_includes_gastrovision() -> None:
     projects = make_cv()["projects"]
     result = _render_projects(projects)
@@ -175,6 +180,7 @@ def test_render_projects_includes_gastrovision() -> None:
 
 
 # --- _render_gap ---
+
 
 def test_render_gap_returns_empty_when_none() -> None:
     assert _render_gap(None) == ""
@@ -188,6 +194,7 @@ def test_render_gap_includes_period() -> None:
 
 
 # --- _safe_filename ---
+
 
 def test_safe_filename_removes_special_chars() -> None:
     result = _safe_filename("Acme Corp & Partners!")
@@ -203,6 +210,7 @@ def test_safe_filename_truncates_to_30() -> None:
 
 # --- escape_latex ---
 
+
 def test_escape_latex_ampersand() -> None:
     assert "\\&" in escape_latex("R&D")
 
@@ -212,6 +220,7 @@ def test_escape_latex_percent() -> None:
 
 
 # --- render_cv ---
+
 
 def test_render_cv_raises_on_missing_tectonic(tmp_path: Path) -> None:
     template_file = tmp_path / "template.tex"

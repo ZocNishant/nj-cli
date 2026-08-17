@@ -4,11 +4,10 @@ from datetime import UTC, datetime
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from nj.analytics.skill_gaps import SkillGapReport, analyze_skill_gaps
-from nj.models.score import ScoreResult, SubScore, ScoreCategory
+from nj.models.score import ScoreResult
 
 
 def make_score(
@@ -95,9 +94,7 @@ def test_matched_skills_in_frequency() -> None:
 
 def test_pytorch_high_frequency_in_matched() -> None:
     report = analyze_skill_gaps(make_sample_scores())
-    pytorch = next(
-        (m for m in report.matched_skill_frequency if m["skill"] == "pytorch"), None
-    )
+    pytorch = next((m for m in report.matched_skill_frequency if m["skill"] == "pytorch"), None)
     assert pytorch is not None
     assert pytorch["frequency_pct"] >= 60
 
@@ -126,9 +123,10 @@ def test_run_gaps_no_jobs(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     buf = StringIO()
     c = Console(file=buf, highlight=False)
-    with patch("nj.cli.cmd_gaps.console", c), patch(
-        "nj.db.repos.job_repo.JobRepo"
-    ) as mock_repo_cls:
+    with (
+        patch("nj.cli.cmd_gaps.console", c),
+        patch("nj.db.repos.job_repo.JobRepo") as mock_repo_cls,
+    ):
         mock_repo_cls.return_value.get_jobs.return_value = []
         run_gaps(Config(), db_path=str(tmp_path / "nj.db"))
     assert "No jobs found" in buf.getvalue()

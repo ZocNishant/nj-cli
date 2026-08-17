@@ -14,9 +14,8 @@ console = Console()
 def run_update_intern(config: Config) -> None:
     """Backward-compatible alias for update-role."""
     if not Path("cv/cv_base.json").exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
     from nj.cli.cmd_update_role import run_update_role
+
     run_update_role(config)

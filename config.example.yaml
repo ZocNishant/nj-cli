@@ -1,7 +1,13 @@
 llm:
   provider: claude          # options: claude, freellmapi
-  model: claude-sonnet-4-20250514
-  api_key: ""               # set in .env as ANTHROPIC_API_KEY
+  api_key: ""               # leave empty — set ANTHROPIC_API_KEY in .env instead
+
+  # Work is tiered by how much the output quality matters. `model` is the
+  # fallback used when a tier below is unset.
+  model: claude-sonnet-5
+  scoring_model: claude-haiku-4-5    # ranks 50-200 jobs a run; cheapest tier
+  tailoring_model: claude-sonnet-5   # CVs and cover letters a recruiter reads
+  reasoning_model: claude-opus-5     # diagnose / prep / frame; few calls, high stakes
 
   # FreeLLMAPI — free local proxy for dev/testing
   # Runs 14 providers (Gemini, Groq, Cerebras, Mistral, etc.)

@@ -1,13 +1,11 @@
 """Unit tests for ghost job detection filter."""
+
 from __future__ import annotations
 
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 
-import pytest
-
-from nj.models.job import Job, VisaLabel, JobStatus
-from nj.scoring.ghost_filter import GhostJobFilter, GhostJobResult, GhostSignal
-
+from nj.models.job import Job, JobStatus, VisaLabel
+from nj.scoring.ghost_filter import GhostJobFilter, GhostSignal
 
 _GOOD_DESC = (
     "We are looking for a machine learning engineer with 2+ years of experience "

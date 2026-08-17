@@ -4,16 +4,14 @@ repos:
     hooks:
       - id: gitleaks
 
+  # Pinned to the same version as pyproject.toml — ruff's default rule set
+  # changes between minor versions, so an unpinned hook drifts from CI.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.15.14
     hooks:
       - id: ruff
         args: [--fix]
-
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

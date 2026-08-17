@@ -154,9 +154,7 @@ def extract_keywords(
             seen.add(term_lower)
             all_terms.append(term.strip())
 
-    logger.debug(
-        "keywords_extracted", count=len(all_terms[:top_n]), keywords=all_terms[:top_n]
-    )
+    logger.debug("keywords_extracted", count=len(all_terms[:top_n]), keywords=all_terms[:top_n])
     return all_terms[:top_n]
 
 

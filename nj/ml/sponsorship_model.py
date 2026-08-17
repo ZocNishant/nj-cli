@@ -32,11 +32,11 @@ class SponsorshipModel:
         self.feature_names: list[str] = []
 
     def train(self, db_path: str = "data/nj.db") -> dict:
+        from scipy.sparse import csr_matrix, hstack
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.model_selection import cross_val_score
         from sklearn.preprocessing import LabelEncoder
-        from scipy.sparse import csr_matrix, hstack
 
         logger.info("sponsorship_model_training_start")
 
@@ -45,10 +45,7 @@ class SponsorshipModel:
         if len(X_text) < MIN_TRAINING_SAMPLES:
             return {
                 "success": False,
-                "error": (
-                    f"Not enough data: {len(X_text)} samples. "
-                    "Run nj intel sync first."
-                ),
+                "error": (f"Not enough data: {len(X_text)} samples. Run nj intel sync first."),
             }
 
         self.vectorizer = TfidfVectorizer(
@@ -87,9 +84,7 @@ class SponsorshipModel:
         self.training_samples = len(X_text)
 
         try:
-            cv_scores = cross_val_score(
-                self.model, X_combined, y_arr, cv=3, scoring="roc_auc"
-            )
+            cv_scores = cross_val_score(self.model, X_combined, y_arr, cv=3, scoring="roc_auc")
             auc = round(float(np.mean(cv_scores)), 3)
         except Exception:
             auc = None
@@ -97,8 +92,7 @@ class SponsorshipModel:
         tfidf_features = self.vectorizer.get_feature_names_out()
         importances = self.model.feature_importances_
         top_features = [
-            tfidf_features[i]
-            for i in np.argsort(importances[: len(tfidf_features)])[-10:][::-1]
+            tfidf_features[i] for i in np.argsort(importances[: len(tfidf_features)])[-10:][::-1]
         ]
 
         self._save()
@@ -164,11 +158,10 @@ class SponsorshipModel:
             "role": job_title,
         }
 
-    def _load_training_data(
-        self, db_path: str
-    ) -> tuple[list[str], list[list], list[int]]:
-        from nj.db.engine import get_engine
+    def _load_training_data(self, db_path: str) -> tuple[list[str], list[list], list[int]]:
         from sqlalchemy import text as sa_text
+
+        from nj.db.engine import get_engine
 
         X_text: list[str] = []
         X_meta: list[list] = []

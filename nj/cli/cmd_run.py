@@ -107,10 +107,14 @@ def run_pipeline(
     job_repo = JobRepo(db_path)
     score_repo = ScoreRepo(db_path)
     app_repo = ApplicationRepo(db_path)
-    provider = get_provider(config.llm)
+    # The pipeline ranks many jobs and tailors a handful, so the two stages get
+    # different models rather than paying tailoring rates to rank the long tail.
+    scoring_provider = get_provider(config.llm, task="scoring")
+    provider = get_provider(config.llm, task="tailoring")
     visa_filter = VisaFilter(config.visa)
     notifier = EmailNotifier(config.notify)
     rate_limiter = RateLimiter(
+        repo=app_repo,  # daily cap counted from the DB, not per-process
         delay_min=config.apply.delay_min,
         delay_max=config.apply.delay_max,
         max_per_day=config.apply.max_per_day,
@@ -140,9 +144,7 @@ def run_pipeline(
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] " "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
     with open(cv_path) as f:
         cv_base = json.load(f)
@@ -179,9 +181,7 @@ def run_pipeline(
             return scraper.name(), []
 
     async def _scrape_all() -> dict[str, list]:
-        results = await asyncio.gather(
-            *[_scrape_one(s) for s in scrapers], return_exceptions=True
-        )
+        results = await asyncio.gather(*[_scrape_one(s) for s in scrapers], return_exceptions=True)
         output = {}
         for result in results:
             if isinstance(result, Exception):
@@ -212,9 +212,7 @@ def run_pipeline(
             )
             console.print(
                 "  [dim]Sources: "
-                + " · ".join(
-                    f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers
-                )
+                + " · ".join(f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers)
                 + "[/dim]\n"
             )
         else:
@@ -259,7 +257,7 @@ def run_pipeline(
             app_repo.save_application(record)
             continue
 
-        result = asyncio.run(score_job(job, cv_base, config, provider, score_repo))
+        result = asyncio.run(score_job(job, cv_base, config, scoring_provider, score_repo))
 
         if result.total_score < config.scoring.threshold:
             record = ApplicationRecord.create(job.id, result.total_score)
@@ -286,10 +284,7 @@ def run_pipeline(
             continue
 
         if not silent:
-            console.print(
-                f"  [dim]Tailoring CV for "
-                f"{job.title[:30]} @ {job.company[:20]}...[/dim]"
-            )
+            console.print(f"  [dim]Tailoring CV for {job.title[:30]} @ {job.company[:20]}...[/dim]")
         tailored_cv, _ = asyncio.run(tailor_cv(job, result, cv_base, config, provider))
         job_repo.update_job_status(job.id, JobStatus.TAILORED)
 
@@ -333,17 +328,12 @@ def run_pipeline(
                 )
             record = ApplicationRecord.create(job.id, result.total_score)
             record.status = ApplicationStatus.FAILED
-            record.error_message = (
-                f"quality_gate_blocked: {'; '.join(gate.blocking_reasons)}"
-            )
+            record.error_message = f"quality_gate_blocked: {'; '.join(gate.blocking_reasons)}"
             app_repo.save_application(record)
             continue
 
         if gate.has_warnings and not silent:
-            console.print(
-                f"  [yellow]⚠ Warnings:[/yellow] "
-                f"{', '.join(gate.warnings[:2])}"
-            )
+            console.print(f"  [yellow]⚠ Warnings:[/yellow] {', '.join(gate.warnings[:2])}")
 
         record = ApplicationRecord.create(job.id, result.total_score)
 

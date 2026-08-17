@@ -37,9 +37,7 @@ def main(
         help="Show version and exit",
         is_eager=True,
     ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed debug output"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed debug output"),
     schedule: str = typer.Option(
         None,
         "--schedule",
@@ -97,9 +95,7 @@ def demo() -> None:
 
 @app.command()
 def init(
-    config_path: str = typer.Option(
-        "config.yaml", "--config", help="Path to config file"
-    ),
+    config_path: str = typer.Option("config.yaml", "--config", help="Path to config file"),
 ) -> None:
     """First-time setup wizard — API keys, CV, email, schedule."""
     from nj.cli.cmd_init import run_init
@@ -180,9 +176,7 @@ def tailor(
 
 @app.command()
 def review(
-    limit: int = typer.Option(
-        50, "--limit", "-n", help="Max jobs to review per session"
-    ),
+    limit: int = typer.Option(50, "--limit", "-n", help="Max jobs to review per session"),
     db_path: str = typer.Option("data/nj.db", "--db", help="Path to SQLite database"),
 ) -> None:
     """Interactively review scored jobs before applying."""
@@ -197,9 +191,7 @@ def review(
 def status(
     db_path: str = typer.Option("data/nj.db", "--db"),
     update_id: str = typer.Option(None, "--update-id", help="Application ID to update"),
-    update_status_val: str = typer.Option(
-        None, "--update-status", help="New status value"
-    ),
+    update_status_val: str = typer.Option(None, "--update-status", help="New status value"),
 ) -> None:
     """Application tracker — history, scores, trajectory."""
     from nj.cli.cmd_status import run_status
@@ -242,9 +234,7 @@ def calibrate(
     if from_outcomes:
         from nj.cli.cmd_calibrate import run_calibrate_from_outcomes
 
-        run_calibrate_from_outcomes(
-            config=config, db_path=db_path, config_path=config_path
-        )
+        run_calibrate_from_outcomes(config=config, db_path=db_path, config_path=config_path)
     else:
         from nj.cli.cmd_calibrate import run_calibrate
 
@@ -277,10 +267,7 @@ def update_cv(
         None,
         "--section",
         "-s",
-        help=(
-            "Section to update: summary, skills, "
-            "research_interests, soft_skills, personal"
-        ),
+        help=("Section to update: summary, skills, research_interests, soft_skills, personal"),
     ),
     show: bool = typer.Option(
         False, "--show", help="Show all editable sections and current values"
@@ -319,9 +306,7 @@ def logs(
 def prep(
     job_id: str = typer.Option(None, "--job-id", "-j", help="Job ID from nj status"),
     url: str = typer.Option(None, "--url", "-u", help="Job URL to prep for"),
-    last: bool = typer.Option(
-        False, "--last", "-l", help="Prep for most recently applied job"
-    ),
+    last: bool = typer.Option(False, "--last", "-l", help="Prep for most recently applied job"),
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
 ) -> None:
@@ -342,9 +327,7 @@ def prep(
 
 @app.command()
 def quality(
-    job_id: str = typer.Option(
-        None, "--job-id", "-j", help="Check a specific job by ID"
-    ),
+    job_id: str = typer.Option(None, "--job-id", "-j", help="Check a specific job by ID"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
     """Run pre-submit quality gate on tailored applications."""
@@ -366,12 +349,8 @@ def frame(
         "-a",
         help="Target audience: production_ml, research_lab, healthtech_startup, big_tech, early_stage_startup, custom",
     ),
-    role_description: str = typer.Option(
-        "", "--role", help="Role description for custom audience"
-    ),
-    list_projects: bool = typer.Option(
-        False, "--list", "-l", help="List available projects"
-    ),
+    role_description: str = typer.Option("", "--role", help="Role description for custom audience"),
+    list_projects: bool = typer.Option(False, "--list", "-l", help="List available projects"),
 ) -> None:
     """Reframe a project for a specific audience or role type."""
     from nj.cli.cmd_frame import run_frame
@@ -423,12 +402,8 @@ def diagnose(
 def watch(
     days_back: int = typer.Option(7, "--days", "-d", help="Days back to scan Gmail"),
     db_path: str = typer.Option("data/nj.db", "--db"),
-    setup: bool = typer.Option(
-        False, "--setup", help="Show Gmail OAuth2 setup instructions"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Detect callbacks without updating DB"
-    ),
+    setup: bool = typer.Option(False, "--setup", help="Show Gmail OAuth2 setup instructions"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Detect callbacks without updating DB"),
 ) -> None:
     """Check Gmail for interview callbacks and offer signals."""
     from nj.cli.cmd_watch import run_watch
@@ -539,9 +514,7 @@ def graph(
         help="build | show | stats | skills | companies | path",
     ),
     query: str = typer.Argument("", help="From node (for path command)"),
-    target: str = typer.Option(
-        "", "--target", "-t", help="Target node (for path command)"
-    ),
+    target: str = typer.Option("", "--target", "-t", help="Target node (for path command)"),
     db_path: str = typer.Option("data/nj.db", "--db"),
 ) -> None:
     """Career knowledge graph — your career as connected data."""
@@ -560,13 +533,9 @@ def graph(
 
 @app.command()
 def intel(
-    subcommand: str = typer.Argument(
-        None, help="sync | company | top | role | search | stats"
-    ),
+    subcommand: str = typer.Argument(None, help="sync | company | top | role | search | stats"),
     query: str = typer.Argument("", help="Company name, role query, or search term"),
-    state: str = typer.Option(
-        "", "--state", "-s", help="Filter by state (e.g. CA, NY)"
-    ),
+    state: str = typer.Option("", "--state", "-s", help="Filter by state (e.g. CA, NY)"),
     year: int = typer.Option(0, "--year", "-y", help="Filter by year (2022–2024)"),
     limit: int = typer.Option(20, "--limit", "-n", help="Max results to show"),
     db_path: str = typer.Option("data/nj.db", "--db"),

@@ -15,7 +15,7 @@ Ghost job signals:
 from __future__ import annotations
 
 import re
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from nj.models.job import Job
 from nj.utils.logger import get_logger
@@ -152,9 +152,7 @@ class GhostJobFilter:
             reason=reason,
         )
 
-    def filter_jobs(
-        self, jobs: list[Job]
-    ) -> tuple[list[Job], list[tuple[Job, GhostJobResult]]]:
+    def filter_jobs(self, jobs: list[Job]) -> tuple[list[Job], list[tuple[Job, GhostJobResult]]]:
         """Returns (clean_jobs, ghost_jobs). ghost_jobs is list of (job, result) tuples."""
         clean = []
         ghosts = []
@@ -200,9 +198,7 @@ class GhostJobFilter:
         if len(job.description) < self.min_description_length:
             return True, 0.7
         desc_lower = job.description.lower()
-        vague_count = sum(
-            1 for indicator in VAGUE_INDICATORS if indicator in desc_lower
-        )
+        vague_count = sum(1 for indicator in VAGUE_INDICATORS if indicator in desc_lower)
         if vague_count >= 2:
             return True, 0.5 + vague_count * 0.05
         return False, 0.0

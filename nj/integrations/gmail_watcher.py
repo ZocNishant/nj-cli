@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import base64
-import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -101,9 +99,7 @@ def check_callbacks(
     if not apps:
         return []
 
-    company_to_app = {
-        a.company.lower(): a for a in apps if hasattr(a, "company") and a.company
-    }
+    company_to_app = {a.company.lower(): a for a in apps if hasattr(a, "company") and a.company}
 
     service = _get_gmail_service(credentials_path, token_path)
     if not service:
@@ -122,9 +118,12 @@ def check_callbacks(
     callbacks = []
     for msg_ref in messages:
         try:
-            msg = service.users().messages().get(
-                userId="me", id=msg_ref["id"], format="full"
-            ).execute()
+            msg = (
+                service.users()
+                .messages()
+                .get(userId="me", id=msg_ref["id"], format="full")
+                .execute()
+            )
         except Exception as e:
             logger.warning("gmail_fetch_failed", msg_id=msg_ref["id"], error=str(e))
             continue
@@ -207,8 +206,9 @@ def update_application_statuses(
                 new_status=new_status,
             )
             try:
-                from nj.graph.builder import GraphBuilder
                 from nj.db.repos.job_repo import JobRepo
+                from nj.graph.builder import GraphBuilder
+
                 builder = GraphBuilder(db_path=db_path)
                 job_repo = JobRepo(db_path)
                 jobs = job_repo.get_jobs()
@@ -240,7 +240,10 @@ def _get_gmail_service(
         from google_auth_oauthlib.flow import InstalledAppFlow
         from googleapiclient.discovery import build
     except ImportError:
-        logger.warning("gmail_deps_missing", hint="pip install google-auth google-auth-oauthlib google-api-python-client")
+        logger.warning(
+            "gmail_deps_missing",
+            hint="pip install google-auth google-auth-oauthlib google-api-python-client",
+        )
         return None
 
     scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -295,6 +298,7 @@ def _extract_email_body(msg: dict) -> str:
             if data:
                 raw = base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
                 from nj.utils.text import clean_html
+
                 return clean_html(raw)
 
     return ""

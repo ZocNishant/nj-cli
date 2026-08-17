@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
-from nj.scheduler.manager import NJ_CRON_MARKER, _parse_time, _read_crontab, get_schedule
+from nj.scheduler.manager import NJ_CRON_MARKER, _parse_time, get_schedule
 
 
 def test_parse_time_valid() -> None:
@@ -26,8 +24,9 @@ def test_parse_time_zero() -> None:
 
 
 def test_get_schedule_returns_none_when_no_schedule() -> None:
-    with patch("nj.scheduler.manager.platform.system", return_value="Linux"), patch(
-        "nj.scheduler.manager._read_crontab", return_value=""
+    with (
+        patch("nj.scheduler.manager.platform.system", return_value="Linux"),
+        patch("nj.scheduler.manager._read_crontab", return_value=""),
     ):
         result = get_schedule()
         assert result is None
@@ -35,8 +34,9 @@ def test_get_schedule_returns_none_when_no_schedule() -> None:
 
 def test_get_schedule_finds_cron_entry() -> None:
     cron_line = f"0 8 */3 * * /usr/bin/nj run --silent {NJ_CRON_MARKER}"
-    with patch("nj.scheduler.manager.platform.system", return_value="Linux"), patch(
-        "nj.scheduler.manager._read_crontab", return_value=cron_line
+    with (
+        patch("nj.scheduler.manager.platform.system", return_value="Linux"),
+        patch("nj.scheduler.manager._read_crontab", return_value=cron_line),
     ):
         result = get_schedule()
         assert result is not None
@@ -52,10 +52,10 @@ def test_set_schedule_zero_calls_remove() -> None:
 
 
 def test_set_schedule_calls_cron_on_linux() -> None:
-    with patch("nj.scheduler.manager.platform.system", return_value="Linux"), patch(
-        "nj.scheduler.manager._set_cron"
-    ) as mock_cron, patch(
-        "nj.scheduler.manager._find_nj_binary", return_value="/usr/bin/nj"
+    with (
+        patch("nj.scheduler.manager.platform.system", return_value="Linux"),
+        patch("nj.scheduler.manager._set_cron") as mock_cron,
+        patch("nj.scheduler.manager._find_nj_binary", return_value="/usr/bin/nj"),
     ):
         from nj.scheduler.manager import set_schedule
 
@@ -64,10 +64,10 @@ def test_set_schedule_calls_cron_on_linux() -> None:
 
 
 def test_set_schedule_calls_launchd_on_macos() -> None:
-    with patch("nj.scheduler.manager.platform.system", return_value="Darwin"), patch(
-        "nj.scheduler.manager._set_launchd"
-    ) as mock_ld, patch(
-        "nj.scheduler.manager._find_nj_binary", return_value="/usr/bin/nj"
+    with (
+        patch("nj.scheduler.manager.platform.system", return_value="Darwin"),
+        patch("nj.scheduler.manager._set_launchd") as mock_ld,
+        patch("nj.scheduler.manager._find_nj_binary", return_value="/usr/bin/nj"),
     ):
         from nj.scheduler.manager import set_schedule
 

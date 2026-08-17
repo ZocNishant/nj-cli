@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from nj.utils.logger import get_logger
 
@@ -58,8 +58,8 @@ def _show_intel_help() -> None:
 
 
 def _run_sync(db_path: str, year: int = 0) -> None:
-    from nj.intel.pipeline import download_uscis_data, parse_uscis_csv
     from nj.db.repos.intel_repo import IntelRepo
+    from nj.intel.pipeline import download_uscis_data, parse_uscis_csv
 
     repo = IntelRepo(db_path)
     years = [2023, 2022, 2021]
@@ -255,9 +255,7 @@ def _run_stats(db_path: str) -> None:
     stats = repo.get_stats()
 
     if stats["total_petitions"] == 0:
-        console.print(
-            "\n[yellow]No H1B data loaded.[/yellow] Run [bold]intel sync[/bold] first.\n"
-        )
+        console.print("\n[yellow]No H1B data loaded.[/yellow] Run [bold]intel sync[/bold] first.\n")
         return
 
     console.print()

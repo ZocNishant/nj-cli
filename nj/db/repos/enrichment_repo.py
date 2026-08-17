@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from nj.db.engine import get_session
 from nj.db.models import JobEnrichmentORM
@@ -74,9 +74,7 @@ class EnrichmentRepo:
                 else None,
             }
 
-    def get_enrichments_for_jobs(
-        self, job_ids: list[str]
-    ) -> dict[str, dict]:
+    def get_enrichments_for_jobs(self, job_ids: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
         for job_id in job_ids:
             enrichment = self.get_enrichment(job_id)

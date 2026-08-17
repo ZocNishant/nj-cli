@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 
@@ -97,11 +97,7 @@ class GraphRepo:
 
     def get_nodes_by_type(self, node_type: str) -> list[GraphNodeORM]:
         with get_session(self.db_path) as session:
-            rows = (
-                session.query(GraphNodeORM)
-                .filter(GraphNodeORM.node_type == node_type)
-                .all()
-            )
+            rows = session.query(GraphNodeORM).filter(GraphNodeORM.node_type == node_type).all()
             # Detach from session by converting to plain objects
             session.expunge_all()
             return rows
@@ -112,9 +108,7 @@ class GraphRepo:
         edge_type: str | None = None,
     ) -> list[dict]:
         with get_session(self.db_path) as session:
-            q = session.query(GraphEdgeORM).filter(
-                GraphEdgeORM.from_node_id == node_id
-            )
+            q = session.query(GraphEdgeORM).filter(GraphEdgeORM.from_node_id == node_id)
             if edge_type:
                 q = q.filter(GraphEdgeORM.edge_type == edge_type)
             edges = q.all()
@@ -190,21 +184,13 @@ class GraphRepo:
         with get_session(self.db_path) as session:
             start_nodes = (
                 session.query(GraphNodeORM)
-                .filter(
-                    GraphNodeORM.label_normalized.contains(
-                        self.normalize(from_label)
-                    )
-                )
+                .filter(GraphNodeORM.label_normalized.contains(self.normalize(from_label)))
                 .limit(3)
                 .all()
             )
             end_nodes = (
                 session.query(GraphNodeORM)
-                .filter(
-                    GraphNodeORM.label_normalized.contains(
-                        self.normalize(to_label)
-                    )
-                )
+                .filter(GraphNodeORM.label_normalized.contains(self.normalize(to_label)))
                 .limit(3)
                 .all()
             )
@@ -222,9 +208,7 @@ class GraphRepo:
                 if len(path) >= max_depth:
                     continue
                 edges = (
-                    session.query(GraphEdgeORM)
-                    .filter(GraphEdgeORM.from_node_id == current)
-                    .all()
+                    session.query(GraphEdgeORM).filter(GraphEdgeORM.from_node_id == current).all()
                 )
                 for edge in edges:
                     if edge.to_node_id not in visited:
@@ -232,9 +216,7 @@ class GraphRepo:
                         queue.append(path + [edge.to_node_id])
             return []
 
-    def _path_to_dicts(
-        self, node_ids: list[int], session
-    ) -> list[dict]:
+    def _path_to_dicts(self, node_ids: list[int], session) -> list[dict]:
         result = []
         for nid in node_ids:
             node = session.get(GraphNodeORM, nid)

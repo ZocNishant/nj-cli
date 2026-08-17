@@ -34,9 +34,7 @@ def _get_enabled_scrapers(config: Config) -> list:
         from nj.scrapers.linkedin import LinkedInScraper
 
         scrapers.append(
-            LinkedInScraper(
-                session_cookie=li_at, visa_config=config.visa, headless=True
-            )
+            LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
         )
 
     adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
@@ -206,9 +204,7 @@ def run_search(
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] " "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -218,12 +214,12 @@ def run_search(
     job_repo = JobRepo(db_path)
     score_repo = ScoreRepo(db_path)
     dedup = JobDeduplicator(job_repo)
-    provider = get_provider(config.llm)
+    provider = get_provider(config.llm, task="scoring")
     visa_filter = VisaFilter(config.visa)
 
-    from nj.utils.logger import is_verbose
-
     import inspect
+
+    from nj.utils.logger import is_verbose
 
     async def _scrape_one(scraper) -> tuple[str, list]:
         try:
@@ -245,9 +241,7 @@ def run_search(
             return scraper.name(), []
 
     async def _scrape_all() -> dict[str, list]:
-        results = await asyncio.gather(
-            *[_scrape_one(s) for s in scrapers], return_exceptions=True
-        )
+        results = await asyncio.gather(*[_scrape_one(s) for s in scrapers], return_exceptions=True)
         output = {}
         for result in results:
             if isinstance(result, Exception):
@@ -284,9 +278,7 @@ def run_search(
 
     if not is_verbose():
         total = sum(counts.values())
-        sources = " · ".join(
-            f"{name}={count}" for name, count in counts.items() if count > 0
-        )
+        sources = " · ".join(f"{name}={count}" for name, count in counts.items() if count > 0)
         console.print(
             f"\n[green]✓[/green] Scraped [bold]{total}[/bold] jobs in "
             f"[cyan]{t_elapsed}s[/cyan]  "
@@ -302,15 +294,12 @@ def run_search(
 
     if ghost_jobs and not is_verbose():
         console.print(
-            f"[dim]Ghost filter: {len(ghost_jobs)} jobs removed "
-            f"({len(all_jobs)} remaining)[/dim]"
+            f"[dim]Ghost filter: {len(ghost_jobs)} jobs removed ({len(all_jobs)} remaining)[/dim]"
         )
     elif ghost_jobs and is_verbose():
         console.print(f"[dim]Ghost filter removed {len(ghost_jobs)} jobs:[/dim]")
         for job, result in ghost_jobs[:5]:
-            console.print(
-                f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]"
-            )
+            console.print(f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]")
 
     if not all_langs:
         pre_lang = len(all_jobs)
@@ -324,9 +313,7 @@ def run_search(
 
     if visa_mode == "sponsor":
         pre_visa = len(all_jobs)
-        all_jobs = [
-            j for j in all_jobs if j.visa_label.value in ("confirmed", "likely")
-        ]
+        all_jobs = [j for j in all_jobs if j.visa_label.value in ("confirmed", "likely")]
         removed_visa = pre_visa - len(all_jobs)
         if removed_visa:
             console.print(
@@ -346,17 +333,13 @@ def run_search(
         return
 
     if limit > 0 and len(all_jobs) > limit:
-        console.print(
-            f"[dim]Limiting to {limit} jobs " f"(use --limit 0 to score all)[/dim]"
-        )
+        console.print(f"[dim]Limiting to {limit} jobs (use --limit 0 to score all)[/dim]")
         all_jobs = all_jobs[:limit]
 
-    console.print(
-        f"\n[bold]{len(all_jobs)} new jobs found.[/bold] " f"Scoring now...\n"
-    )
+    console.print(f"\n[bold]{len(all_jobs)} new jobs found.[/bold] Scoring now...\n")
 
-    from nj.intel.enrichment import JobEnrichment
     from nj.db.repos.enrichment_repo import EnrichmentRepo
+    from nj.intel.enrichment import JobEnrichment
 
     enricher = JobEnrichment(db_path=db_path)
     enrichment_repo = EnrichmentRepo(db_path=db_path)
@@ -368,6 +351,7 @@ def run_search(
         enrichment_repo.save_enrichment(job_id, enrichment)
 
     from asyncio import Semaphore
+
     from nj.models.job import JobStatus
 
     jobs_to_score = [j for j in all_jobs if not visa_filter.should_skip(j)]
@@ -481,10 +465,7 @@ def _display_search_results(
     enrichments: dict | None = None,
 ) -> None:
     if not scored:
-        console.print(
-            f"[yellow]No scoreable jobs.[/yellow] "
-            f"({blocked} blocked by visa filter)"
-        )
+        console.print(f"[yellow]No scoreable jobs.[/yellow] ({blocked} blocked by visa filter)")
         return
 
     enrichments = enrichments or {}
@@ -517,9 +498,7 @@ def _display_search_results(
         prob = sponsor.get("probability")
         sponsor_str = f"{prob:.0%}" if prob is not None else "—"
         sponsor_color = (
-            "green"
-            if prob and prob >= 0.7
-            else "yellow" if prob and prob >= 0.45 else "dim"
+            "green" if prob and prob >= 0.7 else "yellow" if prob and prob >= 0.45 else "dim"
         )
 
         salary_pred = salary_data.get("predicted_salary")

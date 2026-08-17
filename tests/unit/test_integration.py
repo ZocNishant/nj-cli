@@ -1,8 +1,8 @@
 """Integration tests for graph auto-update, diagnose enrichment, and status summary."""
+
 from __future__ import annotations
 
-from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
 
 import pytest
 
@@ -27,23 +27,28 @@ def make_job(job_id: str = "job-001", company: str = "OpenAI") -> Job:
 
 def _fresh_db(tmp_path):
     import nj.db.engine as eng
+
     eng._engine = None
     db_path = str(tmp_path / "test.db")
     from nj.db.engine import init_db
+
     init_db(db_path)
     return db_path
 
 
 def _seed_person(db_path: str) -> None:
     from nj.graph.builder import GraphBuilder
+
     builder = GraphBuilder(db_path=db_path)
-    builder.build_from_cv({
-        "personal": {"name": "Test Candidate"},
-        "skills": {"languages": ["Python"]},
-        "experience": [],
-        "projects": [],
-        "education": [],
-    })
+    builder.build_from_cv(
+        {
+            "personal": {"name": "Test Candidate"},
+            "skills": {"languages": ["Python"]},
+            "experience": [],
+            "projects": [],
+            "education": [],
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +79,7 @@ def test_graph_updated_on_application(tmp_path):
 
     company_nodes = repo.get_nodes_by_type("company")
     labels = [n.label.lower() for n in company_nodes]
-    assert any("openai" in l for l in labels)
+    assert any("openai" in label for label in labels)
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +92,7 @@ def test_graph_outcome_updated_on_callback(tmp_path):
     _seed_person(db_path)
 
     from nj.graph.builder import GraphBuilder
+
     builder = GraphBuilder(db_path=db_path)
     builder.add_job_application(
         job_title="ML Engineer",
@@ -98,6 +104,7 @@ def test_graph_outcome_updated_on_callback(tmp_path):
     )
 
     from nj.graph.repo import GraphRepo
+
     repo = GraphRepo(db_path=db_path)
     stats = repo.get_graph_stats()
     assert stats["total_nodes"] > 0
@@ -113,8 +120,8 @@ def test_graph_outcome_updated_on_callback(tmp_path):
 def test_build_graph_context_with_data(tmp_path):
     db_path = _fresh_db(tmp_path)
     _seed_person(db_path)
-    from nj.graph.builder import GraphBuilder
     from nj.diagnostics.engine import _build_graph_context
+    from nj.graph.builder import GraphBuilder
 
     builder = GraphBuilder(db_path=db_path)
     builder.add_job_application(
@@ -209,8 +216,8 @@ def test_print_enrichment_summary_no_data(tmp_path):
 def test_print_enrichment_summary_with_graph(tmp_path):
     db_path = _fresh_db(tmp_path)
     _seed_person(db_path)
-    from nj.graph.builder import GraphBuilder
     from nj.cli.cmd_status import _print_enrichment_summary
+    from nj.graph.builder import GraphBuilder
 
     builder = GraphBuilder(db_path=db_path)
     builder.add_job_application(

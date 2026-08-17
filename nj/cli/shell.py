@@ -8,11 +8,11 @@ import sys
 import time
 from pathlib import Path
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
 
 from nj.utils.logger import get_logger
 
@@ -355,25 +355,20 @@ def _get_stats() -> dict:
         db_path = "data/nj.db"
         if not Path(db_path).exists():
             return stats
-        from nj.db.engine import get_engine
         from sqlalchemy import text
+
+        from nj.db.engine import get_engine
 
         engine = get_engine(db_path)
         with engine.connect() as conn:
             try:
-                stats["jobs"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar() or 0
-                )
+                stats["jobs"] = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar() or 0
                 stats["scored"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar()
-                    or 0
+                    conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar() or 0
                 )
                 stats["applied"] = (
                     conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM applications "
-                            "WHERE status='submitted'"
-                        )
+                        text("SELECT COUNT(*) FROM applications WHERE status='submitted'")
                     ).scalar()
                     or 0
                 )
@@ -409,13 +404,9 @@ def _render_splash(stats: dict, version: str) -> None:
     if stats.get("jobs", 0) > 0:
         stat_parts = []
         if stats["jobs"] > 0:
-            stat_parts.append(
-                f"[cyan]◆[/cyan] [bold]{stats['jobs']}[/bold] [dim]jobs[/dim]"
-            )
+            stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['jobs']}[/bold] [dim]jobs[/dim]")
         if stats.get("scored", 0) > 0:
-            stat_parts.append(
-                f"[cyan]◆[/cyan] [bold]{stats['scored']}[/bold] [dim]scored[/dim]"
-            )
+            stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['scored']}[/bold] [dim]scored[/dim]")
         if stats.get("applied", 0) > 0:
             stat_parts.append(
                 f"[green]◆[/green] [bold]{stats['applied']}[/bold] [dim]applied[/dim]"
@@ -473,8 +464,7 @@ def _show_help() -> None:
 
     console.print(table)
     console.print(
-        "[dim]  Tip: commands accept same flags as CLI. "
-        "Example: search --dry-run[/dim]\n"
+        "[dim]  Tip: commands accept same flags as CLI. Example: search --dry-run[/dim]\n"
     )
 
 
@@ -748,7 +738,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
     except KeyboardInterrupt:
         console.print("\n  [dim]Interrupted.[/dim]")
     except Exception as e:
-        console.print(f"  [red]Error:[/red] {e}\n" f"  [dim]{type(e).__name__}[/dim]")
+        console.print(f"  [red]Error:[/red] {e}\n  [dim]{type(e).__name__}[/dim]")
         logger.warning(
             "shell_command_failed",
             command=command,
@@ -806,11 +796,7 @@ _SUCCESS_MESSAGES: dict[str, str] = {
 def _print_command_header(command: str) -> None:
     """Print a subtle separator before command output."""
     timestamp = time.strftime("%H:%M:%S")
-    console.print(
-        f"\n[dim]─── {command} "
-        f"{'─' * max(0, 40 - len(command))} "
-        f"{timestamp} ───[/dim]"
-    )
+    console.print(f"\n[dim]─── {command} {'─' * max(0, 40 - len(command))} {timestamp} ───[/dim]")
 
 
 def _show_success(command: str) -> None:
@@ -831,7 +817,7 @@ def _get_prompt_text(config, stats: dict | None = None) -> str:
             f"[dim cyan][{state}][/dim cyan] "
             f"[bold]>[/bold] "
         )
-    return f"[bold cyan]nj[/bold cyan]" f"[dim]({provider})[/dim] " f"[bold]>[/bold] "
+    return f"[bold cyan]nj[/bold cyan][dim]({provider})[/dim] [bold]>[/bold] "
 
 
 def _get_prompt_plain(config, stats: dict | None = None) -> str:
@@ -925,9 +911,7 @@ def run_shell(version: str = "1.2.0") -> None:
     console.print()
     console.print(
         Panel(
-            "[dim]session ended.[/dim]\n\n"
-            "[dim]your data stays local. "
-            "your cv stays yours.[/dim]",
+            "[dim]session ended.[/dim]\n\n[dim]your data stays local. your cv stays yours.[/dim]",
             border_style="dim",
             width=40,
         )

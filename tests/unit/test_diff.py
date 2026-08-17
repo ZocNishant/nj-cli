@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import json
-import pytest
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from io import StringIO
 
 from rich.console import Console
 
-from nj.models.config import Config
 from nj.cli.cmd_diff import (
-    _diff_summary, _diff_skills,
-    _diff_bullet_lists, _diff_projects,
+    _diff_bullet_lists,
+    _diff_projects,
+    _diff_skills,
+    _diff_summary,
     _safe_name,
 )
+from nj.models.config import Config
 
 
 def test_diff_summary_no_change():
@@ -150,9 +151,7 @@ def test_renderer_saves_json(tmp_path):
     from nj.tailoring.renderer import render_cv
 
     template_file = tmp_path / "template.tex"
-    template_file.write_text(
-        "\\begin{document}%%NAME%%\\end{document}"
-    )
+    template_file.write_text("\\begin{document}%%NAME%%\\end{document}")
     output_dir = tmp_path / "output"
     cv = {
         "personal": {
@@ -180,9 +179,7 @@ def test_renderer_saves_json(tmp_path):
         Path(tex.replace(".tex", ".pdf")).write_text("pdf")
         return MagicMock(returncode=0, stderr="")
 
-    with patch(
-        "nj.tailoring.renderer.subprocess.run", side_effect=fake_run
-    ):
+    with patch("nj.tailoring.renderer.subprocess.run", side_effect=fake_run):
         pdf_path = render_cv(
             cv_data=cv,
             template_path=str(template_file),

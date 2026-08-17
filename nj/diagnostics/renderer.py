@@ -80,7 +80,7 @@ def _build_diagnosis_latex(result: DiagnosisResult, cv_base: dict) -> str:
         r"\titleformat{\section}{\vspace{-6pt}\scshape\raggedright\large}{}{0em}{}[\color{black}\titlerule\vspace{-4pt}]",
         r"\begin{document}",
         "",
-        rf"\begin{{center}}\textbf{{\Huge \scshape CV Diagnosis}}\\\vspace{{4pt}}",
+        r"\begin{center}\textbf{\Huge \scshape CV Diagnosis}\\\vspace{4pt}",
         rf"\large {name} $\cdot$ \textcolor{{{health_color}}}{{\textbf{{{result.overall_health.value.upper()}}}}}\\",
         rf"\small Generated: {date}",
         r"\end{center}",
@@ -134,16 +134,12 @@ def _build_diagnosis_latex(result: DiagnosisResult, cv_base: dict) -> str:
         if result.strong_sections:
             strong = ", ".join(result.strong_sections)
             lines += [
-                r"\textbf{\textcolor{green!60!black}{Strong:}} "
-                + escape_latex(strong)
-                + r"\\[4pt]"
+                r"\textbf{\textcolor{green!60!black}{Strong:}} " + escape_latex(strong) + r"\\[4pt]"
             ]
         if result.weak_sections:
             weak = ", ".join(result.weak_sections)
             lines += [
-                r"\textbf{\textcolor{red!70!black}{Needs work:}} "
-                + escape_latex(weak)
-                + r"\\[4pt]"
+                r"\textbf{\textcolor{red!70!black}{Needs work:}} " + escape_latex(weak) + r"\\[4pt]"
             ]
         lines += [""]
 
