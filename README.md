@@ -12,13 +12,14 @@
 # nj — AI Career Operating System
 
 **An open-source AI career intelligence platform for ML/AI/CV engineers.**
+
 Not a job application bot. Not a resume spinner. A career reasoning system.
 
-[![Tests](https://img.shields.io/badge/tests-553%20passing-brightgreen)](https://github.com/ZocNishant/nj-cli)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
+[![CI](https://github.com/ZocNishant/nj-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ZocNishant/nj-cli/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-567%20passing-brightgreen)](https://github.com/ZocNishant/nj-cli/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://python.org)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-cyan)](https://github.com/ZocNishant/nj-cli/releases)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 </div>
 
@@ -28,11 +29,41 @@ Not a job application bot. Not a resume spinner. A career reasoning system.
 
 **nj never invents your experience.**
 
-Every tailored CV is validated against your original before it leaves your machine. If Claude tries to add a skill you don't have, a company you didn't work at, or a metric you didn't achieve — the validator rejects it and regenerates.
+Every tailored CV is validated against your original before it leaves your
+machine. If the model adds a skill you don't have, an employer you didn't work
+for, a degree you didn't earn, or a metric you didn't achieve, the validator
+rejects the result.
 
-This is not a prompt instruction. It is a separate validation module (`nj/tailoring/anti_hallucination.py`) that diffs the output entity by entity against your source CV.
+This is not a prompt instruction. `nj/tailoring/anti_hallucination.py` compares
+employers, job titles, institutions, degrees, projects, certifications and
+skills as normalized sets, then scans the free text for invented years,
+percentages, employers and credential words. Reordering, dropping and rewording
+are allowed. Adding a claim your source CV does not contain is not.
 
-Most AI career tools hallucinate. nj does not.
+---
+
+## Built for the OPT job search
+
+Sponsorship is a hard filter, not a preference, so nj treats it as a
+correctness problem rather than a keyword search.
+
+The classifier is negation-aware and evaluates blocking language before
+sponsoring language, because the naive version of this gets it wrong in both
+directions at once:
+
+| Posting says | Naive keyword match | nj |
+|---|---|---|
+| "Must be authorized to work in the US" | BLOCKED — drops the job | UNKNOWN — OPT *is* authorization |
+| "We do not sponsor employment visas" | CONFIRMED — matches "sponsor" | BLOCKED |
+| "We sponsor H-1B. Must be authorized at hire." | BLOCKED | CONFIRMED |
+| "Strong optimization background required" | CONFIRMED — matches "OPT" inside *optimization* | UNKNOWN |
+
+That last row is not hypothetical. Re-running the old substring matcher over
+441 real scraped jobs, 223 of the 224 marked "sponsorship confirmed" were
+marked that way because the description contained the word *optimization*.
+
+`nj search` shows the phrase that decided each label, so a misclassification is
+visible before it costs you an application.
 
 ---
 
@@ -47,87 +78,100 @@ nj (claude) > prep        # I have an interview tonight
 nj (claude) > exit
 ```
 
-Launch `nj` and you're in a full interactive shell — msfconsole style.
-Every command available from the prompt. No flags to memorize.
+Launch `nj` and you're in a full interactive shell — msfconsole style. Every
+command is available from the prompt, with tab completion and history.
 
 ---
 
 ## Features
 
 ### Career Intelligence
+
 | Command | What it does |
 |---------|-------------|
 | `nj diagnose` | Full CV health report — root causes of interview failure, recruiter first impression, ATS concerns, positioning mismatch |
 | `nj gaps` | Skill gap analysis across all scored jobs — ranked by frequency and estimated score impact |
 | `nj explain` | Exact breakdown of why a job scored the way it did — 6 sub-scores with rationale and evidence |
-| `nj frame` | Reframe your best project for different audiences: production ML, research lab, healthtech startup, big tech |
+| `nj frame` | Reframe your best project for a specific audience: production ML, research lab, healthtech startup, big tech |
 | `nj diff` | Show exactly what changed between your base CV and the tailored version — bullet by bullet |
+| `nj postmortem` | Application failure patterns across everything you've sent |
 
 ### Job Discovery (7 sources)
-| Source | Auth | Coverage |
-|--------|------|----------|
-| RemoteOK | None — always works | 100+ ML/AI/CV jobs per run |
+
+| Source | Auth | Notes |
+|--------|------|-------|
+| RemoteOK | None | Works out of the box |
 | WeWorkRemotely | None — RSS | Remote ML roles |
-| Arbeitnow | None — free API | Remote + EU tech |
-| JSearch | RapidAPI key (free tier) | 30+ boards: LinkedIn, Indeed, Glassdoor, ZipRecruiter... |
-| Adzuna | Free API key | 15+ aggregated sources |
-| LinkedIn | Session cookie | **Disabled by default** — scraping breaches LinkedIn's ToS and risks your account |
+| Arbeitnow | None — free API | Mostly German/EU. Turn off for a US-only search |
+| Adzuna | Free API key | Aggregates 15+ US sources. Highest-value key to set |
+| JSearch | RapidAPI key (free tier) | 30+ boards: LinkedIn, Indeed, Glassdoor, ZipRecruiter |
 | USAJobs | Free API key (opt-in) | Government + research ML roles |
+| LinkedIn | Session cookie | **Off by default** — automated scraping breaches LinkedIn's terms and risks the account recruiters contact you on |
+
+Adzuna and JSearch return nothing until their keys are set. Without them a run
+is served mostly by Arbeitnow, which is the wrong continent for an H-1B search.
 
 ### AI Scoring
+
 - **6 explainable sub-scores** — skills, experience, role alignment, sponsorship, location, resume strength
 - **Weighted scoring** — configurable per your priorities
-- **Confidence score** — how certain the model is
-- **Visa compatibility** — OPT/H1B filtering built in
-- **Outcome calibration** — `nj calibrate --from-outcomes` uses real interview data to set your threshold
+- **Confidence score** — how certain the model is about the comparison
+- **Schema-constrained output** — scores are decoded against a JSON Schema, not parsed out of prose
+- **Outcome calibration** — `nj calibrate --from-outcomes` sets your threshold from real interview results
 
 ### CV Tailoring
-- Keyword alignment from job description
-- Section reordering by relevance
-- Security tools suppressed for ML roles automatically
-- Anchor project always leads (your strongest project first)
-- **Anti-hallucination validation** — entities diffed against source CV
-- LaTeX → PDF via tectonic (your exact template preserved)
-- Cover letter generation (3-paragraph, 250 words max)
+
+- Keyword alignment from the job description
+- Section reordering by relevance; anchor project always leads
+- Irrelevant skill groups suppressed per role type
+- **Anti-hallucination validation** — structural and free-text, described above
+- LaTeX → PDF via tectonic, preserving your template
+- Cover letter generation (3 paragraphs, 250 words max)
 
 ### Application Pipeline
-- Human review queue before any application (Phase 1 — the only implemented mode)
-- Quality gate blocks bad applications before submission
-- Rate limiting (5-7 applications/day max)
-- Email notification with tailored CV attached
+
+- Human review queue before anything is sent (the only implemented mode)
+- Quality gate blocks weak applications
+- Daily rate limit, counted from the database so it survives restarts (default 5/day)
+- Email notification with the tailored CV attached
 - Application tracker with trajectory view
-- Gmail callback detection (interview/rejection/offer signals)
+- Gmail callback detection (interview / rejection / offer signals)
 
 ### Interview Preparation
-- `nj prep` generates a full PDF: company brief, 8-10 technical questions with confidence ratings, STAR behavioural questions, story bank, quick reference card
-- `nj watch` monitors Gmail for callbacks and emails you `nj prep --job-id` to run immediately
+
+- `nj prep` generates a PDF: company brief, 8–10 technical questions with confidence ratings, STAR behavioural questions, story bank, quick reference card
+- `nj watch` monitors Gmail for callbacks and tells you which `nj prep --job-id` to run
 
 ---
 
 ## Quick start
 
 ### Requirements
+
 - Python 3.11+
 - [tectonic](https://tectonic-typesetting.github.io) — LaTeX compiler
-- Anthropic API key — [get one here](https://console.anthropic.com)
+- An Anthropic API key — [console.anthropic.com](https://console.anthropic.com)
 
 ```bash
 # macOS
 brew install tectonic
 
-# Install nj
 git clone https://github.com/ZocNishant/nj-cli
 cd nj-cli
-pip install -e .
+poetry install
 
-# Launch
-nj
+# Secrets go in .env, never in config.yaml
+cp .env.example .env          # add ANTHROPIC_API_KEY
+cp config.example.yaml config.yaml
+
+poetry run nj
 ```
 
 ### First run
+
 ```
-nj (claude) > init        # setup wizard — API key, CV, email
-nj (claude) > search      # find and score jobs (needs API key)
+nj (claude) > init        # setup wizard — CV, email, schedule
+nj (claude) > search      # find and score jobs
 nj (claude) > diagnose    # get your CV diagnosis
 nj (claude) > gaps        # see what to learn
 nj (claude) > review      # approve jobs before applying
@@ -135,8 +179,9 @@ nj (claude) > calibrate   # tune your score threshold
 ```
 
 ### Zero-cost demo (no API key needed)
+
 ```bash
-nj
+poetry run nj
 nj (claude) > demo
 ```
 
@@ -145,18 +190,19 @@ nj (claude) > demo
 ## All commands
 
 ```
-Intelligence:    diagnose  gaps  explain  diff  frame
-Job hunting:     search    run   review   tailor  quality
-Applications:    status    calibrate  label  watch  prep
-CV management:   update-cv  update-intern
-System:          init  logs  config  demo  help  exit
+Intelligence:    diagnose  gaps  explain  diff  frame  postmortem
+Job hunting:     search  run  review  tailor  quality  enrich
+Applications:    status  calibrate  label  watch  prep
+CV management:   update-cv  update-role  update-intern
+Data & models:   intel  graph  ml
+System:          init  config  logs  demo  manual  help  exit
 ```
+
+`nj manual` prints the full reference with every flag and example.
 
 ---
 
 ## Automation phases
-
-nj uses phased automation — trust is earned before autonomy is granted.
 
 | Phase | Mode | Status |
 |-------|------|--------|
@@ -164,12 +210,13 @@ nj uses phased automation — trust is earned before autonomy is granted.
 | 2 | Semi-auto — nj submits, you approve each | Not implemented |
 | 3 | Full auto behind the quality gate | Not implemented |
 
-Phases 2 and 3 are design, not code: `nj/applying/linkedin_easy.py` is a stub.
-Setting `automation_phase` higher than 1 changes no behaviour today. Everything
-nj produces is written to `output/` for you to submit yourself.
+Phases 2 and 3 are design, not code — `nj/applying/linkedin_easy.py` is a stub.
+Setting `automation_phase` above 1 changes no behaviour today. Everything nj
+produces is written to `output/` for you to submit yourself.
 
-**What is NEVER automated regardless of phase:**
-- Resume factual claims (validator enforces in code)
+**Never automated, regardless of phase:**
+
+- Resume factual claims (enforced in code by the validator)
 - Applications that fail the quality gate
 - Interview communication
 
@@ -179,27 +226,38 @@ nj produces is written to `output/` for you to submit yourself.
 
 ```bash
 cp config.example.yaml config.yaml
-# Edit config.yaml — your preferences stay local and gitignored
 ```
 
-Key settings:
-```yaml
-scoring:
-  threshold: 62          # raise to 68 after internship starts
+`config.yaml` is gitignored. Secrets belong in `.env` — the config file holds
+preferences only.
 
-apply:
-  enabled: false         # set true when ready
-  max_per_day: 5
-  automation_phase: 1
+```yaml
+llm:
+  provider: claude
+  # Tiered by what the output is for. `model` is the fallback.
+  model: claude-sonnet-5
+  scoring_model: claude-haiku-4-5      # ranks 50-200 jobs a run
+  tailoring_model: claude-sonnet-5     # what a recruiter reads
+  reasoning_model: claude-opus-5       # diagnose / gaps / prep / frame
+
+scoring:
+  threshold: 62
 
 visa:
   enabled: true
-  status: "OPT"          # OPT | CPT | H1B | GC | citizen
-  skip_no_sponsorship: true
+  status: "OPT"                # OPT | CPT | H1B | GC | citizen
+  h1b_future: true
+  skip_no_sponsorship: true    # drop BLOCKED jobs before scoring
 
-llm:
-  provider: claude       # or: freellmapi
+apply:
+  enabled: false
+  max_per_day: 5
+  automation_phase: 1
 ```
+
+A full search-and-apply cycle costs roughly $1 in API credit on these tiers:
+about $0.63 to score 100 jobs on Haiku, about $0.29 to tailor five CVs and
+cover letters on Sonnet.
 
 ---
 
@@ -207,11 +265,12 @@ llm:
 
 | Provider | Status | Notes |
 |----------|--------|-------|
-| Claude (Anthropic) | ✅ Implemented | Default. Tiered: Haiku 4.5 scores, Sonnet 5 tailors, Opus 5 reasons. |
-| FreeLLMAPI | ✅ Implemented | Free local proxy, 14 providers |
-| OpenAI | 🔲 Interface ready | See `docs/adding-a-provider.md` |
+| Claude (Anthropic) | Implemented | Default. Tiered per task; prompt caching on the CV prefix |
+| Groq / OpenAI-compatible | Implemented | Any OpenAI-shaped endpoint via `provider: freellmapi` and a base URL |
+| OpenAI | Implemented | Same provider class; set `OPENAI_API_KEY` and `provider: openai` |
 
-Switch provider with one config change — zero code changes required.
+Switching providers is a config change. See
+[docs/adding-a-provider.md](docs/adding-a-provider.md) to add another.
 
 ---
 
@@ -220,47 +279,52 @@ Switch provider with one config change — zero code changes required.
 ```
 nj/
   cli/          one file per command, no business logic
-  models/       pure Pydantic models
-  scrapers/     7 scrapers, BaseScraper ABC
-  scoring/      scorer, visa filter, calibration, quality gate
+  models/       Pydantic models
+  scrapers/     7 sources behind a BaseScraper ABC
+  scoring/      scorer, visa filter, calibration, ghost filter, quality gate
   tailoring/    tailor, keyword_align, section_ranker, suppressor,
                 renderer (LaTeX→PDF), anti_hallucination,
                 cover_letter, prep_generator
-  providers/    BaseLLMProvider, Claude, OpenAI-compatible
-  prompts/      versioned prompt modules (scoring_v1, tailoring_v1...)
-  db/           SQLAlchemy + repository pattern (schema via create_all;
-                Alembic is a dependency but no migrations exist yet)
+  providers/    BaseLLMProvider, Claude (AsyncAnthropic), OpenAI-compatible
+  prompts/      versioned prompt modules + untrusted-input fencing
+  db/           SQLAlchemy + repository pattern (schema via create_all)
   diagnostics/  CV diagnosis engine + PDF renderer
-  analytics/    skill_gaps, outcome_feedback
+  analytics/    skill_gaps, outcomes, outcomes_analysis
+  intel/        H-1B petition ingest and job enrichment
+  graph/        career knowledge graph
+  ml/           sponsorship, salary and semantic models
   integrations/ gmail_watcher
 ```
 
 Key decisions:
-- **Repository pattern** — isolates SQL behind repos so the storage engine can change
-- **Provider abstraction** — switch LLM with one config line
-- **Versioned prompts** — every score stores its prompt version for reproducibility
-- **Anti-hallucination as code** — not a prompt instruction, a separate validator
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full decisions and [PRODUCT.md](PRODUCT.md) for product philosophy.
+- **Repository pattern** — SQL stays behind repos so the storage engine can change
+- **Provider abstraction** — switch LLM with one config line
+- **Versioned prompts** — every score records the prompt version that produced it
+- **Anti-hallucination as code** — a validator, not a prompt instruction
+- **Untrusted input is fenced** — scraped postings go inside `<job_description>`
+  tags with the candidate profile kept in the system prompt, so a posting cannot
+  pose as an instruction
+
+[CLAUDE.md](CLAUDE.md) records the project standards, an implementation-status
+table, and the subsystems currently known to be broken.
 
 ---
 
-## International student support
+## Testing
 
-Built by an F-1 OPT student, for F-1 OPT students.
+```bash
+poetry run pytest                            # full suite
+poetry run pytest tests/unit/                # unit only
+poetry run ruff check nj/ tests/             # lint
+poetry run ruff format --check nj/ tests/    # formatting
 
-- Visa keyword scanning — BLOCKED/CONFIRMED/LIKELY/UNKNOWN labels
-- OPT/H1B context injected into every scoring prompt
-- Auto-skip jobs with explicit no-sponsorship language
-- Sponsorship compatibility is a weighted scoring category
-
-```yaml
-visa:
-  enabled: true
-  status: "OPT"          # OPT | CPT | H1B | GC | citizen
-  h1b_future: true
-  skip_no_sponsorship: true
+NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_regression.py
 ```
+
+567 passing, 3 skipped (prompt regression, opt-in). No unit test touches the
+network. CI runs the same three gates on Python 3.11, 3.12 and 3.13, plus
+gitleaks over full history.
 
 ---
 
@@ -268,23 +332,9 @@ visa:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Adding a scraper:** Extend `BaseScraper`, add tests, register in `_get_enabled_scrapers()`. See [docs/adding-a-scraper.md](docs/adding-a-scraper.md).
-
-**Adding an LLM provider:** Extend `BaseLLMProvider`, register in `registry.py`. See [docs/adding-a-provider.md](docs/adding-a-provider.md).
-
-**Improving prompts:** All prompts in `nj/prompts/` are versioned Python modules. See [docs/prompt-engineering.md](docs/prompt-engineering.md).
-
----
-
-## Testing
-
-```bash
-poetry run pytest                           # full suite
-poetry run pytest tests/unit/              # unit only
-NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_regression.py
-```
-
-553 tests · 3 skipped (prompt-regression, opt-in via `NJ_RUN_REGRESSION_TESTS`)
+- **Adding a scraper:** extend `BaseScraper`, add tests, register in `_get_enabled_scrapers()`. See [docs/adding-a-scraper.md](docs/adding-a-scraper.md).
+- **Adding an LLM provider:** extend `BaseLLMProvider`, register in `registry.py`. See [docs/adding-a-provider.md](docs/adding-a-provider.md).
+- **Improving prompts:** all prompts in `nj/prompts/` are versioned modules. See [docs/prompt-engineering.md](docs/prompt-engineering.md).
 
 ---
 
@@ -294,16 +344,15 @@ NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_reg
 - [x] 7 job scrapers
 - [x] Explainable 6-sub-score AI scoring
 - [x] Anti-hallucination CV tailoring
-- [x] CV diagnosis engine
-- [x] Skill gap analysis
+- [x] CV diagnosis engine and skill gap analysis
 - [x] Interview prep PDF
 - [x] Gmail callback detection
 - [x] Outcome-calibrated threshold
-- [x] FreeLLMAPI support
-- [ ] Auto-apply Phase 2 — not started
-- [ ] Web UI / self-hosted dashboard
+- [x] Tiered Claude models with prompt caching
+- [ ] Evaluation harness over fixture postings
+- [ ] H-1B intel rebuild on LCA/PERM data (see [CLAUDE.md](CLAUDE.md))
+- [ ] Read-only web dashboard
 - [ ] PyPI publish
-- [ ] Glassdoor scraper
 
 ---
 

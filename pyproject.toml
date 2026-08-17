@@ -1,7 +1,9 @@
 [tool.poetry]
 name = "nj-cli"
-version = "0.1.0"
-description = "AI-powered job hunting CLI"
+# Keep in sync with nj/cli/app.py:__version__, which the shell splash and
+# `nj --version` report and tests/unit/test_update_cv.py asserts.
+version = "1.2.0"
+description = "AI career intelligence CLI for ML/AI engineers on OPT"
 authors = ["Nishant Joshi <zocnishant@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
