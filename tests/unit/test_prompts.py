@@ -113,7 +113,21 @@ def test_cover_letter_system_prompt_bans_passion() -> None:
     assert "3 paragraphs" in p or "3-paragraph" in p or "3 paragraph" in p
 
 
-def test_cover_letter_build_user_prompt_uses_cv_base() -> None:
+def test_cover_letter_system_prompt_carries_the_candidate_facts() -> None:
+    """The candidate's facts belong in the operator-authored turn."""
+    system = cover_letter_v1.build_system_prompt(_SAMPLE_CV)
+    assert "MedVision" in system
+    assert "F-1 OPT" in system
+    assert "Research Institute" in system
+
+
+def test_cover_letter_system_prompt_without_cv_is_the_bare_instructions() -> None:
+    assert cover_letter_v1.build_system_prompt(None) == cover_letter_v1.SYSTEM_PROMPT
+    assert cover_letter_v1.build_system_prompt({}) == cover_letter_v1.SYSTEM_PROMPT
+
+
+def test_cover_letter_user_prompt_keeps_cv_out_of_the_untrusted_turn() -> None:
+    """A posting must never share a turn with the facts it might try to amend."""
     prompt = cover_letter_v1.build_user_prompt(
         job_title="ML Engineer",
         job_company="DeepMind",
@@ -122,10 +136,36 @@ def test_cover_letter_build_user_prompt_uses_cv_base() -> None:
         overall_rationale="Strong CV match on computer vision.",
         cv_base=_SAMPLE_CV,
     )
-    assert "MedVision" in prompt
     assert "DeepMind" in prompt
-    assert "F-1 OPT" in prompt
-    assert "Research Institute" in prompt
+    assert "MedVision" not in prompt
+    assert "F-1 OPT" not in prompt
+    assert "Research Institute" not in prompt
+
+
+def test_tailoring_system_prompt_carries_the_cv() -> None:
+    system = tailoring_v1.build_system_prompt(_SAMPLE_CV)
+    assert "MedVision" in system
+    assert "Research Institute" in system
+    assert "anchor project" in system
+
+
+def test_tailoring_system_prompt_without_cv_is_the_bare_instructions() -> None:
+    assert tailoring_v1.build_system_prompt(None) == tailoring_v1.SYSTEM_PROMPT
+    assert tailoring_v1.build_system_prompt({}) == tailoring_v1.SYSTEM_PROMPT
+
+
+def test_tailoring_user_prompt_keeps_cv_out_of_the_untrusted_turn() -> None:
+    prompt = tailoring_v1.build_user_prompt(
+        job_title="CV Engineer",
+        job_company="Acme Corp",
+        job_description="We need OpenCV and PyTorch skills.",
+        score_result={"matched_skills": [], "missing_skills": [], "recommended_emphasis": []},
+        cv_base=_SAMPLE_CV,
+        keywords=["OpenCV"],
+    )
+    assert "Acme Corp" in prompt
+    assert "Research Institute" not in prompt
+    assert "State University" not in prompt
 
 
 def test_cover_letter_build_user_prompt_no_cv_base() -> None:

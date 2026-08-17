@@ -73,6 +73,29 @@ def _build_candidate_facts(cv_base: dict) -> str:
     return "\n".join(f"- {f}" for f in facts)
 
 
+def build_system_prompt(cv_base: dict | None = None) -> str:
+    """The instructions plus the candidate's facts — the operator-authored turn.
+
+    Same split as `tailoring_v1.build_system_prompt`: the candidate's facts are
+    the operator's, the job posting is not, and they belong in different turns.
+    A cover letter is signed by the candidate and read by a human, so a fact the
+    posting managed to inject here is a lie the candidate has put their name to.
+    """
+    if not cv_base:
+        return SYSTEM_PROMPT
+
+    facts = _build_candidate_facts(cv_base)
+    if not facts:
+        return SYSTEM_PROMPT
+
+    return (
+        SYSTEM_PROMPT
+        + "\n\nCANDIDATE FACTS — the only facts you may assert about this "
+        + "person. Do not add to them.\n"
+        + facts
+    )
+
+
 def build_user_prompt(
     job_title: str,
     job_company: str,
@@ -81,9 +104,14 @@ def build_user_prompt(
     overall_rationale: str,
     cv_base: dict | None = None,
 ) -> str:
-    from nj.prompts.untrusted import fence
+    """The task and the untrusted posting. Deliberately carries no CV content.
 
-    facts = _build_candidate_facts(cv_base) if cv_base else ""
+    `cv_base` is accepted and ignored so existing call sites keep working; the
+    candidate's facts belong in `build_system_prompt`.
+    """
+    del cv_base
+
+    from nj.prompts.untrusted import fence
 
     return f"""Write a cover letter for this application.
 
@@ -97,7 +125,5 @@ Key matched skills: {", ".join(matched_skills[:6])}
 JD excerpt (untrusted):
 {fence(job_description, 800)}
 
-Candidate facts to draw from:
-{facts}
-
+Draw only on the candidate facts given in your system prompt.
 Write the 3-paragraph cover letter now. Plain text only, no formatting."""
