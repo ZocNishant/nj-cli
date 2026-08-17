@@ -72,20 +72,12 @@ def _render_job_panel(
         if result.missing_skills
         else "[dim]none[/dim]"
     )
-    emphasis = (
-        ", ".join(result.recommended_emphasis[:3])
-        if result.recommended_emphasis
-        else "none"
-    )
+    emphasis = ", ".join(result.recommended_emphasis[:3]) if result.recommended_emphasis else "none"
     jd_excerpt = job.description[:280].strip()
     if len(job.description) > 280:
         jd_excerpt += "..."
 
-    content = (
-        f"{header}\n"
-        f"{score_line}\n\n"
-        f"[bold]Rationale:[/bold] {result.overall_rationale}\n\n"
-    )
+    content = f"{header}\n{score_line}\n\n[bold]Rationale:[/bold] {result.overall_rationale}\n\n"
     content += str(_render_score_table(result)) + "\n"
     content += (
         f"[bold]Matched:[/bold] {matched}\n"
@@ -162,8 +154,7 @@ def run_review(
             if key == "a":
                 job_repo.update_job_status(job.id, JobStatus.TAILORED)
                 console.print(
-                    f"  [green]Approved[/green] — "
-                    f"{job.title} @ {job.company} added to apply queue."
+                    f"  [green]Approved[/green] — {job.title} @ {job.company} added to apply queue."
                 )
                 applied += 1
                 break
@@ -191,8 +182,7 @@ def run_review(
                 }
                 if lkey in label_map:
                     rationale = (
-                        console.input("  Reason (optional, Enter to skip): ").strip()
-                        or None
+                        console.input("  Reason (optional, Enter to skip): ").strip() or None
                     )
                     label = JobLabel(
                         job_id=job.id,
@@ -204,8 +194,7 @@ def run_review(
                     label_repo.save_label(label)
                     job_repo.update_job_status(job.id, JobStatus.SKIPPED)
                     console.print(
-                        f"  [blue]Labeled {lkey}[/blue] and saved "
-                        f"to calibration dataset."
+                        f"  [blue]Labeled {lkey}[/blue] and saved to calibration dataset."
                     )
                     labeled += 1
                 break

@@ -43,9 +43,7 @@ async def _check_provider_async(config: Config) -> dict:
 def run_check_provider(config: Config) -> None:
     import asyncio
 
-    console.print(
-        f"[dim]Testing provider: [bold]{config.llm.provider}[/bold]...[/dim]"
-    )
+    console.print(f"[dim]Testing provider: [bold]{config.llm.provider}[/bold]...[/dim]")
     try:
         result = asyncio.run(_check_provider_async(config))
         console.print(
@@ -82,10 +80,7 @@ def run_config(
         return
     p = Path(config_path)
     if not p.exists():
-        console.print(
-            f"[yellow]{config_path} not found.[/yellow] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print(f"[yellow]{config_path} not found.[/yellow] Run [bold]nj init[/bold] first.")
         return
     if show:
         content = p.read_text()

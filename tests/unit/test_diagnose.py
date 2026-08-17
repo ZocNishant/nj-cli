@@ -76,14 +76,11 @@ def make_diagnosis_data() -> dict:
                 "fix": "Remove security tools section for ML applications",
             },
         ],
-        "hidden_strengths": [
-            "TestVision shows rare medical domain + CV engineering combination"
-        ],
+        "hidden_strengths": ["TestVision shows rare medical domain + CV engineering combination"],
         "weak_sections": ["experience", "summary"],
         "strong_sections": ["projects", "skills"],
         "recruiter_first_impression": (
-            "Sees an IT person trying to break into ML. "
-            "TestVision saves it from the reject pile."
+            "Sees an IT person trying to break into ML. TestVision saves it from the reject pile."
         ),
         "ats_concerns": ["Employment gap may trigger ATS filters"],
         "positioning_mismatch": (

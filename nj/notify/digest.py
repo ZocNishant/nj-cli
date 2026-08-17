@@ -22,10 +22,6 @@ def format_summary_table(applications: list[dict]) -> str:
         visa = app.get("visa_label", "")[:12]
         lines.append(f"{score:<7} {status:<12} {company:<22} {title:<30} {visa:<12}")
 
-    avg = (
-        sum(a.get("score", 0) for a in applications) / len(applications)
-        if applications
-        else 0
-    )
+    avg = sum(a.get("score", 0) for a in applications) / len(applications) if applications else 0
     lines += ["", f"Average score: {avg:.1f}"]
     return "\n".join(lines)

@@ -15,6 +15,7 @@ Run before:
 
 Cost: ~$0.05-0.10 per run (3 fixtures x scoring call)
 """
+
 from __future__ import annotations
 
 import json
@@ -35,24 +36,18 @@ def regression_enabled() -> bool:
 def load_fixtures() -> list[dict]:
     if not FIXTURES_DIR.exists():
         return []
-    return [
-        json.loads(f.read_text())
-        for f in sorted(FIXTURES_DIR.glob("fixture_*.json"))
-    ]
+    return [json.loads(f.read_text()) for f in sorted(FIXTURES_DIR.glob("fixture_*.json"))]
 
 
 @pytest.mark.skipif(
     not regression_enabled(),
-    reason=(
-        f"Set {REGRESSION_ENV_VAR}=true to run regression tests. "
-        "These make real API calls."
-    ),
+    reason=(f"Set {REGRESSION_ENV_VAR}=true to run regression tests. These make real API calls."),
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fixture", load_fixtures())
 async def test_scoring_regression(fixture: dict):
     from nj.models.config import Config
-    from nj.models.job import Job, JobStatus, VisaLabel
+    from nj.models.job import Job, JobStatus
     from nj.providers.registry import get_provider
     from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
@@ -117,15 +112,9 @@ async def test_scoring_regression(fixture: dict):
                 f"but got: {result.matched_skills}. Notes: {notes}"
             )
 
-    assert 0.0 <= result.confidence <= 1.0, (
-        f"[{desc}] confidence {result.confidence} out of range"
-    )
-    assert result.total_score >= 0, (
-        f"[{desc}] Negative score: {result.total_score}"
-    )
-    assert result.prompt_version != "", (
-        f"[{desc}] prompt_version not set"
-    )
+    assert 0.0 <= result.confidence <= 1.0, f"[{desc}] confidence {result.confidence} out of range"
+    assert result.total_score >= 0, f"[{desc}] Negative score: {result.total_score}"
+    assert result.prompt_version != "", f"[{desc}] prompt_version not set"
 
 
 def test_regression_fixtures_are_valid():

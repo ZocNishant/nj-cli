@@ -18,6 +18,7 @@ class DiagnosticsError(Exception):
 def _build_graph_context(db_path: str) -> str:
     try:
         from nj.graph.repo import GraphRepo
+
         repo = GraphRepo(db_path=db_path)
         stats = repo.get_graph_stats()
         if stats["total_nodes"] == 0:
@@ -87,9 +88,7 @@ async def diagnose_cv(
         except json.JSONDecodeError as e:
             logger.warning("diagnosis_parse_failed", attempt=attempt, error=str(e))
             if attempt == 2:
-                raise DiagnosticsError(
-                    f"Failed to parse diagnosis after 2 attempts: {e}"
-                )
+                raise DiagnosticsError(f"Failed to parse diagnosis after 2 attempts: {e}")
         except Exception as e:
             logger.warning("diagnosis_failed", attempt=attempt, error=str(e))
             if attempt == 2:

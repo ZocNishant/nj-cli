@@ -64,9 +64,7 @@ async def generate_prep(
         except Exception as e:
             logger.warning("prep_generation_failed", attempt=attempt, error=str(e))
             if attempt == 2:
-                raise PrepGenerationError(
-                    f"Failed to generate prep after 2 attempts: {e}"
-                )
+                raise PrepGenerationError(f"Failed to generate prep after 2 attempts: {e}")
     return {}
 
 
@@ -148,13 +146,9 @@ def _build_prep_latex(
     # Company Brief
     lines += [r"\section{Company Brief}"]
     if brief.get("what_they_do"):
-        lines += [
-            r"\textbf{What they do:} " + escape_latex(brief["what_they_do"]) + r"\\[4pt]"
-        ]
+        lines += [r"\textbf{What they do:} " + escape_latex(brief["what_they_do"]) + r"\\[4pt]"]
     if brief.get("why_hiring"):
-        lines += [
-            r"\textbf{Why hiring:} " + escape_latex(brief["why_hiring"]) + r"\\[4pt]"
-        ]
+        lines += [r"\textbf{Why hiring:} " + escape_latex(brief["why_hiring"]) + r"\\[4pt]"]
     if brief.get("tech_stack_mentioned"):
         stack = ", ".join(brief["tech_stack_mentioned"])
         lines += [r"\textbf{Tech stack:} " + escape_latex(stack) + r"\\[4pt]"]
@@ -163,11 +157,7 @@ def _build_prep_latex(
     # Quick Reference
     lines += [r"\section{Quick Reference}"]
     if quick.get("role_in_one_sentence"):
-        lines += [
-            r"\textbf{Role:} "
-            + escape_latex(quick["role_in_one_sentence"])
-            + r"\\[4pt]"
-        ]
+        lines += [r"\textbf{Role:} " + escape_latex(quick["role_in_one_sentence"]) + r"\\[4pt]"]
     if quick.get("top_3_they_want"):
         lines += [r"\textbf{They want:} \begin{itemize}[noitemsep,topsep=0pt]"]
         for w in quick["top_3_they_want"]:
@@ -179,21 +169,11 @@ def _build_prep_latex(
             lines += [r"\item " + escape_latex(b)]
         lines += [r"\end{itemize}"]
     if quick.get("biggest_gap"):
-        lines += [
-            r"\textbf{Gap to address:} "
-            + escape_latex(quick["biggest_gap"])
-            + r"\\[2pt]"
-        ]
+        lines += [r"\textbf{Gap to address:} " + escape_latex(quick["biggest_gap"]) + r"\\[2pt]"]
     if quick.get("gap_framing"):
-        lines += [
-            r"\textbf{How to frame it:} "
-            + escape_latex(quick["gap_framing"])
-            + r"\\[4pt]"
-        ]
+        lines += [r"\textbf{How to frame it:} " + escape_latex(quick["gap_framing"]) + r"\\[4pt]"]
     if quick.get("research_before_call"):
-        lines += [
-            r"\textbf{Research before call:} \begin{itemize}[noitemsep,topsep=0pt]"
-        ]
+        lines += [r"\textbf{Research before call:} \begin{itemize}[noitemsep,topsep=0pt]"]
         for r_ in quick["research_before_call"]:
             lines += [r"\item " + escape_latex(r_)]
         lines += [r"\end{itemize}"]
@@ -215,33 +195,19 @@ def _build_prep_latex(
             rf"\textcolor{{{conf_color}}}{{\small [{conf}]}}\\[2pt]",
         ]
         if q.get("why_asked"):
-            lines += [
-                r"\textit{Why asked:} " + escape_latex(q["why_asked"]) + r"\\[2pt]"
-            ]
+            lines += [r"\textit{Why asked:} " + escape_latex(q["why_asked"]) + r"\\[2pt]"]
         if q.get("your_answer"):
-            lines += [
-                r"\textit{Your answer:} "
-                + escape_latex(q["your_answer"])
-                + r"\\[6pt]"
-            ]
+            lines += [r"\textit{Your answer:} " + escape_latex(q["your_answer"]) + r"\\[6pt]"]
     lines += [""]
 
     # Behavioural Questions
     lines += [r"\section{Behavioural Questions}"]
     for i, q in enumerate(behav_qs, 1):
-        lines += [
-            rf"\textbf{{{i}. {escape_latex(q.get('question', ''))}}}\\[2pt]"
-        ]
+        lines += [rf"\textbf{{{i}. {escape_latex(q.get('question', ''))}}}\\[2pt]"]
         if q.get("situation"):
-            lines += [
-                r"\textit{Situation:} "
-                + escape_latex(q["situation"])
-                + r"\\[2pt]"
-            ]
+            lines += [r"\textit{Situation:} " + escape_latex(q["situation"]) + r"\\[2pt]"]
         if q.get("task"):
-            lines += [
-                r"\textit{Task:} " + escape_latex(q["task"]) + r"\\[2pt]"
-            ]
+            lines += [r"\textit{Task:} " + escape_latex(q["task"]) + r"\\[2pt]"]
         if q.get("talking_points"):
             lines += [r"\begin{itemize}[noitemsep,topsep=0pt]"]
             for pt in q["talking_points"]:
@@ -253,14 +219,10 @@ def _build_prep_latex(
     # Story Bank
     lines += [r"\section{Story Bank}"]
     for story in stories:
-        lines += [
-            r"\textbf{" + escape_latex(story.get("story_title", "")) + r"}\\[2pt]"
-        ]
+        lines += [r"\textbf{" + escape_latex(story.get("story_title", "")) + r"}\\[2pt]"]
         if story.get("opening_line"):
             lines += [
-                r"\textit{Open with:} ``"
-                + escape_latex(story["opening_line"])
-                + r"''\\[2pt]"
+                r"\textit{Open with:} ``" + escape_latex(story["opening_line"]) + r"''\\[2pt]"
             ]
         if story.get("jd_requirement_addressed"):
             lines += [
@@ -270,9 +232,7 @@ def _build_prep_latex(
             ]
         if story.get("key_metrics"):
             metrics = ", ".join(story["key_metrics"])
-            lines += [
-                r"\textit{Key metrics:} " + escape_latex(metrics) + r"\\[6pt]"
-            ]
+            lines += [r"\textit{Key metrics:} " + escape_latex(metrics) + r"\\[6pt]"]
 
     lines += ["", r"\end{document}"]
     return "\n".join(lines)

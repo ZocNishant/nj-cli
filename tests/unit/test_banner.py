@@ -1,12 +1,15 @@
-import pytest
-from unittest.mock import patch
 from io import StringIO
+from unittest.mock import patch
 
 from rich.console import Console
 
 from nj.cli.banner import (
-    get_banner, BANNERS, TAGLINES, TIPS,
-    show_banner, _get_quick_stats,
+    BANNERS,
+    TAGLINES,
+    TIPS,
+    _get_quick_stats,
+    get_banner,
+    show_banner,
 )
 
 
@@ -57,10 +60,7 @@ def test_show_banner_contains_tagline(tmp_path):
     with patch("nj.cli.banner.console", c):
         show_banner(db_path=str(tmp_path / "nj.db"))
     output = buf.getvalue()
-    assert any(
-        t.split(".")[0] in output
-        for t in TAGLINES
-    )
+    assert any(t.split(".")[0] in output for t in TAGLINES)
 
 
 def test_get_quick_stats_no_db(tmp_path):
@@ -69,8 +69,9 @@ def test_get_quick_stats_no_db(tmp_path):
 
 
 def test_get_quick_stats_empty_db(tmp_path):
-    from nj.db.engine import init_db
     import nj.db.engine as engine_mod
+    from nj.db.engine import init_db
+
     engine_mod._engine = None
     db_path = str(tmp_path / "test.db")
     init_db(db_path)

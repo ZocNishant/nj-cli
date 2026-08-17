@@ -99,9 +99,7 @@ def download_uscis_data(
     for url in urls_to_try:
         logger.info("trying_uscis_url", year=year, url=url)
         try:
-            with httpx.stream(
-                "GET", url, timeout=60, follow_redirects=True
-            ) as r:
+            with httpx.stream("GET", url, timeout=60, follow_redirects=True) as r:
                 if r.status_code == 404:
                     continue
                 r.raise_for_status()
@@ -143,9 +141,7 @@ def parse_uscis_csv(csv_path: Path, year: int) -> list[dict[str, Any]]:
     return records
 
 
-def _parse_uscis_row(
-    row: dict[str, str], year: int, source_file: str
-) -> dict[str, Any] | None:
+def _parse_uscis_row(row: dict[str, str], year: int, source_file: str) -> dict[str, Any] | None:
     try:
         employer = (row.get("Employer") or "").strip()
 

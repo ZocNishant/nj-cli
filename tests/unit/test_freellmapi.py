@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from nj.providers.base import LLMRequest, LLMResponse
+import pytest
+
+from nj.models.config import LLMConfig
+from nj.providers.base import LLMRequest
 from nj.providers.openai import OpenAICompatibleProvider, OpenAIProvider
 from nj.providers.registry import get_provider
-from nj.models.config import LLMConfig
 
 
 def make_openai_response(content: str, model: str = "gemini-pro"):
@@ -61,11 +62,13 @@ async def test_freellmapi_includes_system_message():
 
     mock_client.chat.completions.create = capture
     with patch.object(provider, "_get_client", return_value=mock_client):
-        await provider.complete(LLMRequest(
-            system="System prompt here.",
-            user="User message here.",
-            max_tokens=10,
-        ))
+        await provider.complete(
+            LLMRequest(
+                system="System prompt here.",
+                user="User message here.",
+                max_tokens=10,
+            )
+        )
     assert any(m["role"] == "system" for m in captured_messages)
     assert any(m["role"] == "user" for m in captured_messages)
 
@@ -86,11 +89,13 @@ async def test_freellmapi_no_system_when_empty():
 
     mock_client.chat.completions.create = capture
     with patch.object(provider, "_get_client", return_value=mock_client):
-        await provider.complete(LLMRequest(
-            system="",
-            user="Just a user message.",
-            max_tokens=10,
-        ))
+        await provider.complete(
+            LLMRequest(
+                system="",
+                user="Just a user message.",
+                max_tokens=10,
+            )
+        )
     roles = [m["role"] for m in captured_messages]
     assert "system" not in roles
     assert "user" in roles

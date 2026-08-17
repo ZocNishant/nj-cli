@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from nj.models.job import Job, JobStatus, VisaLabel
-from nj.models.score import ScoreCategory, ScoreResult, SubScore
+import pytest
+
 from nj.models.application import ApplicationRecord, ApplicationStatus
 from nj.models.config import Config
+from nj.models.job import Job
 from nj.models.label import LabelValue
+from nj.models.score import ScoreCategory, ScoreResult, SubScore
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # --- Job ---
+
 
 def test_generate_id_is_deterministic():
     a = Job.generate_id("Acme", "ML Engineer", "https://acme.com/jobs/1")
@@ -29,6 +31,7 @@ def test_generate_id_differs_for_different_inputs():
 
 
 # --- ScoreResult ---
+
 
 def test_compute_total_weighted_average():
     sub_scores = [
@@ -60,6 +63,7 @@ def test_subscore_raises_if_score_above_100():
 
 # --- ApplicationRecord ---
 
+
 def test_application_record_create_sets_job_id():
     record = ApplicationRecord.create(job_id="abc123", score=75)
     assert record.job_id == "abc123"
@@ -70,6 +74,7 @@ def test_application_record_create_sets_job_id():
 
 # --- Config ---
 
+
 def test_config_load_returns_defaults_when_no_file(tmp_path):
     cfg = Config.load(str(tmp_path / "nonexistent.yaml"))
     assert cfg.scoring.threshold == 62
@@ -78,6 +83,7 @@ def test_config_load_returns_defaults_when_no_file(tmp_path):
 
 
 # --- LabelValue ---
+
 
 def test_label_value_enum_members():
     assert LabelValue.YES == "yes"

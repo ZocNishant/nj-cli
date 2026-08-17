@@ -4,8 +4,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from nj.models.config import NotifyConfig
 from nj.notify.digest import format_summary_table
 from nj.notify.email import EmailNotifier
@@ -106,10 +104,20 @@ def test_daily_summary_empty() -> None:
 
 def test_daily_summary_formats_table() -> None:
     apps = [
-        {"score": 75, "status": "submitted", "company": "Acme",
-         "title": "ML Engineer", "visa_label": "confirmed"},
-        {"score": 62, "status": "submitted", "company": "Beta Corp",
-         "title": "CV Engineer", "visa_label": "unknown"},
+        {
+            "score": 75,
+            "status": "submitted",
+            "company": "Acme",
+            "title": "ML Engineer",
+            "visa_label": "confirmed",
+        },
+        {
+            "score": 62,
+            "status": "submitted",
+            "company": "Beta Corp",
+            "title": "CV Engineer",
+            "visa_label": "unknown",
+        },
     ]
     result = format_summary_table(apps)
     assert "Acme" in result
@@ -119,10 +127,20 @@ def test_daily_summary_formats_table() -> None:
 
 def test_daily_summary_sorted_by_score_descending() -> None:
     apps = [
-        {"score": 60, "status": "submitted", "company": "Low",
-         "title": "Role A", "visa_label": "unknown"},
-        {"score": 90, "status": "submitted", "company": "High",
-         "title": "Role B", "visa_label": "confirmed"},
+        {
+            "score": 60,
+            "status": "submitted",
+            "company": "Low",
+            "title": "Role A",
+            "visa_label": "unknown",
+        },
+        {
+            "score": 90,
+            "status": "submitted",
+            "company": "High",
+            "title": "Role B",
+            "visa_label": "confirmed",
+        },
     ]
     result = format_summary_table(apps)
     assert result.index("High") < result.index("Low")

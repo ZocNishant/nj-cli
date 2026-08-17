@@ -87,9 +87,7 @@ def analyze_skill_gaps(
 
     total_skill_mentions = sum(matched_counter.values()) + sum(missing_counter.values())
     matched_mentions = sum(matched_counter.values())
-    coverage = (
-        (matched_mentions / total_skill_mentions * 100) if total_skill_mentions > 0 else 0.0
-    )
+    coverage = (matched_mentions / total_skill_mentions * 100) if total_skill_mentions > 0 else 0.0
 
     matched_freq = [
         {"skill": skill, "frequency_pct": round((count / total) * 100)}

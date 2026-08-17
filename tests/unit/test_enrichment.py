@@ -1,12 +1,13 @@
 """Unit tests for the job enrichment pipeline."""
+
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 
-from nj.models.job import Job, JobStatus, VisaLabel
 from nj.intel.enrichment import JobEnrichment
+from nj.models.job import Job, JobStatus, VisaLabel
 
 
 def make_job(

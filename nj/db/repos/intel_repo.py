@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import statistics
-from collections import Counter
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -14,9 +12,7 @@ from nj.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def _compute_sponsor_tier(
-    total: int, approval_rate: float, ml_count: int
-) -> str:
+def _compute_sponsor_tier(total: int, approval_rate: float, ml_count: int) -> str:
     if total >= 100 and approval_rate >= 0.85 and ml_count >= 10:
         return "STRONG"
     if total >= 20 and approval_rate >= 0.70:
@@ -34,18 +30,25 @@ class IntelRepo:
     # Write
     # ------------------------------------------------------------------
 
-    _ORM_FIELDS = frozenset({
-        "employer_name", "employer_name_normalized",
-        "job_title", "job_title_normalized",
-        "wage_from", "wage_to", "wage_unit",
-        "case_status", "year",
-        "worksite_state", "worksite_city",
-        "is_ml_role", "source_file",
-    })
+    _ORM_FIELDS = frozenset(
+        {
+            "employer_name",
+            "employer_name_normalized",
+            "job_title",
+            "job_title_normalized",
+            "wage_from",
+            "wage_to",
+            "wage_unit",
+            "case_status",
+            "year",
+            "worksite_state",
+            "worksite_city",
+            "is_ml_role",
+            "source_file",
+        }
+    )
 
-    def bulk_insert_petitions(
-        self, records: list[dict[str, Any]], batch_size: int = 1000
-    ) -> int:
+    def bulk_insert_petitions(self, records: list[dict[str, Any]], batch_size: int = 1000) -> int:
         inserted = 0
         with get_session(self._db_path) as session:
             for i in range(0, len(records), batch_size):
@@ -67,22 +70,18 @@ class IntelRepo:
         with get_session(self._db_path) as session:
             count = (
                 session.execute(
-                    select(func.count()).select_from(H1BPetitionORM).where(
-                        H1BPetitionORM.year == year
-                    )
+                    select(func.count())
+                    .select_from(H1BPetitionORM)
+                    .where(H1BPetitionORM.year == year)
                 ).scalar()
                 or 0
             )
             return count > 0
 
-    def search_company(
-        self, query: str, ml_only: bool = False
-    ) -> list[dict[str, Any]]:
+    def search_company(self, query: str, ml_only: bool = False) -> list[dict[str, Any]]:
         pattern = f"%{query.lower()}%"
         with get_session(self._db_path) as session:
-            stmt = select(CompanyIntelORM).where(
-                CompanyIntelORM.name_normalized.like(pattern)
-            )
+            stmt = select(CompanyIntelORM).where(CompanyIntelORM.name_normalized.like(pattern))
             if ml_only:
                 stmt = stmt.where(CompanyIntelORM.ml_ai_petitions > 0)
             stmt = stmt.order_by(CompanyIntelORM.total_petitions.desc()).limit(20)
@@ -125,6 +124,7 @@ class IntelRepo:
             sponsor_tier = _compute_sponsor_tier(total, approval_rate, 0)
 
             from collections import Counter
+
             state_counts = Counter(states)
             top_states = [s for s, _ in state_counts.most_common(5)]
 
@@ -149,17 +149,12 @@ class IntelRepo:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         with get_session(self._db_path) as session:
-            stmt = (
-                select(
-                    H1BPetitionORM.employer_name,
-                    func.count(H1BPetitionORM.id).label("total"),
-                )
-                .where(H1BPetitionORM.case_status.contains("Certif"))
-            )
+            stmt = select(
+                H1BPetitionORM.employer_name,
+                func.count(H1BPetitionORM.id).label("total"),
+            ).where(H1BPetitionORM.case_status.contains("Certif"))
             if state:
-                stmt = stmt.where(
-                    H1BPetitionORM.worksite_state == state.upper()
-                )
+                stmt = stmt.where(H1BPetitionORM.worksite_state == state.upper())
             if year:
                 stmt = stmt.where(H1BPetitionORM.year == year)
             stmt = (
@@ -179,9 +174,7 @@ class IntelRepo:
                 for r in results
             ]
 
-    def get_role_sponsorship(
-        self, role_query: str, limit: int = 15
-    ) -> list[dict[str, Any]]:
+    def get_role_sponsorship(self, role_query: str, limit: int = 15) -> list[dict[str, Any]]:
         pattern = f"%{role_query.lower()}%"
         with get_session(self._db_path) as session:
             stmt = (
@@ -211,12 +204,7 @@ class IntelRepo:
 
     def get_stats(self) -> dict[str, Any]:
         with get_session(self._db_path) as session:
-            total = (
-                session.execute(
-                    select(func.count()).select_from(H1BPetitionORM)
-                ).scalar()
-                or 0
-            )
+            total = session.execute(select(func.count()).select_from(H1BPetitionORM)).scalar() or 0
             ml = (
                 session.execute(
                     select(func.count())
@@ -225,9 +213,7 @@ class IntelRepo:
                 ).scalar()
                 or 0
             )
-            years_rows = session.execute(
-                select(H1BPetitionORM.year).distinct()
-            ).scalars().all()
+            years_rows = session.execute(select(H1BPetitionORM.year).distinct()).scalars().all()
             years = sorted(years_rows)
         return {"total_petitions": total, "ml_petitions": ml, "years": years}
 
@@ -243,27 +229,24 @@ class IntelRepo:
             session.flush()
 
             # Aggregate from petitions
-            stmt = (
-                select(
-                    H1BPetitionORM.employer_name,
-                    H1BPetitionORM.employer_name_normalized,
-                    func.count().label("total"),
-                    func.sum(
-                        (H1BPetitionORM.case_status.ilike("%certif%")).cast(
-                            type_=H1BPetitionORM.__table__.c.id.type.__class__()
-                        )
-                    ).label("approved"),
-                    func.sum(
-                        H1BPetitionORM.is_ml_role.cast(
-                            type_=H1BPetitionORM.__table__.c.id.type.__class__()
-                        )
-                    ).label("ml_count"),
-                    func.avg(H1BPetitionORM.wage_from).label("avg_sal"),
-                )
-                .group_by(
-                    H1BPetitionORM.employer_name,
-                    H1BPetitionORM.employer_name_normalized,
-                )
+            stmt = select(
+                H1BPetitionORM.employer_name,
+                H1BPetitionORM.employer_name_normalized,
+                func.count().label("total"),
+                func.sum(
+                    (H1BPetitionORM.case_status.ilike("%certif%")).cast(
+                        type_=H1BPetitionORM.__table__.c.id.type.__class__()
+                    )
+                ).label("approved"),
+                func.sum(
+                    H1BPetitionORM.is_ml_role.cast(
+                        type_=H1BPetitionORM.__table__.c.id.type.__class__()
+                    )
+                ).label("ml_count"),
+                func.avg(H1BPetitionORM.wage_from).label("avg_sal"),
+            ).group_by(
+                H1BPetitionORM.employer_name,
+                H1BPetitionORM.employer_name_normalized,
             )
             rows = session.execute(stmt).all()
 
@@ -279,32 +262,39 @@ class IntelRepo:
 
                 # Get years active and states
                 with get_session(self._db_path) as sub:
-                    years_rows = sub.execute(
-                        select(H1BPetitionORM.year)
-                        .where(
-                            H1BPetitionORM.employer_name_normalized
-                            == r.employer_name_normalized
+                    years_rows = (
+                        sub.execute(
+                            select(H1BPetitionORM.year)
+                            .where(
+                                H1BPetitionORM.employer_name_normalized
+                                == r.employer_name_normalized
+                            )
+                            .distinct()
                         )
-                        .distinct()
-                    ).scalars().all()
-                    states_rows = sub.execute(
-                        select(H1BPetitionORM.worksite_state)
-                        .where(
-                            H1BPetitionORM.employer_name_normalized
-                            == r.employer_name_normalized,
-                            H1BPetitionORM.worksite_state != "",
+                        .scalars()
+                        .all()
+                    )
+                    states_rows = (
+                        sub.execute(
+                            select(H1BPetitionORM.worksite_state)
+                            .where(
+                                H1BPetitionORM.employer_name_normalized
+                                == r.employer_name_normalized,
+                                H1BPetitionORM.worksite_state != "",
+                            )
+                            .distinct()
+                            .limit(10)
                         )
-                        .distinct()
-                        .limit(10)
-                    ).scalars().all()
+                        .scalars()
+                        .all()
+                    )
                     top_role_rows = sub.execute(
                         select(
                             H1BPetitionORM.job_title,
                             func.count().label("cnt"),
                         )
                         .where(
-                            H1BPetitionORM.employer_name_normalized
-                            == r.employer_name_normalized
+                            H1BPetitionORM.employer_name_normalized == r.employer_name_normalized
                         )
                         .group_by(H1BPetitionORM.job_title)
                         .order_by(text("cnt DESC"))

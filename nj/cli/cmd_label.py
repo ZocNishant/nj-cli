@@ -56,9 +56,7 @@ def run_label(
 
     for i, (job, result) in enumerate(unlabeled, 1):
         color = (
-            "green"
-            if result.total_score >= 75
-            else "yellow" if result.total_score >= 60 else "red"
+            "green" if result.total_score >= 75 else "yellow" if result.total_score >= 60 else "red"
         )
         panel_content = (
             f"[bold]{job.title}[/bold] @ [cyan]{job.company}[/cyan]  "

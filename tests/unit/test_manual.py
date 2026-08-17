@@ -1,22 +1,43 @@
 """Unit tests for nj manual command reference."""
+
 from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from nj.cli.cmd_help_full import COMMAND_REFERENCE, run_manual, _show_command_detail
+from nj.cli.cmd_help_full import COMMAND_REFERENCE, _show_command_detail, run_manual
 
 
 def test_command_reference_has_expected_commands():
     expected = [
-        "search", "enrich", "explain", "diagnose", "gaps", "frame",
-        "diff", "postmortem", "intel", "graph", "ml", "prep", "review",
-        "status", "calibrate", "watch", "tailor", "update-cv",
-        "update-role", "init", "run", "demo", "logs", "config",
-        "quality", "label", "manual",
+        "search",
+        "enrich",
+        "explain",
+        "diagnose",
+        "gaps",
+        "frame",
+        "diff",
+        "postmortem",
+        "intel",
+        "graph",
+        "ml",
+        "prep",
+        "review",
+        "status",
+        "calibrate",
+        "watch",
+        "tailor",
+        "update-cv",
+        "update-role",
+        "init",
+        "run",
+        "demo",
+        "logs",
+        "config",
+        "quality",
+        "label",
+        "manual",
     ]
     for cmd in expected:
         assert cmd in COMMAND_REFERENCE, f"Missing command: {cmd}"
@@ -34,6 +55,7 @@ def test_each_command_has_required_fields():
 
 def test_run_manual_no_command_shows_full_reference():
     from rich.console import Console
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.cmd_help_full.console", c):
@@ -47,6 +69,7 @@ def test_run_manual_no_command_shows_full_reference():
 
 def test_run_manual_specific_command():
     from rich.console import Console
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.cmd_help_full.console", c):
@@ -58,6 +81,7 @@ def test_run_manual_specific_command():
 
 def test_run_manual_unknown_command():
     from rich.console import Console
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.cmd_help_full.console", c):
@@ -68,6 +92,7 @@ def test_run_manual_unknown_command():
 
 def test_show_command_detail_renders_flags():
     from rich.console import Console
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.cmd_help_full.console", c):
@@ -78,6 +103,7 @@ def test_show_command_detail_renders_flags():
 
 def test_show_command_detail_renders_examples():
     from rich.console import Console
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.cmd_help_full.console", c):
@@ -88,9 +114,8 @@ def test_show_command_detail_renders_examples():
 
 def test_manual_command_registered():
     from nj.cli.app import app
-    callback_names = [
-        c.callback.__name__ for c in app.registered_commands if c.callback
-    ]
+
+    callback_names = [c.callback.__name__ for c in app.registered_commands if c.callback]
     assert "manual" in callback_names
 
 

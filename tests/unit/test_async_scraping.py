@@ -1,12 +1,13 @@
 """Tests for async parallel scraping infrastructure."""
+
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 
-from nj.models.job import Job, VisaLabel, JobStatus
+from nj.models.job import Job, JobStatus, VisaLabel
 from nj.scrapers.base import BaseScraper
 
 
@@ -61,6 +62,7 @@ class FailingScraper(BaseScraper):
 @pytest.mark.asyncio
 async def test_sync_scraper_runs_in_thread():
     import inspect
+
     scraper = SyncScraper("test", [make_job("j1")])
     assert not inspect.iscoroutinefunction(scraper.scrape)
     result = await asyncio.to_thread(scraper.scrape, ["ML Engineer"], "Remote")
@@ -70,6 +72,7 @@ async def test_sync_scraper_runs_in_thread():
 @pytest.mark.asyncio
 async def test_async_scraper_runs_directly():
     import inspect
+
     scraper = AsyncScraper("test", [make_job("j1")])
     assert inspect.iscoroutinefunction(scraper.scrape)
     result = await scraper.scrape(["ML Engineer"], "Remote")
@@ -86,6 +89,7 @@ async def test_parallel_scrapers_all_run():
 
     async def scrape_one(s):
         import inspect
+
         if inspect.iscoroutinefunction(s.scrape):
             return s.name(), await s.scrape([], "")
         else:
@@ -109,6 +113,7 @@ async def test_failing_scraper_doesnt_break_others():
     async def scrape_one(s):
         try:
             import inspect
+
             if inspect.iscoroutinefunction(s.scrape):
                 jobs = await s.scrape([], "")
             else:
@@ -119,7 +124,7 @@ async def test_failing_scraper_doesnt_break_others():
 
     results = await asyncio.gather(*[scrape_one(s) for s in scrapers])
     all_jobs = []
-    for name, jobs in results:
+    for _name, jobs in results:
         all_jobs.extend(jobs)
     assert len(all_jobs) == 2
 

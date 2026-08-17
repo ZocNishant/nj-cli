@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 import yaml
 
 from nj.cli.cmd_init import (
@@ -23,9 +20,7 @@ def test_load_env_returns_empty_when_no_file(tmp_path, monkeypatch):
 
 def test_load_env_parses_key_value_pairs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".env").write_text(
-        "ANTHROPIC_API_KEY=sk-test\nSMTP_HOST=smtp.gmail.com\n"
-    )
+    (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=sk-test\nSMTP_HOST=smtp.gmail.com\n")
     result = _load_env()
     assert result["ANTHROPIC_API_KEY"] == "sk-test"
     assert result["SMTP_HOST"] == "smtp.gmail.com"
@@ -33,9 +28,7 @@ def test_load_env_parses_key_value_pairs(tmp_path, monkeypatch):
 
 def test_load_env_skips_comments(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".env").write_text(
-        "# this is a comment\nKEY=value\n"
-    )
+    (tmp_path / ".env").write_text("# this is a comment\nKEY=value\n")
     result = _load_env()
     assert "# this is a comment" not in result
     assert result["KEY"] == "value"
@@ -74,6 +67,7 @@ def test_test_anthropic_returns_false_on_exception():
 
 def test_step_visa_not_needed():
     from nj.cli.cmd_init import _step_visa
+
     with patch("nj.cli.cmd_init.Confirm.ask", return_value=False):
         result = _step_visa()
     assert result["enabled"] is False
@@ -82,8 +76,11 @@ def test_step_visa_not_needed():
 
 def test_step_visa_with_sponsorship():
     from nj.cli.cmd_init import _step_visa
-    with patch("nj.cli.cmd_init.Confirm.ask", side_effect=[True, True, True]), \
-         patch("nj.cli.cmd_init.Prompt.ask", side_effect=["opt", "OPT — open to H1B sponsorship"]):
+
+    with (
+        patch("nj.cli.cmd_init.Confirm.ask", side_effect=[True, True, True]),
+        patch("nj.cli.cmd_init.Prompt.ask", side_effect=["opt", "OPT — open to H1B sponsorship"]),
+    ):
         result = _step_visa()
     assert result["enabled"] is True
     assert result["status"] == "opt"
@@ -92,6 +89,7 @@ def test_step_visa_with_sponsorship():
 
 def test_step_preferences_parses_keywords():
     from nj.cli.cmd_init import _step_preferences
+
     with patch("nj.cli.cmd_init.Prompt.ask", return_value="10+ years, Director"):
         result = _step_preferences({"career_field": "software_engineering"})
     assert "10+ years" in result["keywords_exclude"]

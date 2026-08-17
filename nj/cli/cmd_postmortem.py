@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.rule import Rule
-from rich import box
+from rich.table import Table
 
 from nj.models.config import Config
 from nj.utils.logger import get_logger
@@ -18,10 +18,10 @@ def run_postmortem(
     db_path: str = "data/nj.db",
     min_applications: int = 3,
 ) -> None:
-    from nj.db.repos.application_repo import ApplicationRepo
-    from nj.db.repos.score_repo import ScoreRepo
-    from nj.db.repos.job_repo import JobRepo
     from nj.analytics.outcomes_analysis import analyze_postmortem
+    from nj.db.repos.application_repo import ApplicationRepo
+    from nj.db.repos.job_repo import JobRepo
+    from nj.db.repos.score_repo import ScoreRepo
 
     app_repo = ApplicationRepo(db_path)
     score_repo = ScoreRepo(db_path)
@@ -61,20 +61,24 @@ def run_postmortem(
 
 def _display_postmortem(report) -> None:
     rate_color = (
-        "green" if report.interview_rate >= 20
-        else "yellow" if report.interview_rate >= 10
+        "green"
+        if report.interview_rate >= 20
+        else "yellow"
+        if report.interview_rate >= 10
         else "red"
     )
-    console.print(Panel(
-        f"[bold]Application Postmortem[/bold]\n\n"
-        f"Total applications:  [bold]{report.total_applications}[/bold]\n"
-        f"With outcomes:       [bold]{report.total_with_outcomes}[/bold]\n\n"
-        f"Interview rate:      [{rate_color}][bold]{report.interview_rate}%[/bold][/{rate_color}]\n"
-        f"Rejection rate:      [red]{report.rejection_rate}%[/red]\n"
-        f"No response rate:    [dim]{report.no_response_rate}%[/dim]",
-        title="nj postmortem",
-        border_style=rate_color,
-    ))
+    console.print(
+        Panel(
+            f"[bold]Application Postmortem[/bold]\n\n"
+            f"Total applications:  [bold]{report.total_applications}[/bold]\n"
+            f"With outcomes:       [bold]{report.total_with_outcomes}[/bold]\n\n"
+            f"Interview rate:      [{rate_color}][bold]{report.interview_rate}%[/bold][/{rate_color}]\n"
+            f"Rejection rate:      [red]{report.rejection_rate}%[/red]\n"
+            f"No response rate:    [dim]{report.no_response_rate}%[/dim]",
+            title="nj postmortem",
+            border_style=rate_color,
+        )
+    )
 
     console.print(Rule("[dim]Score analysis[/dim]"))
     console.print(
@@ -90,20 +94,22 @@ def _display_postmortem(report) -> None:
                 continue
             bar = "█" * min(count * 2, 20)
             color = (
-                "green" if band.startswith("8") or band.startswith("9")
-                else "yellow" if band.startswith("7")
+                "green"
+                if band.startswith("8") or band.startswith("9")
+                else "yellow"
+                if band.startswith("7")
                 else "red"
             )
-            console.print(
-                f"  [dim]{band:>8}[/dim] [{color}]{bar}[/{color}] {count}"
-            )
+            console.print(f"  [dim]{band:>8}[/dim] [{color}]{bar}[/{color}] {count}")
 
     if report.patterns:
         console.print(Rule("[dim]Patterns detected[/dim]"))
         for pattern in report.patterns:
             color = (
-                "red" if pattern.severity == "high"
-                else "yellow" if pattern.severity == "medium"
+                "red"
+                if pattern.severity == "high"
+                else "yellow"
+                if pattern.severity == "medium"
                 else "dim"
             )
             console.print(
@@ -129,9 +135,12 @@ def _display_postmortem(report) -> None:
         ):
             rate = data["interview_rate"]
             rate_color = (
-                "green" if rate >= 20
-                else "yellow" if rate >= 10
-                else "red" if data["total"] >= 3
+                "green"
+                if rate >= 20
+                else "yellow"
+                if rate >= 10
+                else "red"
+                if data["total"] >= 3
                 else "dim"
             )
             table.add_row(

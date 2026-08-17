@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import httpx
 import pytest
@@ -30,9 +29,7 @@ def scraper() -> AdzunaScraper:
 
 @respx.mock
 def test_scraper_returns_jobs_from_fixture(scraper: AdzunaScraper) -> None:
-    respx.get(ADZUNA_PAGE_URL).mock(
-        return_value=httpx.Response(200, json=FIXTURE)
-    )
+    respx.get(ADZUNA_PAGE_URL).mock(return_value=httpx.Response(200, json=FIXTURE))
     jobs = scraper._fetch_page("ML Engineer", "United States", 1)
     assert len(jobs) == 3
     titles = {j.title for j in jobs}

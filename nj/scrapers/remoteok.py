@@ -7,8 +7,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 

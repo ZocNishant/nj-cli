@@ -61,15 +61,8 @@ def _demo_search() -> None:
         progress.update(task, description="Deduplicating...")
         time.sleep(0.4)
 
-    console.print(
-        "[green]✓[/green] 118 new jobs found  "
-        "[dim](1 blocked by visa filter)[/dim]"
-    )
-    console.print(
-        "[dim]Sources: remoteok=118  "
-        "linkedin=0 (needs cookie)  "
-        "indeed=0 (blocked)[/dim]"
-    )
+    console.print("[green]✓[/green] 118 new jobs found  [dim](1 blocked by visa filter)[/dim]")
+    console.print("[dim]Sources: remoteok=118  linkedin=0 (needs cookie)  indeed=0 (blocked)[/dim]")
     console.print()
 
 
@@ -111,9 +104,7 @@ def _demo_score() -> None:
         )
     )
     console.print(table)
-    console.print(
-        f"\nMatched: [green]{', '.join(score['matched_skills'][:5])}[/green]"
-    )
+    console.print(f"\nMatched: [green]{', '.join(score['matched_skills'][:5])}[/green]")
     console.print(f"Missing: [red]{', '.join(score['missing_skills'])}[/red]")
     console.print(f"Emphasise: {', '.join(score['recommended_emphasis'])}")
     console.print()
@@ -127,9 +118,7 @@ def _demo_diagnose() -> None:
     console.print()
 
     health = d["overall_health"]
-    health_color = (
-        "green" if health == "strong" else "yellow" if health == "moderate" else "red"
-    )
+    health_color = "green" if health == "strong" else "yellow" if health == "moderate" else "red"
 
     console.print(
         Panel(

@@ -56,9 +56,7 @@ def suppress_for_role(
             logger.debug(
                 "compressed_it_experience",
                 company=(
-                    exp.get("company")
-                    if isinstance(exp, dict)
-                    else getattr(exp, "company", "")
+                    exp.get("company") if isinstance(exp, dict) else getattr(exp, "company", "")
                 ),
             )
 

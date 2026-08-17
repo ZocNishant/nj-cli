@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -176,9 +176,7 @@ class LinkedInScraper(BaseScraper):
                 fallback="",
             )
 
-            desc_el = await page.query_selector(
-                ".description__text, .show-more-less-html__markup"
-            )
+            desc_el = await page.query_selector(".description__text, .show-more-less-html__markup")
             description = ""
             if desc_el:
                 raw_html = await desc_el.inner_html()

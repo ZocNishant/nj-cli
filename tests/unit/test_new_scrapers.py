@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import json
 import xml.etree.ElementTree as ET
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 import respx
 from httpx import Response
 
 from nj.models.config import VisaConfig
-from nj.models.job import Job
 
 VISA_CONFIG = VisaConfig()
 
 
 # ── JSearch ──────────────────────────────────────────────────────────────────
+
 
 class TestJSearchScraper:
     def _make_result(self, **kwargs) -> dict:
@@ -61,7 +59,9 @@ class TestJSearchScraper:
     def test_remote_job_location(self):
         from nj.scrapers.jsearch import JSearchScraper
 
-        result = self._make_result(job_is_remote=True, job_city="Austin", job_state="TX", job_country="US")
+        result = self._make_result(
+            job_is_remote=True, job_city="Austin", job_state="TX", job_country="US"
+        )
         payload = {"data": [result]}
         respx.get("https://jsearch.p.rapidapi.com/search").mock(
             return_value=Response(200, json=payload)
@@ -102,6 +102,7 @@ class TestJSearchScraper:
 
 
 # ── Arbeitnow ─────────────────────────────────────────────────────────────────
+
 
 class TestArbeitnowScraper:
     def _make_item(self, **kwargs) -> dict:
@@ -176,6 +177,7 @@ class TestArbeitnowScraper:
 
 # ── WeWorkRemotely ────────────────────────────────────────────────────────────
 
+
 def _make_rss(items: list[dict]) -> str:
     root = ET.Element("rss")
     channel = ET.SubElement(root, "channel")
@@ -192,11 +194,15 @@ class TestWeWorkRemotelyScraper:
     def test_scrape_returns_relevant_jobs(self):
         from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
 
-        rss = _make_rss([{
-            "title": "Acme: ML Engineer",
-            "link": "https://weworkremotely.com/jobs/1",
-            "description": "PyTorch and deep learning experience required.",
-        }])
+        rss = _make_rss(
+            [
+                {
+                    "title": "Acme: ML Engineer",
+                    "link": "https://weworkremotely.com/jobs/1",
+                    "description": "PyTorch and deep learning experience required.",
+                }
+            ]
+        )
         respx.get("https://weworkremotely.com/categories/remote-programming-jobs.rss").mock(
             return_value=Response(200, text=rss)
         )
@@ -216,11 +222,15 @@ class TestWeWorkRemotelyScraper:
     def test_irrelevant_jobs_filtered_out(self):
         from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
 
-        rss = _make_rss([{
-            "title": "Acme: Ruby on Rails Developer",
-            "link": "https://weworkremotely.com/jobs/2",
-            "description": "Build web apps with Rails.",
-        }])
+        rss = _make_rss(
+            [
+                {
+                    "title": "Acme: Ruby on Rails Developer",
+                    "link": "https://weworkremotely.com/jobs/2",
+                    "description": "Build web apps with Rails.",
+                }
+            ]
+        )
         respx.get("https://weworkremotely.com/categories/remote-programming-jobs.rss").mock(
             return_value=Response(200, text=rss)
         )
@@ -236,11 +246,15 @@ class TestWeWorkRemotelyScraper:
     def test_title_without_colon_parsed(self):
         from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
 
-        rss = _make_rss([{
-            "title": "Machine Learning Engineer",
-            "link": "https://weworkremotely.com/jobs/3",
-            "description": "pytorch nlp llm work",
-        }])
+        rss = _make_rss(
+            [
+                {
+                    "title": "Machine Learning Engineer",
+                    "link": "https://weworkremotely.com/jobs/3",
+                    "description": "pytorch nlp llm work",
+                }
+            ]
+        )
         respx.get("https://weworkremotely.com/categories/remote-programming-jobs.rss").mock(
             return_value=Response(200, text=rss)
         )
@@ -255,6 +269,7 @@ class TestWeWorkRemotelyScraper:
 
 
 # ── USAJobs ───────────────────────────────────────────────────────────────────
+
 
 def _make_usajobs_response(items: list[dict]) -> dict:
     return {

@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from nj.cli.cmd_review import (
     _print_session_summary,
     _render_job_panel,
@@ -36,8 +34,15 @@ def make_job(**kwargs) -> Job:
 
 def make_score(**kwargs) -> ScoreResult:
     sub_scores = [
-        SubScore(category=ScoreCategory.SKILLS_MATCH, score=80, weight=0.30, rationale="Strong match"),
-        SubScore(category=ScoreCategory.SPONSORSHIP_COMPAT, score=90, weight=0.15, rationale="Confirmed sponsor"),
+        SubScore(
+            category=ScoreCategory.SKILLS_MATCH, score=80, weight=0.30, rationale="Strong match"
+        ),
+        SubScore(
+            category=ScoreCategory.SPONSORSHIP_COMPAT,
+            score=90,
+            weight=0.15,
+            rationale="Confirmed sponsor",
+        ),
     ]
     defaults = dict(
         job_id="job-1",
@@ -55,6 +60,7 @@ def make_score(**kwargs) -> ScoreResult:
 
 
 # --- _score_color ---
+
 
 def test_score_color_green_at_75() -> None:
     assert _score_color(75) == "green"
@@ -82,8 +88,10 @@ def test_score_color_red_at_zero() -> None:
 
 # --- _render_score_table ---
 
+
 def test_render_score_table_returns_table() -> None:
     from rich.table import Table
+
     result = _render_score_table(make_score())
     assert isinstance(result, Table)
 
@@ -96,15 +104,19 @@ def test_render_score_table_has_rows() -> None:
 
 # --- _render_job_panel ---
 
+
 def test_render_job_panel_returns_panel() -> None:
     from rich.panel import Panel
+
     panel = _render_job_panel(make_job(), make_score(), 1, 5)
     assert isinstance(panel, Panel)
 
 
 def test_render_job_panel_contains_job_title() -> None:
-    from rich.console import Console
     from io import StringIO
+
+    from rich.console import Console
+
     job = make_job()
     score = make_score()
     panel = _render_job_panel(job, score, 1, 5)
@@ -116,8 +128,10 @@ def test_render_job_panel_contains_job_title() -> None:
 
 
 def test_render_job_panel_shows_score() -> None:
-    from rich.console import Console
     from io import StringIO
+
+    from rich.console import Console
+
     score = make_score(total_score=80)
     panel = _render_job_panel(make_job(), score, 1, 5)
     buf = StringIO()
@@ -128,9 +142,12 @@ def test_render_job_panel_shows_score() -> None:
 
 # --- _print_session_summary ---
 
+
 def test_print_session_summary_renders(capsys) -> None:
-    from rich.console import Console
     from io import StringIO
+
+    from rich.console import Console
+
     buf = StringIO()
     with patch("nj.cli.cmd_review.console", Console(file=buf, highlight=False)):
         _print_session_summary(applied=2, skipped=3, labeled=1, total=10)
@@ -142,8 +159,10 @@ def test_print_session_summary_renders(capsys) -> None:
 
 # --- run_review ---
 
+
 def test_run_review_exits_on_empty_queue() -> None:
     from nj.models.config import Config
+
     config = MagicMock(spec=Config)
     with (
         patch("nj.cli.cmd_review.JobRepo") as mock_job_repo_cls,
@@ -155,7 +174,9 @@ def test_run_review_exits_on_empty_queue() -> None:
         mock_job_repo_cls.return_value = mock_job_repo
 
         from io import StringIO
+
         from rich.console import Console
+
         buf = StringIO()
         with patch("nj.cli.cmd_review.console", Console(file=buf, highlight=False)):
             run_review(config=config, db_path=":memory:", limit=50)

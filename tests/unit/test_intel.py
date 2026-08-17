@@ -1,19 +1,20 @@
 """Unit tests for the H1B intelligence pipeline."""
+
 from __future__ import annotations
 
+from nj.db.repos.intel_repo import _compute_sponsor_tier
 from nj.intel.pipeline import (
+    _parse_uscis_row,
+    is_ml_role,
     normalize_company,
     normalize_title,
-    is_ml_role,
     parse_wage,
-    _parse_uscis_row,
 )
-from nj.db.repos.intel_repo import _compute_sponsor_tier
-
 
 # ---------------------------------------------------------------------------
 # normalize_company
 # ---------------------------------------------------------------------------
+
 
 def test_normalize_company_strips_inc():
     assert "google" in normalize_company("Google Inc.")
@@ -39,6 +40,7 @@ def test_normalize_company_removes_extra_spaces():
 # normalize_title
 # ---------------------------------------------------------------------------
 
+
 def test_normalize_title_lowercases():
     assert normalize_title("Machine Learning Engineer") == "machine learning engineer"
 
@@ -56,6 +58,7 @@ def test_normalize_title_strips_commas():
 # ---------------------------------------------------------------------------
 # is_ml_role
 # ---------------------------------------------------------------------------
+
 
 def test_is_ml_role_machine_learning():
     assert is_ml_role("Machine Learning Engineer") is True
@@ -81,6 +84,7 @@ def test_is_ml_role_accountant():
 # parse_wage
 # ---------------------------------------------------------------------------
 
+
 def test_parse_wage_integer_string():
     assert parse_wage("120000") == 120_000.0
 
@@ -104,6 +108,7 @@ def test_parse_wage_non_numeric():
 # ---------------------------------------------------------------------------
 # _parse_uscis_row
 # ---------------------------------------------------------------------------
+
 
 def test_parse_uscis_row_valid():
     row = {
@@ -173,6 +178,7 @@ def test_parse_uscis_row_zero_total_returns_none():
 # ---------------------------------------------------------------------------
 # _compute_sponsor_tier
 # ---------------------------------------------------------------------------
+
 
 def test_compute_sponsor_tier_strong():
     assert _compute_sponsor_tier(total=500, approval_rate=0.95, ml_count=50) == "STRONG"

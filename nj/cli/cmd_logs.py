@@ -36,9 +36,7 @@ def run_logs(
             console.print(f"[yellow]{line}[/yellow]")
         else:
             console.print(f"[dim]{line}[/dim]")
-    console.print(
-        f"\n[dim]Showing last {len(recent)} of {len(lines)} log lines.[/dim]"
-    )
+    console.print(f"\n[dim]Showing last {len(recent)} of {len(lines)} log lines.[/dim]")
 
 
 def _show_log_stats(db_path: str) -> None:
@@ -54,8 +52,7 @@ def _show_log_stats(db_path: str) -> None:
         failure_stats = score_repo.get_parse_failure_rate()
         apps = app_repo.get_applications()
         failed_apps = [
-            a for a in apps
-            if a.status.value in ("failed", "captcha_blocked", "bot_detected")
+            a for a in apps if a.status.value in ("failed", "captcha_blocked", "bot_detected")
         ]
         table = Table(title="nj reliability stats", box=box.ROUNDED)
         table.add_column("Metric", width=30)

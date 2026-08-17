@@ -1,13 +1,13 @@
 """Unit tests for nj ML models (no H1B data required)."""
+
 from __future__ import annotations
 
-import pytest
 import numpy as np
+import pytest
 
-from nj.ml.sponsorship_model import SponsorshipModel
-from nj.ml.salary_model import SalaryModel, ROLE_CATEGORIES, STATE_TIERS
+from nj.ml.salary_model import ROLE_CATEGORIES, STATE_TIERS, SalaryModel
 from nj.ml.semantic_model import SemanticModel
-
+from nj.ml.sponsorship_model import SponsorshipModel
 
 # ---------------------------------------------------------------------------
 # SponsorshipModel

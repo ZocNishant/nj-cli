@@ -81,21 +81,13 @@ class ScoreRepo:
 
     def get_scores_with_failures(self) -> list[ScoreResult]:
         with get_session(self.db_path) as session:
-            rows = (
-                session.query(ScoreResultORM)
-                .filter(ScoreResultORM.total_score == 0)
-                .all()
-            )
+            rows = session.query(ScoreResultORM).filter(ScoreResultORM.total_score == 0).all()
             return [_to_model(r) for r in rows]
 
     def get_parse_failure_rate(self) -> dict:
         with get_session(self.db_path) as session:
             total = session.query(ScoreResultORM).count()
-            failures = (
-                session.query(ScoreResultORM)
-                .filter(ScoreResultORM.total_score == 0)
-                .count()
-            )
+            failures = session.query(ScoreResultORM).filter(ScoreResultORM.total_score == 0).count()
             return {
                 "total": total,
                 "failures": failures,

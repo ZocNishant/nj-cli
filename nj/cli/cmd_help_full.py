@@ -2,13 +2,14 @@
 Full command reference — every command, flag, and example.
 Accessible via: nj manual
 """
+
 from __future__ import annotations
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.rule import Rule
-from rich import box
+from rich.table import Table
 
 from nj.utils.logger import get_logger
 
@@ -32,13 +33,19 @@ COMMAND_REFERENCE = {
     "enrich": {
         "description": "Full intelligence report for any job URL — sponsorship probability, salary estimate, USCIS data, semantic match.",
         "flags": [
-            ("URL", "Job URL (required) — works with LinkedIn, Greenhouse, Lever, Workday, any job board"),
+            (
+                "URL",
+                "Job URL (required) — works with LinkedIn, Greenhouse, Lever, Workday, any job board",
+            ),
             ("--no-score", "Skip AI scoring (faster, no API credits)"),
             ("--db PATH", "Database path"),
         ],
         "examples": [
             ("nj enrich https://jobs.lever.co/company/job-id", "Full intelligence on a Lever job"),
-            ("nj enrich https://linkedin.com/jobs/view/123 --no-score", "Quick intel without scoring"),
+            (
+                "nj enrich https://linkedin.com/jobs/view/123 --no-score",
+                "Quick intel without scoring",
+            ),
         ],
         "notes": "Works without API key for sponsorship/salary/USCIS layers. Needs API key for AI scoring.",
     },
@@ -85,13 +92,19 @@ COMMAND_REFERENCE = {
         "description": "Reframe your best project for a specific audience — production ML, research lab, healthtech, big tech.",
         "flags": [
             ("--project / -p ID", "Project ID to frame (see nj frame --list)"),
-            ("--audience / -a TYPE", "Target: production_ml, research_lab, healthtech_startup, big_tech, early_stage_startup, custom"),
+            (
+                "--audience / -a TYPE",
+                "Target: production_ml, research_lab, healthtech_startup, big_tech, early_stage_startup, custom",
+            ),
             ("--role TEXT", "Role description for custom audience"),
             ("--list / -l", "List available projects"),
         ],
         "examples": [
             ("nj frame --list", "See all projects in CV"),
-            ("nj frame --project gastrovision --audience healthtech_startup", "Frame GastroVision for healthtech"),
+            (
+                "nj frame --project gastrovision --audience healthtech_startup",
+                "Frame GastroVision for healthtech",
+            ),
             ("nj frame --audience research_lab", "Frame anchor project for research"),
         ],
         "notes": "Anti-hallucination validated. Only reframes existing content — never invents.",
@@ -267,7 +280,10 @@ COMMAND_REFERENCE = {
     "update-cv": {
         "description": "Update CV sections interactively — no JSON editing needed.",
         "flags": [
-            ("--section / -s NAME", "Section: summary, skills, research_interests, soft_skills, personal"),
+            (
+                "--section / -s NAME",
+                "Section: summary, skills, research_interests, soft_skills, personal",
+            ),
             ("--show", "Display all sections and current values"),
         ],
         "examples": [
@@ -399,11 +415,13 @@ def run_manual(
 def _show_command_detail(command: str) -> None:
     ref = COMMAND_REFERENCE[command]
 
-    console.print(Panel(
-        f"[bold]nj {command}[/bold]\n\n{ref['description']}",
-        title=f"nj {command}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]nj {command}[/bold]\n\n{ref['description']}",
+            title=f"nj {command}",
+            border_style="cyan",
+        )
+    )
 
     if ref.get("flags"):
         table = Table(box=box.SIMPLE, show_header=False, pad_edge=False)
@@ -424,17 +442,19 @@ def _show_command_detail(command: str) -> None:
 
 
 def _show_full_manual() -> None:
-    console.print(Panel(
-        "[bold]nj-cli — AI Career Operating System[/bold]\n\n"
-        "Anti-hallucination CV tailoring · "
-        "Explainable scoring · H1B intelligence\n"
-        "Career knowledge graph · ML models · "
-        "Interactive shell\n\n"
-        "[dim]Usage: nj <command> [flags]\n"
-        "Shell: nj → then type commands interactively\n"
-        "Help:  nj manual <command> for detailed help[/dim]",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            "[bold]nj-cli — AI Career Operating System[/bold]\n\n"
+            "Anti-hallucination CV tailoring · "
+            "Explainable scoring · H1B intelligence\n"
+            "Career knowledge graph · ML models · "
+            "Interactive shell\n\n"
+            "[dim]Usage: nj <command> [flags]\n"
+            "Shell: nj → then type commands interactively\n"
+            "Help:  nj manual <command> for detailed help[/dim]",
+            border_style="cyan",
+        )
+    )
 
     sections = {
         "Intelligence": ["diagnose", "gaps", "explain", "diff", "frame", "postmortem"],
@@ -453,6 +473,5 @@ def _show_full_manual() -> None:
             console.print(f"  [cyan]{cmd:<18}[/cyan] [dim]{desc}[/dim]")
 
     console.print(
-        "\n[dim]Run [bold]nj manual <command>[/bold] "
-        "for detailed help on any command.[/dim]\n"
+        "\n[dim]Run [bold]nj manual <command>[/bold] for detailed help on any command.[/dim]\n"
     )

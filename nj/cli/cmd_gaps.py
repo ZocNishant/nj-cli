@@ -27,10 +27,7 @@ def run_gaps(
 
     jobs = job_repo.get_jobs()
     if not jobs:
-        console.print(
-            "[yellow]No jobs found.[/yellow] "
-            "Run [bold]nj search[/bold] first."
-        )
+        console.print("[yellow]No jobs found.[/yellow] Run [bold]nj search[/bold] first.")
         return
 
     results = []
@@ -135,10 +132,7 @@ def _display_matched_strengths(report) -> None:
     for item in report.matched_skill_frequency[:5]:
         freq = item["frequency_pct"]
         bar = "█" * (freq // 10) + "░" * (10 - freq // 10)
-        console.print(
-            f"  [green]{item['skill'].title():<20}[/green] "
-            f"{bar} {freq}% of jobs"
-        )
+        console.print(f"  [green]{item['skill'].title():<20}[/green] {bar} {freq}% of jobs")
 
 
 def _display_recommendations(report) -> None:

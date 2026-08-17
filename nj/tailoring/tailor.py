@@ -76,9 +76,7 @@ async def tailor_cv(
                 break
 
             tailored_cv = parsed
-            logger.info(
-                "tailoring_complete", job_id=job.id, keywords_injected=len(keywords)
-            )
+            logger.info("tailoring_complete", job_id=job.id, keywords_injected=len(keywords))
             break
 
         except Exception as e:

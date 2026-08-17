@@ -43,5 +43,5 @@ class ApplicationRecord(BaseModel):
     outcome_recorded_at: datetime | None = None
 
     @classmethod
-    def create(cls, job_id: str, score: int) -> "ApplicationRecord":
+    def create(cls, job_id: str, score: int) -> ApplicationRecord:
         return cls(id=str(uuid.uuid4()), job_id=job_id, score=score)

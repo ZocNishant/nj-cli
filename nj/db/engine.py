@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
-from sqlalchemy import create_engine, Engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 class Base(DeclarativeBase):

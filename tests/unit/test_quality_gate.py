@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from nj.models.config import Config
@@ -155,9 +154,7 @@ def test_warning_on_senior_signal() -> None:
         score=make_score(75),
         config=make_config(),
     )
-    assert any(
-        "senior" in w.lower() or "staff" in w.lower() for w in result.warnings
-    )
+    assert any("senior" in w.lower() or "staff" in w.lower() for w in result.warnings)
 
 
 def test_warning_on_low_confidence() -> None:

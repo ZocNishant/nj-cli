@@ -4,12 +4,11 @@ import json
 import re
 from pathlib import Path
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.rule import Rule
-from rich.text import Text
-from rich import box
+from rich.table import Table
 
 from nj.models.config import Config
 from nj.utils.logger import get_logger
@@ -29,10 +28,7 @@ def run_diff(
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -52,8 +48,7 @@ def run_diff(
     )
     if not job:
         console.print(
-            f"[red]Job '{job_id}' not found.[/red]\n"
-            "Run [bold]nj diff[/bold] to see available jobs."
+            f"[red]Job '{job_id}' not found.[/red]\nRun [bold]nj diff[/bold] to see available jobs."
         )
         return
 
@@ -80,10 +75,7 @@ def _find_tailored_cv(output_dir: Path, job) -> dict | None:
         return None
 
     for f in output_dir.glob("*.json"):
-        if (
-            safe_company[:8].lower() in f.name.lower()
-            or safe_title[:8].lower() in f.name.lower()
-        ):
+        if safe_company[:8].lower() in f.name.lower() or safe_title[:8].lower() in f.name.lower():
             try:
                 return json.loads(f.read_text())
             except Exception:
@@ -98,10 +90,7 @@ def _safe_name(text: str) -> str:
 def _show_available_jobs(job_repo, score_repo) -> None:
     jobs = job_repo.get_jobs()
     if not jobs:
-        console.print(
-            "[yellow]No jobs found.[/yellow] "
-            "Run [bold]nj search[/bold] first."
-        )
+        console.print("[yellow]No jobs found.[/yellow] Run [bold]nj search[/bold] first.")
         return
 
     output_dir = Path("output")
@@ -131,11 +120,7 @@ def _show_available_jobs(job_repo, score_repo) -> None:
 
     for job, score, _ in tailored_jobs:
         s = score.total_score if score else 0
-        color = (
-            "green" if s >= 75
-            else "yellow" if s >= 60
-            else "red"
-        )
+        color = "green" if s >= 75 else "yellow" if s >= 60 else "red"
         table.add_row(
             job.id[:8],
             job.company[:22],
@@ -143,10 +128,7 @@ def _show_available_jobs(job_repo, score_repo) -> None:
             f"[{color}]{s}[/{color}]",
         )
     console.print(table)
-    console.print(
-        "\n[dim]Run [bold]nj diff --job-id ID[/bold] "
-        "to see what changed.[/dim]"
-    )
+    console.print("\n[dim]Run [bold]nj diff --job-id ID[/bold] to see what changed.[/dim]")
 
 
 def _display_diff(
@@ -156,18 +138,17 @@ def _display_diff(
     score,
     section: str | None,
 ) -> None:
-    console.print(Panel(
-        f"[bold]{job.title}[/bold] @ "
-        f"[cyan]{job.company}[/cyan]\n"
-        f"[dim]Diff: base CV → tailored CV[/dim]",
-        title="nj diff",
-        border_style="cyan",
-    ))
-
-    sections_to_diff = (
-        [section] if section
-        else ["summary", "skills", "experience", "projects"]
+    console.print(
+        Panel(
+            f"[bold]{job.title}[/bold] @ "
+            f"[cyan]{job.company}[/cyan]\n"
+            f"[dim]Diff: base CV → tailored CV[/dim]",
+            title="nj diff",
+            border_style="cyan",
+        )
     )
+
+    sections_to_diff = [section] if section else ["summary", "skills", "experience", "projects"]
 
     for sec in sections_to_diff:
         base_val = cv_base.get(sec)
@@ -196,10 +177,7 @@ def _diff_summary(base: str, tailored: str) -> None:
     if not base and not tailored:
         return
     if not base and tailored:
-        console.print(
-            "[green]+ ADDED summary:[/green]\n"
-            f"  {tailored}"
-        )
+        console.print(f"[green]+ ADDED summary:[/green]\n  {tailored}")
         return
     if base == tailored:
         console.print("[dim]  No change.[/dim]")
@@ -227,9 +205,7 @@ def _diff_skills(base: dict | None, tailored: dict | None) -> None:
 
         if added or removed:
             any_change = True
-            console.print(
-                f"\n  [bold]{cat.replace('_', ' ').title()}[/bold]"
-            )
+            console.print(f"\n  [bold]{cat.replace('_', ' ').title()}[/bold]")
             for s in sorted(added):
                 console.print(f"    [green]+ {s}[/green]")
             for s in sorted(removed):
@@ -244,14 +220,10 @@ def _diff_experience(base: list | None, tailored: list | None) -> None:
     tailored = tailored or []
 
     base_map = {
-        e.get("id", e.get("company", i)): e
-        for i, e in enumerate(base)
-        if isinstance(e, dict)
+        e.get("id", e.get("company", i)): e for i, e in enumerate(base) if isinstance(e, dict)
     }
     tail_map = {
-        e.get("id", e.get("company", i)): e
-        for i, e in enumerate(tailored)
-        if isinstance(e, dict)
+        e.get("id", e.get("company", i)): e for i, e in enumerate(tailored) if isinstance(e, dict)
     }
 
     any_change = False
@@ -285,34 +257,18 @@ def _diff_projects(base: list | None, tailored: list | None) -> None:
     base = base or []
     tailored = tailored or []
 
-    base_map = {
-        p.get("id", p.get("name", i)): p
-        for i, p in enumerate(base)
-        if isinstance(p, dict)
-    }
+    base_map = {p.get("id", p.get("name", i)): p for i, p in enumerate(base) if isinstance(p, dict)}
     tail_map = {
-        p.get("id", p.get("name", i)): p
-        for i, p in enumerate(tailored)
-        if isinstance(p, dict)
+        p.get("id", p.get("name", i)): p for i, p in enumerate(tailored) if isinstance(p, dict)
     }
 
-    base_order = [
-        p.get("id", p.get("name", ""))
-        for p in base if isinstance(p, dict)
-    ]
-    tail_order = [
-        p.get("id", p.get("name", ""))
-        for p in tailored if isinstance(p, dict)
-    ]
+    base_order = [p.get("id", p.get("name", "")) for p in base if isinstance(p, dict)]
+    tail_order = [p.get("id", p.get("name", "")) for p in tailored if isinstance(p, dict)]
 
     if base_order != tail_order and tail_order:
         console.print("\n  [yellow]~ ORDER CHANGED:[/yellow]")
-        console.print(
-            f"  Base:     {' → '.join(str(x)[:12] for x in base_order[:4])}"
-        )
-        console.print(
-            f"  Tailored: {' → '.join(str(x)[:12] for x in tail_order[:4])}"
-        )
+        console.print(f"  Base:     {' → '.join(str(x)[:12] for x in base_order[:4])}")
+        console.print(f"  Tailored: {' → '.join(str(x)[:12] for x in tail_order[:4])}")
 
     any_bullet_change = False
     for key in base_map:
@@ -351,9 +307,7 @@ def _diff_bullet_lists(base: list[str], tailored: list[str]) -> None:
             add_words = set(add.lower().split())
             if not rem_words or not add_words:
                 continue
-            overlap = len(rem_words & add_words) / max(
-                len(rem_words), len(add_words)
-            )
+            overlap = len(rem_words & add_words) / max(len(rem_words), len(add_words))
             if overlap > 0.4 and overlap > best_score:
                 best_score = overlap
                 best_match = add
@@ -378,7 +332,4 @@ def _diff_generic(section: str, base, tailored) -> None:
     if base == tailored:
         console.print("[dim]  No change.[/dim]")
     else:
-        console.print(
-            f"[red]− {base}[/red]\n"
-            f"[green]+ {tailored}[/green]"
-        )
+        console.print(f"[red]− {base}[/red]\n[green]+ {tailored}[/green]")

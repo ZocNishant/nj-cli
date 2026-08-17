@@ -1,23 +1,36 @@
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
 from io import StringIO
+from unittest.mock import MagicMock, patch
 
 from rich.console import Console
 
 from nj.cli.shell import (
-    _dispatch, _get_flag, _show_help,
-    _render_splash, _print_command_header, _show_success,
-    SHELL_COMMANDS, BANNERS, TAGLINES,
+    BANNERS,
+    SHELL_COMMANDS,
+    TAGLINES,
+    _dispatch,
+    _get_flag,
+    _print_command_header,
+    _render_splash,
+    _show_help,
+    _show_success,
 )
 from nj.models.config import Config
 
 
 def test_shell_commands_complete():
     required = [
-        "search", "run", "review", "explain", "diff",
-        "diagnose", "gaps", "status", "help", "exit",
+        "search",
+        "run",
+        "review",
+        "explain",
+        "diff",
+        "diagnose",
+        "gaps",
+        "status",
+        "help",
+        "exit",
     ]
     for cmd in required:
         assert cmd in SHELL_COMMANDS
@@ -106,8 +119,10 @@ def test_show_help_renders():
 
 def test_render_splash_renders():
     stats = {
-        "jobs": 118, "scored": 45,
-        "applied": 3, "interviews": 1,
+        "jobs": 118,
+        "scored": 45,
+        "applied": 3,
+        "interviews": 1,
     }
     buf = StringIO()
     c = Console(file=buf, highlight=False)
@@ -138,10 +153,13 @@ def test_dispatch_search_dry_run():
 
 def test_boot_sequence_runs(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda x: None)
-    from nj.cli.shell import _boot_sequence
     from io import StringIO
-    from rich.console import Console
     from unittest.mock import patch
+
+    from rich.console import Console
+
+    from nj.cli.shell import _boot_sequence
+
     buf = StringIO()
     c = Console(file=buf, highlight=False)
     with patch("nj.cli.shell.console", c):

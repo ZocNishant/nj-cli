@@ -74,9 +74,7 @@ def check_application_quality(
         jd_lower = job.description.lower()
         for signal in NO_SPONSORSHIP_SIGNALS:
             if signal in jd_lower:
-                blocking_reasons.append(
-                    f"Job contains no-sponsorship signal: '{signal}'"
-                )
+                blocking_reasons.append(f"Job contains no-sponsorship signal: '{signal}'")
                 issues.append(
                     QualityIssue(
                         category="visa",
@@ -91,9 +89,7 @@ def check_application_quality(
     jd_lower = job.description.lower()
     for pattern in SENIOR_SIGNALS:
         if re.search(pattern, jd_lower, re.IGNORECASE):
-            warnings.append(
-                f"Job may require senior-level experience (matched: '{pattern}')"
-            )
+            warnings.append(f"Job may require senior-level experience (matched: '{pattern}')")
             issues.append(
                 QualityIssue(
                     category="seniority",
@@ -138,9 +134,7 @@ def check_application_quality(
         if any(kw in s.lower() for kw in ["required", "must", "essential"])
     ]
     if critical_missing:
-        warnings.append(
-            f"Missing potentially required skills: {', '.join(critical_missing[:3])}"
-        )
+        warnings.append(f"Missing potentially required skills: {', '.join(critical_missing[:3])}")
 
     # 7. Low confidence check
     if score.confidence < 0.4:

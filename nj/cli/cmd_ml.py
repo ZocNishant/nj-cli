@@ -3,11 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
-from rich.table import Table
 
 from nj.utils.logger import get_logger
 
@@ -95,8 +93,7 @@ def _run_train(db_path: str) -> None:
         console.print(f"  [red]✗[/red] {salary_metrics['error']}")
 
     console.print(
-        "\n[dim]Models saved to data/models/\n"
-        "Run [bold]nj ml predict[/bold] to use them.[/dim]"
+        "\n[dim]Models saved to data/models/\nRun [bold]nj ml predict[/bold] to use them.[/dim]"
     )
 
 
@@ -108,9 +105,7 @@ def _run_predict(
     db_path: str,
 ) -> None:
     if not company or not role:
-        console.print(
-            "[red]Usage:[/red] ml predict --company NAME --role TITLE"
-        )
+        console.print("[red]Usage:[/red] ml predict --company NAME --role TITLE")
         return
 
     from nj.ml.sponsorship_model import get_sponsorship_model
@@ -156,10 +151,7 @@ def _run_predict(
 
 def _run_salary(role: str, state: str, year: int, db_path: str) -> None:
     if not role:
-        console.print(
-            "[red]Usage:[/red] ml salary --role TITLE "
-            "[--state CA] [--year 2024]"
-        )
+        console.print("[red]Usage:[/red] ml salary --role TITLE [--state CA] [--year 2024]")
         return
 
     from nj.ml.salary_model import get_salary_model
@@ -187,8 +179,7 @@ def _run_salary(role: str, state: str, year: int, db_path: str) -> None:
             f"Predicted salary: [green][bold]${pred:,}[/bold][/green]\n"
             f"Range:            ${low:,} – ${high:,}\n"
             f"Role category:    {cat}\n"
-            f"Confidence:       {result['confidence']}"
-            + note_line,
+            f"Confidence:       {result['confidence']}" + note_line,
             title="Salary Prediction",
             border_style="green",
         )
@@ -247,9 +238,7 @@ def _run_semantic(job_id: str | None, db_path: str) -> None:
         ):
             bar_len = int(sec_score / 5)
             bar = "█" * bar_len + "░" * (20 - bar_len)
-            sec_color = (
-                "green" if sec_score >= 70 else "yellow" if sec_score >= 50 else "red"
-            )
+            sec_color = "green" if sec_score >= 70 else "yellow" if sec_score >= 50 else "red"
             console.print(
                 f"  [dim]{section:<14}[/dim] [{sec_color}]{bar}[/{sec_color}] {sec_score}"
             )
@@ -260,14 +249,13 @@ def _run_semantic(job_id: str | None, db_path: str) -> None:
         for g in gaps:
             sev_color = "red" if g["gap_severity"] == "high" else "yellow"
             console.print(
-                f"  [{sev_color}][{g['gap_severity']}][/{sev_color}] "
-                f"{g['jd_requirement'][:80]}"
+                f"  [{sev_color}][{g['gap_severity']}][/{sev_color}] {g['jd_requirement'][:80]}"
             )
 
 
 def _run_status(db_path: str) -> None:
-    from nj.ml.sponsorship_model import MODEL_PATH as SPONSOR_PATH
     from nj.ml.salary_model import MODEL_PATH as SALARY_PATH
+    from nj.ml.sponsorship_model import MODEL_PATH as SPONSOR_PATH
 
     console.print(
         Panel(
@@ -296,14 +284,8 @@ def _run_status(db_path: str) -> None:
 def _model_status(name: str, path: Path, description: str) -> str:
     if path.exists():
         size_kb = path.stat().st_size // 1024
-        return (
-            f"[green]✓[/green] [bold]{name}[/bold] "
-            f"[dim]({size_kb}KB — {description})[/dim]"
-        )
-    return (
-        f"[red]✗[/red] [bold]{name}[/bold] "
-        f"[dim]not trained — {description}[/dim]"
-    )
+        return f"[green]✓[/green] [bold]{name}[/bold] [dim]({size_kb}KB — {description})[/dim]"
+    return f"[red]✗[/red] [bold]{name}[/bold] [dim]not trained — {description}[/dim]"
 
 
 def _semantic_status() -> str:

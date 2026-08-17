@@ -28,7 +28,8 @@ _DEFAULT_ROLES: dict[str, list[str]] = {
 }
 
 _SPONSORSHIP_STATUSES = [
-    s.value for s in VisaStatus
+    s.value
+    for s in VisaStatus
     if s not in (VisaStatus.NOT_APPLICABLE, VisaStatus.CITIZEN, VisaStatus.PERMANENT_RESIDENT)
 ]
 
@@ -152,9 +153,7 @@ def _step_personal() -> dict:
     name = Prompt.ask("Full name")
     email = Prompt.ask("Email address")
     phone = Prompt.ask("Phone number [dim](optional, press Enter to skip)[/dim]", default="")
-    location = Prompt.ask(
-        "City, Country [dim](e.g. San Francisco, USA)[/dim]", default=""
-    )
+    location = Prompt.ask("City, Country [dim](e.g. San Francisco, USA)[/dim]", default="")
     linkedin = Prompt.ask("LinkedIn URL [dim](optional)[/dim]", default="")
     github = Prompt.ask("GitHub URL [dim](optional)[/dim]", default="")
     website = Prompt.ask("Personal website [dim](optional)[/dim]", default="")
@@ -224,9 +223,7 @@ def _step_visa() -> dict:
         default="opt",
     )
     h1b = Confirm.ask("Will you need H1B sponsorship in the future?", default=True)
-    skip_no_sponsor = Confirm.ask(
-        "Auto-skip jobs that say 'no sponsorship'?", default=True
-    )
+    skip_no_sponsor = Confirm.ask("Auto-skip jobs that say 'no sponsorship'?", default=True)
     work_auth_default = (
         f"{status.upper()} — open to H1B sponsorship" if h1b else f"{status.upper()}"
     )
@@ -338,31 +335,41 @@ def _extract_cv_from_pdf(
             pdf_data = base64.standard_b64encode(f.read()).decode("utf-8")
 
         client = anthropic.Anthropic(api_key=api_key)
-        schema_str = json.dumps({
-            "personal": {
-                "name": "", "email": "", "phone": "", "location": "",
-                "linkedin": "", "github": "", "website": "",
-                "visa_status": "not_applicable", "work_authorization": "",
-                "graduation_date": "", "target_country": "USA",
+        schema_str = json.dumps(
+            {
+                "personal": {
+                    "name": "",
+                    "email": "",
+                    "phone": "",
+                    "location": "",
+                    "linkedin": "",
+                    "github": "",
+                    "website": "",
+                    "visa_status": "not_applicable",
+                    "work_authorization": "",
+                    "graduation_date": "",
+                    "target_country": "USA",
+                },
+                "career_field": "software_engineering",
+                "target_roles": [],
+                "target_locations": [],
+                "seniority": "mid",
+                "summary": "",
+                "skills": {},
+                "experience": [],
+                "projects": [],
+                "education": [],
+                "certifications": [],
+                "publications": [],
+                "languages": [],
+                "research_interests": [],
+                "soft_skills": [],
+                "cv_version": "1.0",
+                "created_at": "",
+                "last_updated": "",
             },
-            "career_field": "software_engineering",
-            "target_roles": [],
-            "target_locations": [],
-            "seniority": "mid",
-            "summary": "",
-            "skills": {},
-            "experience": [],
-            "projects": [],
-            "education": [],
-            "certifications": [],
-            "publications": [],
-            "languages": [],
-            "research_interests": [],
-            "soft_skills": [],
-            "cv_version": "1.0",
-            "created_at": "",
-            "last_updated": "",
-        }, indent=2)
+            indent=2,
+        )
 
         msg = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -458,12 +465,14 @@ def _step_notifications(env: dict) -> dict:
             "SMTP password [dim](Gmail: use App Password)[/dim]",
             password=True,
         )
-        env.update({
-            "SMTP_HOST": host,
-            "SMTP_PORT": str(port),
-            "SMTP_USER": user,
-            "SMTP_PASSWORD": password,
-        })
+        env.update(
+            {
+                "SMTP_HOST": host,
+                "SMTP_PORT": str(port),
+                "SMTP_USER": user,
+                "SMTP_PASSWORD": password,
+            }
+        )
         return {
             "email_to": email_to,
             "provider": "smtp",

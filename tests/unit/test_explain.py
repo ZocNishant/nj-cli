@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
 from io import StringIO
+from unittest.mock import MagicMock, patch
 
 from rich.console import Console
 
-from nj.models.job import Job, VisaLabel, JobStatus
-from nj.models.score import ScoreResult, SubScore, ScoreCategory
-from nj.models.config import Config
 from nj.cli.cmd_explain import (
-    _show_top_jobs, _display_full_explanation,
+    _display_full_explanation,
+    _show_top_jobs,
 )
+from nj.models.config import Config
+from nj.models.job import Job, JobStatus, VisaLabel
+from nj.models.score import ScoreCategory, ScoreResult, SubScore
 
 
 def make_job(score: int = 75) -> Job:
@@ -150,11 +150,7 @@ def test_display_low_score_shows_skip_recommendation():
     with patch("nj.cli.cmd_explain.console", c):
         _display_full_explanation(job, score)
     output = buf.getvalue()
-    assert (
-        "threshold" in output.lower()
-        or "skip" in output.lower()
-        or "Below" in output
-    )
+    assert "threshold" in output.lower() or "skip" in output.lower() or "Below" in output
 
 
 def test_display_shows_visa_info():
@@ -213,9 +209,11 @@ def test_run_explain_no_job_id_shows_top(tmp_path, monkeypatch):
     c = Console(file=buf, highlight=False)
     mock_job_repo = MagicMock()
     mock_job_repo.get_jobs.return_value = []
-    with patch("nj.cli.cmd_explain.console", c), \
-         patch("nj.cli.cmd_explain.JobRepo", return_value=mock_job_repo), \
-         patch("nj.cli.cmd_explain.ScoreRepo"):
+    with (
+        patch("nj.cli.cmd_explain.console", c),
+        patch("nj.cli.cmd_explain.JobRepo", return_value=mock_job_repo),
+        patch("nj.cli.cmd_explain.ScoreRepo"),
+    ):
         run_explain(Config(), db_path=str(tmp_path / "nj.db"))
     assert "No jobs found" in buf.getvalue()
 
@@ -231,9 +229,11 @@ def test_run_explain_partial_job_id_match(tmp_path, monkeypatch):
     mock_job_repo.get_jobs.return_value = [job]
     mock_score_repo = MagicMock()
     mock_score_repo.get_score.return_value = make_score()
-    with patch("nj.cli.cmd_explain.console", c), \
-         patch("nj.cli.cmd_explain.JobRepo", return_value=mock_job_repo), \
-         patch("nj.cli.cmd_explain.ScoreRepo", return_value=mock_score_repo):
+    with (
+        patch("nj.cli.cmd_explain.console", c),
+        patch("nj.cli.cmd_explain.JobRepo", return_value=mock_job_repo),
+        patch("nj.cli.cmd_explain.ScoreRepo", return_value=mock_score_repo),
+    ):
         run_explain(
             Config(),
             job_id="abc123",

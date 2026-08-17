@@ -130,8 +130,9 @@ def _get_quick_stats(db_path: str) -> str:
 
         if not Path(db_path).exists():
             return ""
-        from nj.db.engine import get_engine
         from sqlalchemy import text
+
+        from nj.db.engine import get_engine
 
         engine = get_engine(db_path)
         with engine.connect() as conn:
@@ -139,17 +140,11 @@ def _get_quick_stats(db_path: str) -> str:
                 jobs = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar() or 0
                 apps = (
                     conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM applications "
-                            "WHERE status='submitted'"
-                        )
+                        text("SELECT COUNT(*) FROM applications WHERE status='submitted'")
                     ).scalar()
                     or 0
                 )
-                scores = (
-                    conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar()
-                    or 0
-                )
+                scores = conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar() or 0
                 if jobs == 0 and apps == 0:
                     return ""
                 parts = []

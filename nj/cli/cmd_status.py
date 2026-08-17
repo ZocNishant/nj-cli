@@ -59,8 +59,7 @@ def run_status(
     if not applications:
         console.print("[yellow]No applications yet.[/yellow]")
         console.print(
-            "Run [bold]nj search[/bold] to find jobs, "
-            "then [bold]nj review[/bold] to approve them."
+            "Run [bold]nj search[/bold] to find jobs, then [bold]nj review[/bold] to approve them."
         )
         return
 
@@ -98,9 +97,7 @@ def run_status(
         date_str = app.applied_at.strftime("%Y-%m-%d") if app.applied_at else "—"
         status_val = app.status.value
         color = STATUS_COLORS.get(status_val, "white")
-        score_color = (
-            "green" if app.score >= 75 else "yellow" if app.score >= 60 else "red"
-        )
+        score_color = "green" if app.score >= 75 else "yellow" if app.score >= 60 else "red"
         table.add_row(
             date_str,
             company,
@@ -122,14 +119,10 @@ def _print_stats(applications: list) -> None:
 
     submitted = [a for a in applications if a.status.value in ("submitted", "applied")]
     this_week = [
-        a
-        for a in submitted
-        if a.applied_at and a.applied_at.replace(tzinfo=UTC) >= week_ago
+        a for a in submitted if a.applied_at and a.applied_at.replace(tzinfo=UTC) >= week_ago
     ]
     this_month = [
-        a
-        for a in submitted
-        if a.applied_at and a.applied_at.replace(tzinfo=UTC) >= month_ago
+        a for a in submitted if a.applied_at and a.applied_at.replace(tzinfo=UTC) >= month_ago
     ]
     avg_score = sum(a.score for a in submitted) / len(submitted) if submitted else 0
     interviews = sum(1 for a in applications if a.status.value == "interview")
@@ -146,17 +139,15 @@ def _print_stats(applications: list) -> None:
 
 def _print_enrichment_summary(db_path: str) -> None:
     try:
-        from nj.db.repos.enrichment_repo import EnrichmentRepo
-        from nj.graph.repo import GraphRepo
-        repo = EnrichmentRepo(db_path)
-        from nj.db.engine import get_engine
         from sqlalchemy import text
+
+        from nj.db.engine import get_engine
+        from nj.graph.repo import GraphRepo
+
         engine = get_engine(db_path)
         with engine.connect() as conn:
             try:
-                enriched = conn.execute(
-                    text("SELECT COUNT(*) FROM job_enrichments")
-                ).scalar() or 0
+                enriched = conn.execute(text("SELECT COUNT(*) FROM job_enrichments")).scalar() or 0
             except Exception:
                 enriched = 0
 

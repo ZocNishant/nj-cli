@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
 
@@ -33,10 +32,7 @@ def run_update_cv(
 ) -> None:
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
-        console.print(
-            "[red]cv/cv_base.json not found.[/red] "
-            "Run [bold]nj init[/bold] first."
-        )
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
         return
 
     with open(cv_path) as f:
@@ -82,9 +78,7 @@ def _show_cv_sections(cv_base: dict) -> None:
         else:
             preview = str(value)[:80] if value else "[dim]empty[/dim]"
         console.print(
-            f"  [bold cyan]{key:<22}[/bold cyan] "
-            f"[dim]{description}[/dim]\n"
-            f"  {'':22} {preview}\n"
+            f"  [bold cyan]{key:<22}[/bold cyan] [dim]{description}[/dim]\n  {'':22} {preview}\n"
         )
 
 
@@ -98,23 +92,23 @@ def _update_section(cv_base: dict, section: str, cv_path: Path) -> None:
         cv_base[section] = new_value
 
     elif isinstance(current, list):
-        console.print(
-            "[dim]"
-            + "\n".join(f"  • {item}" for item in current)
-            + "[/dim]\n"
-        )
-        console.print(
-            "Enter new values (comma-separated) or press Enter to keep current:"
-        )
+        console.print("[dim]" + "\n".join(f"  • {item}" for item in current) + "[/dim]\n")
+        console.print("Enter new values (comma-separated) or press Enter to keep current:")
         raw = Prompt.ask(f"New {section}", default="")
         if raw.strip():
             cv_base[section] = [v.strip() for v in raw.split(",") if v.strip()]
 
     elif isinstance(current, dict) and section == "personal":
         for field in [
-            "name", "email", "phone", "location",
-            "linkedin", "github", "website",
-            "work_authorization", "graduation_date",
+            "name",
+            "email",
+            "phone",
+            "location",
+            "linkedin",
+            "github",
+            "website",
+            "work_authorization",
+            "graduation_date",
         ]:
             old_val = current.get(field, "")
             new_val = Prompt.ask(f"  {field}", default=old_val)
@@ -124,9 +118,7 @@ def _update_section(cv_base: dict, section: str, cv_path: Path) -> None:
 
     elif isinstance(current, dict):
         console.print(Syntax(json.dumps(current, indent=2), "json", theme="monokai"))
-        console.print(
-            "[dim]Edit cv/cv_base.json directly for complex section updates.[/dim]"
-        )
+        console.print("[dim]Edit cv/cv_base.json directly for complex section updates.[/dim]")
         return
 
     console.print(f"\n[bold]Updated {section}:[/bold] {cv_base.get(section)}")

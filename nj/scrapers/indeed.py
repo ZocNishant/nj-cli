@@ -8,8 +8,8 @@ import httpx
 
 from nj.models.config import VisaConfig
 from nj.models.job import Job
-from nj.scrapers.base import BaseScraper
 from nj.scoring.visa_filter import VisaFilter
+from nj.scrapers.base import BaseScraper
 from nj.utils.logger import get_logger
 from nj.utils.text import clean_html, truncate
 
@@ -88,9 +88,7 @@ class AdzunaScraper(BaseScraper):
                     break
                 time.sleep(random.uniform(0.5, 1.5))
             except Exception as e:
-                logger.warning(
-                    "adzuna_page_failed", role=role, page=page, error=str(e)
-                )
+                logger.warning("adzuna_page_failed", role=role, page=page, error=str(e))
                 break
         return jobs
 

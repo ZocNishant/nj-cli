@@ -3,7 +3,6 @@ from __future__ import annotations
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from nj.cli.cmd_demo import _demo_diagnose, _demo_gaps, _demo_score, _demo_summary
