@@ -1,9 +1,12 @@
 .env
 config.yaml
-# Claude Code: track the shared config and hooks, ignore personal overrides.
+# Claude Code: track the shared config, hooks and commands, ignore personal
+# overrides. The commands are project workflows, so they belong to everyone
+# working on the repo.
 .claude/*
 !.claude/settings.json
 !.claude/hooks/
+!.claude/commands/
 .claude/settings.local.json
 cv/cv_base.json
 cv/profile.json
