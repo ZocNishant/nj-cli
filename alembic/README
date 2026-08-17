@@ -1,0 +1,39 @@
+Database migrations for nj-cli (SQLite via SQLAlchemy).
+
+CONNECTION
+    The URL is not in alembic.ini. env.py builds it from the environment:
+        NJ_ALEMBIC_URL   full URL, wins when set (use for scratch databases)
+        NJ_DB_PATH       path only, defaults to data/nj.db
+
+COMMON COMMANDS
+    poetry run alembic upgrade head        apply everything outstanding
+    poetry run alembic current             what this database is at
+    poetry run alembic check               is the ORM ahead of the migrations?
+    poetry run alembic downgrade -1        roll back one revision
+
+ADDING A MIGRATION
+    1. Change nj/db/models.py.
+    2. poetry run alembic revision --autogenerate -m "what changed"
+    3. poetry run ruff format alembic/      (alembic's generated body is not
+       ruff-format clean; the template header already is)
+    4. Read the generated file. Autogenerate does not detect renames — it emits
+       a drop plus an add, which loses the column's data. Rewrite those by hand.
+    5. poetry run pytest tests/unit/test_migrations.py
+
+    tests/unit/test_migrations.py fails if you skip step 2, so drift cannot
+    reach main unnoticed.
+
+AN EXISTING DATABASE
+    Databases created before Alembic was introduced already have their tables,
+    so `upgrade head` would fail trying to create them again. Mark such a
+    database as current instead, once:
+
+        poetry run alembic stamp head
+
+    data/nj.db was stamped at the baseline revision on 2026-08-17.
+
+SQLITE
+    SQLite cannot ALTER a column, so env.py sets render_as_batch=True and
+    Alembic rebuilds the table instead. This is already configured; you do not
+    need to do anything for it, but it is why generated migrations that touch
+    columns are wrapped in batch_alter_table blocks.
