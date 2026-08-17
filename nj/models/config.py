@@ -9,8 +9,22 @@ from nj.models.score import DEFAULT_WEIGHTS
 
 
 class LLMConfig(BaseModel):
+    """LLM routing.
+
+    Work is tiered by how much the output quality matters. Bulk job scoring runs
+    on the cheap model because it only has to rank; anything that ends up in
+    front of a recruiter runs on a stronger one.
+    """
+
     provider: str = "claude"
-    model: str = "claude-sonnet-4-20250514"
+    # Default/fallback model when a task-specific tier is not set.
+    model: str = "claude-sonnet-5"
+    # Bulk scoring: dozens to hundreds of calls per run, output is a ranking.
+    scoring_model: str = "claude-haiku-4-5"
+    # CV tailoring and cover letters: this is what a human actually reads.
+    tailoring_model: str = "claude-sonnet-5"
+    # Diagnosis, interview prep, project framing: a few calls, highest stakes.
+    reasoning_model: str = "claude-opus-5"
     api_key: str = ""
     freellmapi_base_url: str = "http://localhost:3001/v1"
     freellmapi_api_key: str = ""
@@ -29,14 +43,17 @@ class VisaConfig(BaseModel):
     status: str = "OPT"
     h1b_future: bool = True
     skip_no_sponsorship: bool = True
-    include_keywords: list[str] = ["OPT", "CPT", "H1B", "visa sponsorship", "sponsor"]
-    exclude_keywords: list[str] = [
-        "no sponsorship",
-        "citizen only",
-        "green card only",
-        "must be authorized",
-        "no visa",
-    ]
+    # Both lists are literal-substring overrides layered on top of the
+    # negation-aware patterns in nj/scoring/visa_filter.py. Leave them empty
+    # unless you hit a posting the classifier gets wrong — a loose keyword here
+    # silently overrides the phrase matching for every job.
+    #
+    # "must be authorized" used to live in exclude_keywords and was dropping
+    # sponsoring employers wholesale: nearly every US posting says it, and it is
+    # satisfied by OPT. "sponsor" used to live in include_keywords and matched
+    # "we do not sponsor". Both are now handled by phrase patterns instead.
+    include_keywords: list[str] = []
+    exclude_keywords: list[str] = []
 
 
 class ScoringConfig(BaseModel):
@@ -93,7 +110,7 @@ class Config(BaseModel):
     scraper: ScraperConfig = ScraperConfig()
 
     @classmethod
-    def load(cls, path: str = "config.yaml") -> "Config":
+    def load(cls, path: str = "config.yaml") -> Config:
         p = Path(path)
         if not p.exists():
             return cls()
