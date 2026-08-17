@@ -1,6 +1,10 @@
 .env
 config.yaml
-.claude/
+# Claude Code: track the shared config and hooks, ignore personal overrides.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/settings.local.json
 cv/cv_base.json
 cv/profile.json
 cookies/

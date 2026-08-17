@@ -37,8 +37,11 @@ pytest = ">=8.0"
 pytest-asyncio = ">=0.23"
 respx = ">=0.21"
 pytest-mock = ">=3.14"
-ruff = ">=0.4"
-black = ">=24.0"
+# CI runs `pytest --cov`, which needs the plugin, not just the coverage lib.
+pytest-cov = ">=5.0"
+# Pinned: ruff's default rule set changes between minor versions, so an
+# unpinned range means CI can start failing on a commit that changed nothing.
+ruff = "==0.15.14"
 mypy = ">=1.10"
 coverage = ">=7.0"
 pre-commit = "^4.6.0"
@@ -50,6 +53,17 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# Stated explicitly rather than inherited, so a ruff upgrade changes the
+# pinned version deliberately instead of silently widening what CI enforces.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+ignore = [
+    "B008",  # typer declares defaults via function calls in signatures
+    # Deliberate deferrals, not permanent exemptions:
+    "UP042",  # str+Enum -> StrEnum; mechanical but touches every Pydantic model
+    "B904",   # `raise ... from err`; worth doing, no behavioural impact
+]
 
 [tool.mypy]
 python_version = "3.11"
