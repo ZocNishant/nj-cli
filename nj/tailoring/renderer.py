@@ -17,12 +17,88 @@ class RendererError(Exception):
     pass
 
 
+class PageBudgetError(RendererError):
+    """The compiled PDF ran past its page budget.
+
+    Carries `pdf_path` because the file is deliberately left on disk: the
+    operator needs to look at the overflow to decide what to cut.
+    """
+
+    def __init__(self, message: str, pdf_path: str, pages: int, max_pages: int):
+        super().__init__(message)
+        self.pdf_path = pdf_path
+        self.pages = pages
+        self.max_pages = max_pages
+
+
+# A CV that spills onto a third page is a formatting failure, not a longer CV:
+# the overflow is usually two orphan lines, and it reads as carelessness.
+DEFAULT_MAX_PAGES = 2
+
+
+def page_count(pdf_path: str) -> int | None:
+    """Pages in a PDF, or None if it cannot be read.
+
+    None is a real answer, not an error: a caller that cannot count pages must
+    not conclude the document is within budget, and must not throw away an
+    otherwise valid PDF either.
+    """
+    try:
+        from pypdf import PdfReader
+
+        return len(PdfReader(pdf_path).pages)
+    except Exception as e:
+        logger.warning("pdf_page_count_failed", path=pdf_path, error=str(e))
+        return None
+
+
+def verify_page_budget(
+    pdf_path: str,
+    max_pages: int | None = DEFAULT_MAX_PAGES,
+    reference_pages: int | None = None,
+) -> int | None:
+    """Check a compiled PDF against its page budget.
+
+    `reference_pages` is the base CV's own page count, when the caller knows it:
+    tailoring reorders and compresses, so the tailored PDF should come out the
+    same length as the base one. It tightens the budget but never loosens it —
+    a base CV that is somehow four pages does not license a four-page tailored
+    CV.
+
+    Returns the page count (or None if unreadable). Raises PageBudgetError when
+    the document is over budget.
+    """
+    pages = page_count(pdf_path)
+    if pages is None or max_pages is None:
+        return pages
+
+    budget = max_pages
+    if reference_pages is not None and 0 < reference_pages < budget:
+        budget = reference_pages
+
+    if pages > budget:
+        logger.error("pdf_page_budget_exceeded", path=pdf_path, pages=pages, budget=budget)
+        raise PageBudgetError(
+            f"CV compiled to {pages} pages, budget is {budget}. "
+            f"Orphan spillover reads as carelessness to a recruiter — cut a "
+            f"bullet or tighten the summary. Overflowing PDF kept at {pdf_path}",
+            pdf_path=pdf_path,
+            pages=pages,
+            max_pages=budget,
+        )
+
+    logger.info("pdf_page_budget_ok", path=pdf_path, pages=pages, budget=budget)
+    return pages
+
+
 def render_cv(
     cv_data: dict,
     template_path: str,
     output_dir: str,
     company: str,
     job_title: str,
+    max_pages: int | None = DEFAULT_MAX_PAGES,
+    reference_pages: int | None = None,
 ) -> str:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     template = Path(template_path).read_text(encoding="utf-8")
@@ -63,6 +139,10 @@ def render_cv(
         except Exception as e:
             logger.warning("tailored_cv_json_save_failed", error=str(e))
 
+        # Verified after the copy, so an over-budget PDF is still on disk for
+        # the operator to inspect when this raises.
+        verify_page_budget(str(pdf_dst), max_pages=max_pages, reference_pages=reference_pages)
+
         logger.info("pdf_rendered", path=str(pdf_dst))
         return str(pdf_dst)
 
@@ -72,6 +152,23 @@ def _safe_filename(text: str) -> str:
     return safe[:30].strip("_")
 
 
+# URLs land inside \href{...}, where escaping would corrupt the link but a stray
+# brace or backslash would end the argument and start executing. Allow-list the
+# characters a URL legitimately needs and drop the rest.
+_URL_ALLOWED = re.compile(r"[^A-Za-z0-9\-._~:/?#\[\]@!$'()*+,;=%]")
+
+
+def _safe_url(url: str) -> str:
+    """Strip anything from a URL that could break out of \\href{...}.
+
+    Escaping is not an option here — `\\_` inside an href is a broken link, not
+    an escaped underscore — so the defence is an allow-list instead.
+    """
+    if not url:
+        return ""
+    return _URL_ALLOWED.sub("", str(url))
+
+
 def _fill_template(template: str, cv: dict) -> str:
     personal = cv.get("personal", {})
     replacements = {
@@ -79,8 +176,8 @@ def _fill_template(template: str, cv: dict) -> str:
         "%%LOCATION%%": escape_latex(personal.get("location", "")),
         "%%PHONE%%": escape_latex(personal.get("phone", "")),
         "%%EMAIL%%": escape_latex(personal.get("email", "")),
-        "%%LINKEDIN%%": personal.get("linkedin", ""),
-        "%%GITHUB%%": personal.get("github", ""),
+        "%%LINKEDIN%%": _safe_url(personal.get("linkedin", "")),
+        "%%GITHUB%%": _safe_url(personal.get("github", "")),
         "%%SUMMARY_BLOCK%%": _render_summary(cv.get("summary", "")),
         "%%EDUCATION_BLOCK%%": _render_education(cv.get("education", [])),
         "%%SKILLS_BLOCK%%": _render_skills(cv.get("skills", {})),
@@ -90,7 +187,7 @@ def _fill_template(template: str, cv: dict) -> str:
         "%%PROJECTS_BLOCK%%": _render_projects(cv.get("projects", [])),
         "%%MEMBERSHIPS_BLOCK%%": _render_memberships(cv.get("memberships", [])),
         "%%CERTIFICATIONS_BLOCK%%": _render_certifications(cv.get("certifications", [])),
-        "%%SOFT_SKILLS%%": " $|$ ".join(cv.get("soft_skills", [])),
+        "%%SOFT_SKILLS%%": " $|$ ".join(escape_latex(s) for s in cv.get("soft_skills", [])),
     }
     result = template
     for placeholder, value in replacements.items():
@@ -149,7 +246,10 @@ def _render_skills(skills: dict) -> str:
     for key, items in skills.items():
         if not items:
             continue
-        label = SKILL_LABELS.get(key, key.replace("_", " ").title())
+        # Known labels are trusted LaTeX (they contain intentional `\&`). An
+        # unknown key came from the CV JSON, so it is escaped like any other
+        # dynamic string.
+        label = SKILL_LABELS.get(key) or escape_latex(str(key).replace("_", " ").title())
         items_str = escape_latex(", ".join(items))
         lines.append(f"\\textbf{{{label}}}{{: {items_str}}} \\\\")
     return "\n".join(lines)

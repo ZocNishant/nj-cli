@@ -33,6 +33,9 @@ beautifulsoup4 = ">=4.12"
 openai = ">=1.0.0"
 scikit-learn = ">=1.3.0"
 scipy = ">=1.11.0"
+# Reads the page count back out of the PDF tectonic produced, so a CV that
+# spilled onto a third page is caught before it is emailed to a recruiter.
+pypdf = ">=4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"
