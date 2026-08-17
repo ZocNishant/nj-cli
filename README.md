@@ -4,17 +4,17 @@
    ███╗   ██╗     ██╗
    ████╗  ██║     ██║     career intelligence
    ██╔██╗ ██║     ██║     anti-hallucination by design
-   ██║╚██╗██║██   ██║     
-   ██║ ╚████║╚█████╔╝     
-   ╚═╝  ╚═══╝ ╚════╝      
+   ██║╚██╗██║██   ██║
+   ██║ ╚████║╚█████╔╝
+   ╚═╝  ╚═══╝ ╚════╝
 ```
 
 # nj — AI Career Operating System
 
-**An open-source AI career intelligence platform for ML/AI/CV engineers.**  
+**An open-source AI career intelligence platform for ML/AI/CV engineers.**
 Not a job application bot. Not a resume spinner. A career reasoning system.
 
-[![Tests](https://img.shields.io/badge/tests-347%20passing-brightgreen)](https://github.com/ZocNishant/nj-cli)
+[![Tests](https://img.shields.io/badge/tests-553%20passing-brightgreen)](https://github.com/ZocNishant/nj-cli)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.2.0-cyan)](https://github.com/ZocNishant/nj-cli/releases)
@@ -40,14 +40,14 @@ Most AI career tools hallucinate. nj does not.
 
 ```
 nj (claude) > diagnose    # why am I not getting interviews
-nj (claude) > gaps        # what should I learn — ranked by ROI  
+nj (claude) > gaps        # what should I learn — ranked by ROI
 nj (claude) > search      # find and score 100+ ML jobs
 nj (claude) > explain     # why did this job score 78?
 nj (claude) > prep        # I have an interview tonight
 nj (claude) > exit
 ```
 
-Launch `nj` and you're in a full interactive shell — msfconsole style.  
+Launch `nj` and you're in a full interactive shell — msfconsole style.
 Every command available from the prompt. No flags to memorize.
 
 ---
@@ -71,7 +71,7 @@ Every command available from the prompt. No flags to memorize.
 | Arbeitnow | None — free API | Remote + EU tech |
 | JSearch | RapidAPI key (free tier) | 30+ boards: LinkedIn, Indeed, Glassdoor, ZipRecruiter... |
 | Adzuna | Free API key | 15+ aggregated sources |
-| LinkedIn | Session cookie | Highest ML job volume |
+| LinkedIn | Session cookie | **Disabled by default** — scraping breaches LinkedIn's ToS and risks your account |
 | USAJobs | Free API key (opt-in) | Government + research ML roles |
 
 ### AI Scoring
@@ -91,7 +91,7 @@ Every command available from the prompt. No flags to memorize.
 - Cover letter generation (3-paragraph, 250 words max)
 
 ### Application Pipeline
-- Human review queue before any application (Phase 1 default)
+- Human review queue before any application (Phase 1 — the only implemented mode)
 - Quality gate blocks bad applications before submission
 - Rate limiting (5-7 applications/day max)
 - Email notification with tailored CV attached
@@ -158,11 +158,15 @@ System:          init  logs  config  demo  help  exit
 
 nj uses phased automation — trust is earned before autonomy is granted.
 
-| Phase | Mode | How to unlock |
-|-------|------|---------------|
-| 1 (default) | Score + tailor + human review | Default |
-| 2 | Semi-auto — you approve each | `automation_phase: 2` in config |
-| 3 | Full auto with quality gate | `automation_phase: 3` in config |
+| Phase | Mode | Status |
+|-------|------|--------|
+| 1 (default) | Score + tailor + human review, you submit | **Implemented** |
+| 2 | Semi-auto — nj submits, you approve each | Not implemented |
+| 3 | Full auto behind the quality gate | Not implemented |
+
+Phases 2 and 3 are design, not code: `nj/applying/linkedin_easy.py` is a stub.
+Setting `automation_phase` higher than 1 changes no behaviour today. Everything
+nj produces is written to `output/` for you to submit yourself.
 
 **What is NEVER automated regardless of phase:**
 - Resume factual claims (validator enforces in code)
@@ -203,7 +207,7 @@ llm:
 
 | Provider | Status | Notes |
 |----------|--------|-------|
-| Claude (Anthropic) | ✅ Implemented | Default. Best quality. |
+| Claude (Anthropic) | ✅ Implemented | Default. Tiered: Haiku 4.5 scores, Sonnet 5 tailors, Opus 5 reasons. |
 | FreeLLMAPI | ✅ Implemented | Free local proxy, 14 providers |
 | OpenAI | 🔲 Interface ready | See `docs/adding-a-provider.md` |
 
@@ -224,14 +228,15 @@ nj/
                 cover_letter, prep_generator
   providers/    BaseLLMProvider, Claude, OpenAI-compatible
   prompts/      versioned prompt modules (scoring_v1, tailoring_v1...)
-  db/           SQLAlchemy + repository pattern
+  db/           SQLAlchemy + repository pattern (schema via create_all;
+                Alembic is a dependency but no migrations exist yet)
   diagnostics/  CV diagnosis engine + PDF renderer
   analytics/    skill_gaps, outcome_feedback
   integrations/ gmail_watcher
 ```
 
 Key decisions:
-- **Repository pattern** — swap SQLite for Postgres with zero app changes
+- **Repository pattern** — isolates SQL behind repos so the storage engine can change
 - **Provider abstraction** — switch LLM with one config line
 - **Versioned prompts** — every score stores its prompt version for reproducibility
 - **Anti-hallucination as code** — not a prompt instruction, a separate validator
@@ -279,7 +284,7 @@ poetry run pytest tests/unit/              # unit only
 NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_regression.py
 ```
 
-347 tests · 3 skipped (regression, require API key) · 0 warnings
+553 tests · 3 skipped (prompt-regression, opt-in via `NJ_RUN_REGRESSION_TESTS`)
 
 ---
 
@@ -287,7 +292,7 @@ NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_reg
 
 - [x] Interactive msfconsole-style shell
 - [x] 7 job scrapers
-- [x] Explainable 6-sub-score AI scoring  
+- [x] Explainable 6-sub-score AI scoring
 - [x] Anti-hallucination CV tailoring
 - [x] CV diagnosis engine
 - [x] Skill gap analysis
@@ -295,7 +300,7 @@ NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_reg
 - [x] Gmail callback detection
 - [x] Outcome-calibrated threshold
 - [x] FreeLLMAPI support
-- [ ] Auto-apply Phase 2 (August 2026)
+- [ ] Auto-apply Phase 2 — not started
 - [ ] Web UI / self-hosted dashboard
 - [ ] PyPI publish
 - [ ] Glassdoor scraper
@@ -306,8 +311,8 @@ NJ_RUN_REGRESSION_TESTS=true poetry run pytest tests/integration/test_prompt_reg
 
 Apache 2.0 — see [LICENSE](LICENSE).
 
-Built by [Nishant Joshi](https://github.com/ZocNishant) · 
-[LinkedIn](https://linkedin.com/in/nishant-joshi) · 
+Built by [Nishant Joshi](https://github.com/ZocNishant) ·
+[LinkedIn](https://linkedin.com/in/nishant-joshi) ·
 [GitHub](https://github.com/ZocNishant)
 
 ---
