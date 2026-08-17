@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from nj.prompts.untrusted import UNTRUSTED_INPUT_NOTICE, fence
+
 PROMPT_VERSION = "prep_v1"
 
 SYSTEM_PROMPT = """You are an expert technical interview coach \
@@ -71,6 +73,11 @@ Generate exactly:
 - Complete quick reference section"""
 
 
+# This prompt receives a scraped job posting, so it carries the shared
+# instruction for handling text inside <job_description> tags.
+SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + UNTRUSTED_INPUT_NOTICE
+
+
 def build_user_prompt(
     job_title: str,
     job_company: str,
@@ -79,8 +86,6 @@ def build_user_prompt(
     score_result: dict | None = None,
 ) -> str:
     import json
-
-    from nj.utils.text import truncate
 
     score_context = ""
     if score_result:
@@ -104,7 +109,7 @@ CANDIDATE CV:
 {cv_json}
 
 JOB DESCRIPTION:
-{truncate(job_description, 2500)}
+{fence(job_description, 2500)}
 
 Generate comprehensive interview prep following the JSON schema.
 Base all answers on the candidate's actual CV — never invent experience.

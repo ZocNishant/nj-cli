@@ -66,8 +66,6 @@ def build_user_prompt(
 ) -> str:
     import json
 
-    from nj.utils.text import truncate
-
     cv_json = json.dumps(cv_base, indent=2)[:5000]
 
     score_context = ""
@@ -80,18 +78,12 @@ def build_user_prompt(
                 if cat not in avg_by_category:
                     avg_by_category[cat] = []
                 avg_by_category[cat].append(sub.get("score", 0))
-        cat_avgs = {
-            k: round(sum(v) / len(v))
-            for k, v in avg_by_category.items()
-        }
+        cat_avgs = {k: round(sum(v) / len(v)) for k, v in avg_by_category.items()}
         score_context = (
             f"\nSCORING DATA ({len(recent_scores)} jobs scored):\n"
             f"Average total score: {avg_total:.1f}/100\n"
             f"Average by category:\n"
-            + "\n".join(
-                f"  {k}: {v}/100"
-                for k, v in sorted(cat_avgs.items(), key=lambda x: x[1])
-            )
+            + "\n".join(f"  {k}: {v}/100" for k, v in sorted(cat_avgs.items(), key=lambda x: x[1]))
         )
 
     graph_section = ""
@@ -100,7 +92,7 @@ def build_user_prompt(
 
     return f"""Diagnose this candidate's CV for ML/AI/CV engineering roles.
 
-TARGET ROLES: {', '.join(target_roles)}
+TARGET ROLES: {", ".join(target_roles)}
 
 CANDIDATE CV:
 {cv_json}

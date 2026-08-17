@@ -52,6 +52,7 @@ def render_cv(
 
         # Save tailored CV JSON for nj diff
         import json as _json
+
         json_dst = Path(output_dir) / f"{filename}.json"
         try:
             json_dst.write_text(
@@ -88,9 +89,7 @@ def _fill_template(template: str, cv: dict) -> str:
         "%%RESEARCH_INTERESTS%%": _render_research(cv.get("research_interests", [])),
         "%%PROJECTS_BLOCK%%": _render_projects(cv.get("projects", [])),
         "%%MEMBERSHIPS_BLOCK%%": _render_memberships(cv.get("memberships", [])),
-        "%%CERTIFICATIONS_BLOCK%%": _render_certifications(
-            cv.get("certifications", [])
-        ),
+        "%%CERTIFICATIONS_BLOCK%%": _render_certifications(cv.get("certifications", [])),
         "%%SOFT_SKILLS%%": " $|$ ".join(cv.get("soft_skills", [])),
     }
     result = template
@@ -123,9 +122,7 @@ def _render_education(education: list) -> str:
         else:
             continue
         lines.append(
-            f"\\resumeSubheading\n"
-            f"  {{{inst}}}{{{loc}}}\n"
-            f"  {{{degree}}}{{{start} -- {end}}}"
+            f"\\resumeSubheading\n  {{{inst}}}{{{loc}}}\n  {{{degree}}}{{{start} -- {end}}}"
         )
         if courses:
             lines.append("  \\resumeItemListStart")
@@ -179,9 +176,7 @@ def _render_experience(experience: list) -> str:
             bullets = getattr(exp, "bullets", [])
 
         lines.append(
-            f"\\resumeSubheading\n"
-            f"  {{{title}}}{{{start} -- {end}}}\n"
-            f"  {{{company}}}{{{location}}}"
+            f"\\resumeSubheading\n  {{{title}}}{{{start} -- {end}}}\n  {{{company}}}{{{location}}}"
         )
         if status == "incoming":
             lines.append("  \\resumeItemListStart")
@@ -190,7 +185,7 @@ def _render_experience(experience: list) -> str:
         elif bullets:
             lines.append("  \\resumeItemListStart")
             for bullet in bullets:
-                lines.append(f"    \\resumeItem{{{bullet}}}")
+                lines.append(f"    \\resumeItem{{{escape_latex(bullet)}}}")
             lines.append("  \\resumeItemListEnd")
     return "\n".join(lines)
 
@@ -213,7 +208,7 @@ def _render_projects(projects: list) -> str:
         if bullets:
             lines.append("  \\resumeItemListStart")
             for bullet in bullets:
-                lines.append(f"    \\resumeItem{{{bullet}}}")
+                lines.append(f"    \\resumeItem{{{escape_latex(bullet)}}}")
             lines.append("  \\resumeItemListEnd")
     return "\n".join(lines)
 

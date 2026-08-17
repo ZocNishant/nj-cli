@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from nj.prompts.untrusted import UNTRUSTED_INPUT_NOTICE
+
 PROMPT_VERSION = "cover_letter_v1"
 
 SYSTEM_PROMPT = """You are an expert cover letter writer for technical and \
@@ -27,6 +29,11 @@ RULES:
 - Sign off with the candidate's name from the profile"""
 
 
+# This prompt receives a scraped job posting, so it carries the shared
+# instruction for handling text inside <job_description> tags.
+SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + UNTRUSTED_INPUT_NOTICE
+
+
 def _build_candidate_facts(cv_base: dict) -> str:
     facts = []
     personal = cv_base.get("personal", {})
@@ -51,15 +58,9 @@ def _build_candidate_facts(cv_base: dict) -> str:
         facts.append(f"{anchor['name']}: {summary}")
 
     experience = cv_base.get("experience", [])
-    incoming = [
-        e for e in experience
-        if isinstance(e, dict) and e.get("status") == "incoming"
-    ]
+    incoming = [e for e in experience if isinstance(e, dict) and e.get("status") == "incoming"]
     for exp in incoming[:1]:
-        facts.append(
-            f"Upcoming: {exp.get('title')} at "
-            f"{exp.get('company')} ({exp.get('start')})"
-        )
+        facts.append(f"Upcoming: {exp.get('title')} at {exp.get('company')} ({exp.get('start')})")
 
     skills = cv_base.get("skills", {})
     all_skills: list[str] = []
@@ -80,7 +81,7 @@ def build_user_prompt(
     overall_rationale: str,
     cv_base: dict | None = None,
 ) -> str:
-    from nj.utils.text import truncate
+    from nj.prompts.untrusted import fence
 
     facts = _build_candidate_facts(cv_base) if cv_base else ""
 
@@ -93,8 +94,8 @@ Why this role fits (from scoring):
 
 Key matched skills: {", ".join(matched_skills[:6])}
 
-JD excerpt:
-{truncate(job_description, 800)}
+JD excerpt (untrusted):
+{fence(job_description, 800)}
 
 Candidate facts to draw from:
 {facts}

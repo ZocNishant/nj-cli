@@ -89,3 +89,28 @@ def test_rate_limiter_remaining_never_negative() -> None:
 async def test_rate_limiter_wait_completes() -> None:
     rl = RateLimiter(delay_min=0, delay_max=0)
     await rl.wait()
+
+
+def test_rate_limiter_counts_from_db_when_repo_given():
+    """The daily cap must survive a process restart, or `nj run` x3 sends 3x."""
+
+    class FakeRepo:
+        def __init__(self, n):
+            self.n = n
+
+        def count_today(self):
+            return self.n
+
+    assert RateLimiter(max_per_day=5, repo=FakeRepo(4)).can_apply() is True
+    assert RateLimiter(max_per_day=5, repo=FakeRepo(5)).can_apply() is False
+    assert RateLimiter(max_per_day=5, repo=FakeRepo(2)).remaining_today() == 3
+
+
+def test_rate_limiter_fails_closed_if_the_count_errors():
+    """A DB failure must not read as 'zero sent today'."""
+
+    class BrokenRepo:
+        def count_today(self):
+            raise RuntimeError("db gone")
+
+    assert RateLimiter(max_per_day=5, repo=BrokenRepo()).can_apply() is False
