@@ -29,7 +29,7 @@ def run_tailor(
     from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
     from nj.tailoring.cover_letter import generate_and_save_cover_letter
-    from nj.tailoring.renderer import render_cv
+    from nj.tailoring.renderer import PageBudgetError, render_cv
     from nj.tailoring.tailor import tailor_cv
 
     cv_path = Path("cv/cv_base.json")
@@ -65,11 +65,15 @@ def run_tailor(
     )
 
     provider = get_provider(config.llm, task="tailoring")
+    # Audits the drafter's output on the cheap tier before anything is rendered.
+    review_provider = get_provider(config.llm, task="review")
     console.print("[dim]Scoring...[/dim]")
     result = asyncio.run(score_job(job, cv_base, config, provider, repo=None))
 
-    console.print("[dim]Tailoring CV...[/dim]")
-    tailored_cv, _ = asyncio.run(tailor_cv(job, result, cv_base, config, provider))
+    console.print("[dim]Tailoring CV (draft → adversarial review)...[/dim]")
+    tailored_cv, cover_letter = asyncio.run(
+        tailor_cv(job, result, cv_base, config, provider, review_provider=review_provider)
+    )
 
     template_path = "templates/cv_template.tex"
     pdf_path = None
@@ -83,11 +87,22 @@ def run_tailor(
                 job_title=job.title,
             )
             console.print(f"[green]CV rendered:[/green] {pdf_path}")
+        except PageBudgetError as e:
+            # The PDF exists and is worth looking at — it just runs long. Say so
+            # distinctly, or this reads as a compile failure.
+            console.print(
+                f"[yellow]CV ran to {e.pages} pages (budget {e.max_pages}).[/yellow] "
+                f"Not attached. Trim it and re-run: {e.pdf_path}"
+            )
         except Exception as e:
             console.print(f"[yellow]PDF render failed:[/yellow] {e}")
 
+    # Saves the letter that already went through the reviewer, rather than
+    # paying for a second, unreviewed one.
     cover_path = asyncio.run(
-        generate_and_save_cover_letter(job, result, cv_base, provider, output_dir)
+        generate_and_save_cover_letter(
+            job, result, cv_base, provider, output_dir, content=cover_letter
+        )
     )
     console.print(f"[green]Cover letter:[/green] {cover_path}")
 

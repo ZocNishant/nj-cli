@@ -18,11 +18,22 @@ async def generate_and_save_cover_letter(
     cv_base: dict,
     provider: BaseLLMProvider,
     output_dir: str,
+    content: str | None = None,
 ) -> str:
+    """Write the cover letter for one job to disk and return its path.
+
+    `content` lets a caller save a letter that has already been drafted and
+    reviewed. Without it this generates a fresh one, which is both a second
+    paid call and — more to the point — a letter that never went past the
+    reviewer. Callers that ran `tailor_cv` should pass its letter through.
+    """
     from nj.prompts import cover_letter_v1
     from nj.providers.base import LLMRequest
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    if content is not None and content.strip():
+        return _save(job, content.strip(), output_dir)
 
     try:
         user_prompt = cover_letter_v1.build_user_prompt(
@@ -31,10 +42,9 @@ async def generate_and_save_cover_letter(
             job_description=job.description,
             matched_skills=score.matched_skills,
             overall_rationale=score.overall_rationale,
-            cv_base=cv_base,
         )
         request = LLMRequest(
-            system=cover_letter_v1.SYSTEM_PROMPT,
+            system=cover_letter_v1.build_system_prompt(cv_base),
             user=user_prompt,
             max_tokens=600,
             temperature=0.5,
@@ -46,6 +56,11 @@ async def generate_and_save_cover_letter(
         logger.warning("cover_letter_generation_failed", error=str(e))
         content = _fallback_cover_letter(job, score)
 
+    return _save(job, content, output_dir)
+
+
+def _save(job: Job, content: str, output_dir: str) -> str:
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     safe_company = _safe_filename(job.company)
     safe_title = _safe_filename(job.title)
     date_str = datetime.now(UTC).strftime("%Y%m%d")

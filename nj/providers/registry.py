@@ -8,6 +8,7 @@ from nj.providers.base import BaseLLMProvider
 _TASK_MODEL_FIELDS = {
     "scoring": "scoring_model",
     "tailoring": "tailoring_model",
+    "review": "review_model",
     "reasoning": "reasoning_model",
 }
 
@@ -16,8 +17,9 @@ def resolve_model(config: LLMConfig, task: str | None = None) -> str:
     """Pick the model for a task, falling back to the generic one.
 
     Tasks are coarse on purpose: `scoring` is high-volume and disposable,
-    `tailoring` produces what a recruiter reads, `reasoning` is low-volume and
-    high-stakes. See LLMConfig for the defaults behind each.
+    `tailoring` produces what a recruiter reads, `review` audits that output on
+    the cheap tier, `reasoning` is low-volume and high-stakes. See LLMConfig for
+    the defaults behind each.
     """
     field = _TASK_MODEL_FIELDS.get(task or "")
     if field:
