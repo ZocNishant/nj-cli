@@ -220,6 +220,23 @@ def label(
 
 
 @app.command()
+def reclassify(
+    db_path: str = typer.Option("data/nj.db", "--db"),
+    config_path: str = typer.Option("config.yaml", "--config"),
+    apply: bool = typer.Option(
+        False, "--apply", help="Write the new labels. Without this, nothing is changed."
+    ),
+    sample: int = typer.Option(10, "--sample", help="How many changed jobs to show"),
+) -> None:
+    """Re-derive stored visa labels with the current classifier (dry run by default)."""
+    from nj.cli.cmd_reclassify import run_reclassify
+    from nj.models.config import Config
+
+    config = Config.load(config_path)
+    run_reclassify(config=config, db_path=db_path, apply=apply, sample=sample)
+
+
+@app.command()
 def calibrate(
     db_path: str = typer.Option("data/nj.db", "--db"),
     config_path: str = typer.Option("config.yaml", "--config"),

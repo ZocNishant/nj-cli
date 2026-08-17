@@ -58,6 +58,26 @@ class JobRepo:
             if job:
                 job.status = status.value
 
+    def update_visa_labels(self, labels: dict[str, VisaLabel]) -> int:
+        """Rewrite stored visa labels in one transaction. Returns rows changed.
+
+        Bulk rather than per-job because the caller is re-deriving every label
+        from the current classifier: a partial write would leave the table
+        split between two classifier versions, which is worse than either one
+        alone. Rows whose label already matches are skipped so the count
+        reflects real changes.
+        """
+        if not labels:
+            return 0
+        changed = 0
+        with get_session(self.db_path) as session:
+            for job_id, label in labels.items():
+                job = session.get(JobORM, job_id)
+                if job is not None and job.visa_label != label.value:
+                    job.visa_label = label.value
+                    changed += 1
+        return changed
+
     def _to_model(self, orm: JobORM) -> Job:
         return Job(
             id=orm.id,
