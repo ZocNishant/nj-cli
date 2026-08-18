@@ -628,6 +628,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Adding a scraper:** extend `BaseScraper`, add tests, register in `_get_enabled_scrapers()`. See [docs/adding-a-scraper.md](docs/adding-a-scraper.md).
 - **Adding an LLM provider:** extend `BaseLLMProvider`, register in `registry.py`. See [docs/adding-a-provider.md](docs/adding-a-provider.md).
 - **Improving prompts:** all prompts in `nj/prompts/` are versioned modules. See [docs/prompt-engineering.md](docs/prompt-engineering.md).
+- **Understanding the system:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) covers every layer, both pipelines, the trust boundaries and the open structural backlog.
 
 ---
 
