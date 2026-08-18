@@ -120,6 +120,7 @@ def run_review(
     pending = pending[:limit]
     total = len(pending)
     applied = skipped = labeled = 0
+    approved_ids: list[tuple[str, str, str]] = []
 
     console.print(f"\n[bold]nj review[/bold] — {total} jobs in queue\n")
     console.print(
@@ -152,9 +153,15 @@ def run_review(
             console.print(key)
 
             if key == "a":
-                job_repo.update_job_status(job.id, JobStatus.TAILORED)
+                # Not TAILORED: approving generates nothing. Writing TAILORED
+                # here asserted a rendered CV that did not exist, and left the
+                # operator with rows labelled tailored and an empty output/.
+                job_repo.update_job_status(job.id, JobStatus.APPROVED_PENDING_TAILORING)
+                approved_ids.append((job.id, job.title, job.company))
                 console.print(
-                    f"  [green]Approved[/green] — {job.title} @ {job.company} added to apply queue."
+                    f"  [green]Approved[/green] — {job.title} @ {job.company}\n"
+                    f"  [dim]Nothing generated yet. To tailor it:[/dim] "
+                    f"nj tailor --job-id {job.id[:12]}"
                 )
                 applied += 1
                 break
@@ -206,6 +213,7 @@ def run_review(
             elif key == "q":
                 console.print("\n[dim]Review session ended.[/dim]")
                 _print_session_summary(applied, skipped, labeled, total)
+                _print_next_steps(approved_ids)
                 return
 
             else:
@@ -215,6 +223,23 @@ def run_review(
 
     console.print("\n[bold]Review complete.[/bold]")
     _print_session_summary(applied, skipped, labeled, total)
+    _print_next_steps(approved_ids)
+
+
+def _print_next_steps(approved: list[tuple[str, str, str]]) -> None:
+    """Spell out the command that turns an approval into an application.
+
+    Approving is a decision, not an artifact. Without this the session ends
+    with a count of approvals and no indication that anything further is
+    required, which is how the old TAILORED status read as "done".
+    """
+    if not approved:
+        return
+    console.print("\n[bold]Next:[/bold] tailor the jobs you approved — nothing is generated yet.")
+    for job_id, title, company in approved:
+        console.print(
+            f"  [cyan]nj tailor --job-id {job_id[:12]}[/cyan]  [dim]{title} @ {company}[/dim]"
+        )
 
 
 def _print_session_summary(
@@ -226,7 +251,7 @@ def _print_session_summary(
     table = Table(box=box.SIMPLE, show_header=False)
     table.add_column(width=20)
     table.add_column(width=10, justify="right")
-    table.add_row("Approved for apply", f"[green]{applied}[/green]")
+    table.add_row("Approved to tailor", f"[green]{applied}[/green]")
     table.add_row("Skipped", f"[red]{skipped}[/red]")
     table.add_row("Labeled", f"[blue]{labeled}[/blue]")
     table.add_row("Total reviewed", str(applied + skipped + labeled))

@@ -42,6 +42,24 @@ class ApplicationRepo:
                 q = q.filter(ApplicationRecordORM.status == status.value)
             return [self._to_model(r) for r in q.all()]
 
+    def get_by_job_id(self, job_id: str) -> ApplicationRecord | None:
+        """The most recent application for a job, or None.
+
+        `nj tailor` uses this to avoid writing a second row every time you
+        regenerate a packet for the same job: duplicates would inflate
+        `count_today()` and show the same application twice on the dashboard.
+        Ordered newest-first so a job that somehow has several rows resolves to
+        the one a human would mean.
+        """
+        with get_session(self.db_path) as session:
+            row = (
+                session.query(ApplicationRecordORM)
+                .filter(ApplicationRecordORM.job_id == job_id)
+                .order_by(ApplicationRecordORM.applied_at.desc().nullslast())
+                .first()
+            )
+            return self._to_model(row) if row else None
+
     def get_applications_with_outcomes(self) -> list[ApplicationRecord]:
         with get_session(self.db_path) as session:
             q = session.query(ApplicationRecordORM).filter(ApplicationRecordORM.outcome.isnot(None))

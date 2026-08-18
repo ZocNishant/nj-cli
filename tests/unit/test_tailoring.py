@@ -206,3 +206,201 @@ def test_extract_entities_finds_capitalized_words() -> None:
     assert "Nishant" in entities
     assert "Moffitt" in entities
     assert "96.11%" in entities
+
+
+# --- application logging ---------------------------------------------------
+#
+# `nj tailor` wrote the PDF, the letter and the JSON, and wrote nothing to the
+# applications table. The promotion path is
+# `nj status --update-id <id> --update-status submitted`, and that id was only
+# ever created by `cmd_run` — so the moment a human sent a tailored CV, the
+# system had no memory of it. No applied_at, so the daily cap counted zero; no
+# row on the dashboard; and nothing for an interview or rejection to attach to,
+# which is why the outcome analytics have never had data to read.
+
+
+def _repo(tmp_path):
+    from nj.db.repos.application_repo import ApplicationRepo
+
+    return ApplicationRepo(str(tmp_path / "apps.db"))
+
+
+def _record(repo, job=None, score=77, pdf="output/cv.pdf", cover="output/cv_cover.txt"):
+    from nj.cli.cmd_tailor import _record_application
+
+    _record_application(
+        app_repo=repo,
+        job=job or make_job(),
+        score=score,
+        pdf_path=pdf,
+        cover_path=cover,
+    )
+
+
+def test_a_rendered_packet_is_logged(tmp_path) -> None:
+    repo = _repo(tmp_path)
+    _record(repo)
+
+    apps = repo.get_applications()
+    assert len(apps) == 1
+    assert apps[0].job_id == make_job().id
+    assert apps[0].cv_path == "output/cv.pdf"
+    assert apps[0].cover_letter_path == "output/cv_cover.txt"
+    assert apps[0].score == 77
+
+
+def test_the_logged_row_is_generated_never_submitted(tmp_path) -> None:
+    """nj cannot send anything. Only a human promotes a row."""
+    from nj.models.application import ApplicationStatus
+
+    repo = _repo(tmp_path)
+    _record(repo)
+    assert repo.get_applications()[0].status is ApplicationStatus.GENERATED
+
+
+def test_applied_at_is_stamped_so_the_daily_cap_can_count_it(tmp_path) -> None:
+    """count_today() filters on applied_at; unset, max_per_day never fires."""
+    repo = _repo(tmp_path)
+    _record(repo)
+
+    assert repo.get_applications()[0].applied_at is not None
+    assert repo.count_today() == 1
+
+
+def test_the_row_carries_an_id_status_can_promote(tmp_path) -> None:
+    """The whole point: an id for --update-id to target."""
+    from nj.models.application import ApplicationStatus
+
+    repo = _repo(tmp_path)
+    _record(repo)
+
+    app_id = repo.get_applications()[0].id
+    repo.update_status(app_id, ApplicationStatus.SUBMITTED)
+    assert repo.get_applications()[0].status is ApplicationStatus.SUBMITTED
+
+
+def test_a_failed_render_is_not_logged_as_an_application(tmp_path) -> None:
+    """GENERATED asserts a CV is on disk. Without a PDF there is nothing to send."""
+    repo = _repo(tmp_path)
+    _record(repo, pdf=None)
+    assert repo.get_applications() == []
+
+
+def test_an_over_budget_render_is_not_logged(tmp_path) -> None:
+    """PageBudgetError leaves pdf_path unset — the file exists but is not sendable."""
+    repo = _repo(tmp_path)
+    _record(repo, pdf=None, cover="output/cv_cover.txt")
+    assert repo.count_today() == 0
+
+
+def test_a_missing_cover_letter_still_logs_the_cv(tmp_path) -> None:
+    """A letter can fail while the CV is perfectly sendable."""
+    repo = _repo(tmp_path)
+    _record(repo, cover=None)
+
+    apps = repo.get_applications()
+    assert len(apps) == 1
+    assert apps[0].cover_letter_path is None
+
+
+def test_retailoring_the_same_job_does_not_duplicate_the_row(tmp_path) -> None:
+    """Two rows would double-count against max_per_day and show twice on the
+    dashboard."""
+    repo = _repo(tmp_path)
+    _record(repo, pdf="output/v1.pdf", score=70)
+    _record(repo, pdf="output/v2.pdf", score=85)
+
+    apps = repo.get_applications()
+    assert len(apps) == 1
+    assert apps[0].cv_path == "output/v2.pdf"
+    assert apps[0].score == 85
+    assert repo.count_today() == 1
+
+
+def test_retailoring_never_retracts_a_submitted_application(tmp_path) -> None:
+    """A human asserted they sent this. Regenerating the packet must not
+    silently un-assert it."""
+    from nj.models.application import ApplicationStatus
+
+    repo = _repo(tmp_path)
+    _record(repo, pdf="output/v1.pdf")
+    app_id = repo.get_applications()[0].id
+    repo.update_status(app_id, ApplicationStatus.SUBMITTED)
+
+    _record(repo, pdf="output/v2.pdf")
+
+    apps = repo.get_applications()
+    assert len(apps) == 1
+    assert apps[0].status is ApplicationStatus.SUBMITTED
+    assert apps[0].cv_path == "output/v2.pdf"
+
+
+def test_two_different_jobs_get_two_rows(tmp_path) -> None:
+    """Deduplication is per job id, not global — make_job() pins one id, so
+    these have to be built separately."""
+    repo = _repo(tmp_path)
+
+    first = make_job(title="ML Engineer")
+    second = make_job(title="Research Engineer")
+    second.id = "test-id-2"
+
+    _record(repo, job=first)
+    _record(repo, job=second)
+
+    apps = repo.get_applications()
+    assert len(apps) == 2
+    assert {a.job_id for a in apps} == {"test-id", "test-id-2"}
+
+
+def test_get_by_job_id_returns_none_for_an_unknown_job(tmp_path) -> None:
+    assert _repo(tmp_path).get_by_job_id("no-such-job") is None
+
+
+def test_run_tailor_end_to_end_logs_the_application(tmp_path, monkeypatch) -> None:
+    """Drives run_tailor itself, not the helper.
+
+    The tests above call `_record_application` directly, so deleting the call
+    site from `run_tailor` — which *is* the original bug — leaves every one of
+    them green. This is the one that fails if the wiring goes away.
+    """
+    import json as _json
+
+    from nj.db.repos.application_repo import ApplicationRepo
+    from nj.db.repos.job_repo import JobRepo
+    from nj.models.application import ApplicationStatus
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "cv").mkdir()
+    (tmp_path / "cv" / "cv_base.json").write_text(_json.dumps(make_cv_base()))
+    (tmp_path / "templates").mkdir()
+    (tmp_path / "templates" / "cv_template.tex").write_text("stub")
+
+    db_path = str(tmp_path / "nj.db")
+    job = make_job()
+    JobRepo(db_path).save_job(job)
+
+    async def fake_score_job(*a, **k):
+        return make_score()
+
+    async def fake_tailor_cv(*a, **k):
+        return make_cv_base(), "Dear Hiring Manager, ..."
+
+    async def fake_cover(*a, **k):
+        return "output/letter.txt"
+
+    monkeypatch.setattr("nj.scoring.scorer.score_job", fake_score_job)
+    monkeypatch.setattr("nj.tailoring.tailor.tailor_cv", fake_tailor_cv)
+    monkeypatch.setattr("nj.tailoring.cover_letter.generate_and_save_cover_letter", fake_cover)
+    monkeypatch.setattr("nj.tailoring.renderer.render_cv", lambda **k: "output/cv.pdf")
+    monkeypatch.setattr("nj.providers.registry.get_provider", lambda *a, **k: object())
+
+    from nj.cli.cmd_tailor import run_tailor
+    from nj.models.config import Config
+
+    run_tailor(url=None, config=Config(), db_path=db_path, job_id=job.id)
+
+    apps = ApplicationRepo(db_path).get_applications()
+    assert len(apps) == 1, "run_tailor produced a packet but logged no application"
+    assert apps[0].status is ApplicationStatus.GENERATED
+    assert apps[0].cv_path == "output/cv.pdf"
+    assert apps[0].applied_at is not None

@@ -49,6 +49,78 @@ def _job_from_url(url: str, config: Config):
     )
 
 
+def _record_application(
+    app_repo,
+    job,
+    score: int,
+    pdf_path: str | None,
+    cover_path: str | None,
+) -> None:
+    """Log the generated packet so a human can later mark it sent.
+
+    Without this row there is no id for
+    `nj status --update-id <id> --update-status submitted`, so the moment you
+    send the CV the system has no memory of it: nothing counts against
+    `apply.max_per_day`, nothing appears on the dashboard, and there is no
+    record for an interview or rejection to attach to — which is why the
+    outcome analytics have never had data to read.
+
+    Three rules, each load-bearing:
+
+    * **No PDF, no row.** `ApplicationStatus.GENERATED` asserts that a CV and
+      letter are on disk. If the render failed or ran past the page budget
+      there is nothing to send, and a row claiming otherwise is the exact lie
+      the GENERATED/SUBMITTED split exists to prevent.
+    * **Never SUBMITTED.** nj cannot send anything; only a human promotes a row.
+    * **A human's promotion is never undone.** Re-tailoring a job you have
+      already sent refreshes the paths and the score but leaves the status
+      alone. Overwriting SUBMITTED with GENERATED would silently retract an
+      application you actually made.
+    """
+    from datetime import UTC, datetime
+
+    from nj.models.application import ApplicationRecord, ApplicationStatus
+
+    if not pdf_path:
+        logger.info("application_not_recorded_no_pdf", job_id=job.id)
+        return
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    existing = app_repo.get_by_job_id(job.id)
+
+    if existing is not None:
+        # Same status back in: update_status writes the paths and score without
+        # touching a verdict a human already gave.
+        app_repo.update_status(
+            existing.id,
+            existing.status,
+            cv_path=pdf_path,
+            cover_letter_path=cover_path,
+            score=score,
+            applied_at=existing.applied_at or now,
+        )
+        console.print(
+            f"[dim]Application record updated:[/dim] [bold]{existing.id}[/bold] "
+            f"([bold]{existing.status.value}[/bold])"
+        )
+        return
+
+    record = ApplicationRecord.create(job.id, score)
+    record.cv_path = pdf_path
+    record.cover_letter_path = cover_path
+    record.status = ApplicationStatus.GENERATED
+    # count_today() filters on applied_at; unset, the daily cap counts zero.
+    record.applied_at = now
+    app_repo.save_application(record)
+
+    console.print(
+        f"[green]Logged as[/green] [bold]{record.id}[/bold] "
+        f"[dim](generated — nothing sent)[/dim]\n"
+        f"[dim]After you send it:[/dim] "
+        f"nj status --update-id {record.id} --update-status submitted"
+    )
+
+
 def run_tailor(
     url: str | None,
     config: Config,
@@ -56,6 +128,7 @@ def run_tailor(
     output_dir: str = "output",
     job_id: str | None = None,
 ) -> None:
+    from nj.db.repos.application_repo import ApplicationRepo
     from nj.db.repos.job_repo import JobRepo
     from nj.providers.registry import get_provider
     from nj.scoring.scorer import score_job
@@ -90,6 +163,12 @@ def run_tailor(
         except Exception as e:
             console.print(f"[red]Failed to fetch URL:[/red] {e}")
             return
+        # Stored so the application row written below has a job to resolve
+        # against — `nj status` looks the title and company up by job_id, and a
+        # dangling reference degrades to a blank line. The id is derived from
+        # the URL, so re-running on the same posting updates rather than
+        # duplicates.
+        JobRepo(db_path).save_job(job)
 
     provider = get_provider(config.llm, task="tailoring")
     # Audits the drafter's output on the cheap tier before anything is rendered.
@@ -137,6 +216,14 @@ def run_tailor(
         # No file is written in this case, by design. Say so, or the operator
         # sends the CV believing a letter went with it.
         console.print("[yellow]Cover letter failed — no file written.[/yellow] See logs.")
+
+    _record_application(
+        app_repo=ApplicationRepo(db_path),
+        job=job,
+        score=result.total_score,
+        pdf_path=pdf_path,
+        cover_path=cover_path,
+    )
 
     if config.notify.email_to:
         from nj.notify.email import EmailNotifier

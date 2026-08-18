@@ -70,7 +70,8 @@ def run_quality_check(
         if not tailored:
             console.print(
                 "[yellow]No tailored jobs found.[/yellow]\n"
-                "Run [bold]nj review[/bold] and approve jobs first."
+                "Approving in [bold]nj review[/bold] does not generate anything — "
+                "run [bold]nj tailor --job-id <id>[/bold] to produce a CV to check."
             )
             return
         console.print(f"\n[bold]Checking {len(tailored)} tailored jobs...[/bold]\n")
