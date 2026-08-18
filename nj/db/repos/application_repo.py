@@ -4,7 +4,12 @@ from datetime import UTC, date, datetime
 
 from nj.db.engine import get_session
 from nj.db.models import ApplicationRecordORM
-from nj.models.application import ApplicationRecord, ApplicationStatus, OutcomeType
+from nj.models.application import (
+    ACTIVE_APPLICATION_STATUSES,
+    ApplicationRecord,
+    ApplicationStatus,
+    OutcomeType,
+)
 
 
 class ApplicationRepo:
@@ -43,13 +48,20 @@ class ApplicationRepo:
             return [self._to_model(r) for r in q.all()]
 
     def count_today(self) -> int:
+        """Applications whose CV and letter were produced today.
+
+        Counts GENERATED as well as SUBMITTED. The daily cap exists to bound
+        work — every row here cost a tailoring and a review call — and nj never
+        writes SUBMITTED on its own, so counting only SUBMITTED would leave
+        `apply.max_per_day` permanently at zero and the cap unenforced.
+        """
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
         with get_session(self.db_path) as session:
             return (
                 session.query(ApplicationRecordORM)
                 .filter(
-                    ApplicationRecordORM.status == ApplicationStatus.SUBMITTED.value,
+                    ApplicationRecordORM.status.in_([s.value for s in ACTIVE_APPLICATION_STATUSES]),
                     ApplicationRecordORM.applied_at >= start_of_day,
                 )
                 .count()

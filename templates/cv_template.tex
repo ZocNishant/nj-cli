@@ -1,0 +1,148 @@
+%% nj-cli CV template
+%%
+%% Contract: nj/tailoring/renderer.py::_fill_template does a literal string
+%% replace of each double-percent-delimited token below. Every key in that dict
+%% must appear here or its content is silently dropped from the PDF.
+%%
+%% NOTE: the substitution is a blind string replace over this entire file,
+%% comments included. Never write a placeholder token in a comment — it will be
+%% expanded into live LaTeX in the middle of the commented-out region.
+%%
+%% Two blocks emit their own \section header and must NOT be wrapped here: the
+%% SUMMARY block (emits \section{Summary} plus its own itemize) and the GAP
+%% block (emits its own \section plus its own subheading-list wrapper).
+%% The rest emit bare content and are wrapped below.
+%%
+%% The list macros below are deliberately \begingroup/\endgroup rather than
+%% itemize environments. The _render_* helpers emit nothing at all for an empty
+%% section, and an empty itemize is a LaTeX error ("Something's wrong--perhaps a
+%% missing \item"). A group is a no-op when empty, so a CV with no projects or
+%% no certifications still compiles. \resumeItem draws its own bullet for the
+%% same reason: it is emitted both inside a list (experience bullets) and bare
+%% (gap, certifications, memberships).
+
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage[empty]{fullpage}
+\usepackage[hidelinks]{hyperref}
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{latexsym}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Tight margins: the renderer enforces a 2-page budget via verify_page_budget().
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.6in}
+\addtolength{\textwidth}{1.2in}
+\addtolength{\topmargin}{-0.7in}
+\addtolength{\textheight}{1.4in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+\setlength{\parindent}{0pt}
+
+\titleformat{\section}{\vspace{-6pt}\scshape\raggedright\large}
+  {}{0em}{}[\color{black}\titlerule\vspace{-4pt}]
+
+%% ---------- macros the renderer's output depends on ----------
+
+\newcommand{\resumeSubHeadingListStart}{\begingroup}
+\newcommand{\resumeSubHeadingListEnd}{\endgroup\vspace{2pt}}
+\newcommand{\resumeItemListStart}{\begingroup}
+\newcommand{\resumeItemListEnd}{\endgroup\vspace{2pt}}
+
+\newcommand{\resumeItem}[1]{%
+  \par\noindent\hangindent=1.3em\hspace*{0.7em}\textbullet\hspace{0.5em}%
+  \small #1\par\vspace{1pt}%
+}
+
+% \resumeSubheading{title}{dates}{company}{location}   (experience)
+% \resumeSubheading{institution}{location}{degree}{dates}  (education)
+\newcommand{\resumeSubheading}[4]{%
+  \vspace{5pt}\par\noindent
+  \begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{#1} & \small #2 \\
+    \textit{\small #3} & \textit{\small #4} \\
+  \end{tabular*}\par\vspace{-2pt}%
+}
+
+\newcommand{\resumeProjectHeading}[2]{%
+  \vspace{4pt}\par\noindent
+  \begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    #1 & \small #2 \\
+  \end{tabular*}\par\vspace{-2pt}%
+}
+
+\begin{document}
+
+%% ---------- header ----------
+\begin{center}
+  {\Huge \scshape %%NAME%%} \\ \vspace{4pt}
+  \small
+  %%LOCATION%% $|$
+  %%PHONE%% $|$
+  \href{mailto:%%EMAIL%%}{\underline{%%EMAIL%%}} $|$
+  \href{%%LINKEDIN%%}{\underline{LinkedIn}} $|$
+  \href{%%GITHUB%%}{\underline{GitHub}}
+\end{center}
+
+%% Emits its own \section{Summary}. Empty string when the CV has no summary.
+%%SUMMARY_BLOCK%%
+
+\section{Education}
+\resumeSubHeadingListStart
+%%EDUCATION_BLOCK%%
+\resumeSubHeadingListEnd
+
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    %%SKILLS_BLOCK%%
+    \mbox{}
+  }}
+\end{itemize}
+%% \mbox{} above is load-bearing: _render_skills terminates EVERY line with \\,
+%% including the last one, and a trailing \\ with nothing after it raises
+%% "There's no line here to end". The empty box gives that break a target.
+
+\section{Experience}
+\resumeSubHeadingListStart
+%%EXPERIENCE_BLOCK%%
+\resumeSubHeadingListEnd
+
+\section{Projects}
+\resumeSubHeadingListStart
+%%PROJECTS_BLOCK%%
+\resumeSubHeadingListEnd
+
+%% Emits its own \section and list wrapper. Empty string when gap_explanation
+%% is absent from the CV JSON.
+%%GAP_BLOCK%%
+
+%% The four blocks below each emit their own \section and list wrapper, and
+%% collapse to the empty string when the CV has nothing for them. A bare
+%% \section here instead would print a heading with a rule and no content
+%% whenever a section is absent -- which is exactly what shipped when a CV
+%% dropped research_interests and soft_skills.
+%%RESEARCH_BLOCK%%
+
+%%CERTIFICATIONS_BLOCK%%
+
+%%MEMBERSHIPS_BLOCK%%
+
+%%SOFT_SKILLS_BLOCK%%
+
+\end{document}

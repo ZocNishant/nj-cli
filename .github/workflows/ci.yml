@@ -33,6 +33,23 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction
 
+      # tectonic is not a Python package, so `poetry install` cannot supply it.
+      # nj/tailoring/renderer.py shells out to it, and cmd_run swallows a render
+      # failure as a logger.warning — so without this step a broken CV template
+      # looks like a successful run that happens to produce no PDF.
+      #
+      # Installed from the upstream release rather than apt: tectonic is not in
+      # noble proper, only noble-updates/backports, so `apt-get install` is not
+      # a stable contract. The musl build is statically linked and pinned.
+      - name: Install tectonic
+        env:
+          TECTONIC_VERSION: "0.17.0"
+        run: |
+          curl -fsSL \
+            "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            | sudo tar xz -C /usr/local/bin tectonic
+          tectonic --version
+
       - name: Lint
         run: poetry run ruff check nj/ tests/
 
@@ -40,6 +57,12 @@ jobs:
         run: poetry run ruff format --check nj/ tests/
 
       - name: Run tests
+        # NJ_REQUIRE_TECTONIC turns "tectonic is missing" from a skip into a
+        # failure. The template compile tests skip on a laptop without a LaTeX
+        # toolchain, which is right for local work and wrong for CI — a silently
+        # skipped check is how the 0-byte template survived for months.
+        env:
+          NJ_REQUIRE_TECTONIC: "1"
         # cov-fail-under is a ratchet, not a target: it sits just under actual
         # coverage so a PR that drops it fails, and is raised deliberately as
         # coverage improves. It was set to 70 against real coverage of 56, which

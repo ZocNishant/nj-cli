@@ -144,14 +144,24 @@ def _get_quick_stats(db_path: str) -> str:
                     ).scalar()
                     or 0
                 )
+                # Tracked separately from `apps` so the banner never calls a
+                # rendered-but-unsent draft an application.
+                drafts = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM applications WHERE status='generated'")
+                    ).scalar()
+                    or 0
+                )
                 scores = conn.execute(text("SELECT COUNT(*) FROM score_results")).scalar() or 0
-                if jobs == 0 and apps == 0:
+                if jobs == 0 and apps == 0 and drafts == 0:
                     return ""
                 parts = []
                 if jobs > 0:
                     parts.append(f"{jobs} jobs tracked")
                 if scores > 0:
                     parts.append(f"{scores} scored")
+                if drafts > 0:
+                    parts.append(f"{drafts} ready to send")
                 if apps > 0:
                     parts.append(f"{apps} applied")
                 return " · ".join(parts)

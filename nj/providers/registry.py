@@ -8,6 +8,7 @@ from nj.providers.base import BaseLLMProvider
 _TASK_MODEL_FIELDS = {
     "scoring": "scoring_model",
     "tailoring": "tailoring_model",
+    "review": "review_model",
     "reasoning": "reasoning_model",
 }
 
@@ -16,8 +17,9 @@ def resolve_model(config: LLMConfig, task: str | None = None) -> str:
     """Pick the model for a task, falling back to the generic one.
 
     Tasks are coarse on purpose: `scoring` is high-volume and disposable,
-    `tailoring` produces what a recruiter reads, `reasoning` is low-volume and
-    high-stakes. See LLMConfig for the defaults behind each.
+    `tailoring` produces what a recruiter reads, `review` audits that output on
+    the cheap tier, `reasoning` is low-volume and high-stakes. See LLMConfig for
+    the defaults behind each.
     """
     field = _TASK_MODEL_FIELDS.get(task or "")
     if field:
@@ -49,8 +51,15 @@ def get_provider(config: LLMConfig, task: str | None = None) -> BaseLLMProvider:
         else:
             base_url = "https://api.openai.com/v1"
             api_key = os.getenv("OPENAI_API_KEY") or config.api_key
-            model = config.model
+            # Tiered like the Claude path. This used to read config.model for
+            # every task, which silently collapsed scoring, tailoring, review
+            # and reasoning onto one model — and made the reviewer the same
+            # model as the drafter, which is the one thing the drafter-reviewer
+            # split exists to prevent.
+            model = resolve_model(config, task)
 
         return OpenAICompatibleProvider(api_key=api_key, base_url=base_url, model=model)
 
-    raise ValueError(f"Unknown LLM provider: '{config.provider}'. Available: claude, freellmapi")
+    raise ValueError(
+        f"Unknown LLM provider: '{config.provider}'. Available: claude, openai, freellmapi"
+    )

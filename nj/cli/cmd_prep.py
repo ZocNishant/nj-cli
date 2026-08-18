@@ -174,12 +174,17 @@ def _prep_from_last(db_path: str) -> tuple:
     from datetime import datetime
 
     from nj.db.repos.application_repo import ApplicationRepo
-    from nj.models.application import ApplicationStatus
+    from nj.models.application import ACTIVE_APPLICATION_STATUSES
 
     app_repo = ApplicationRepo(db_path)
-    apps = app_repo.get_applications(status=ApplicationStatus.SUBMITTED)
+    all_apps = app_repo.get_applications()
+    # Prep for the last application that actually produced something — sent or
+    # merely rendered. Filtering in Python rather than by a single status so a
+    # GENERATED row still counts; the old SUBMITTED-only query fell through to
+    # "any row at all", which could prep you for a job skipped on visa.
+    apps = [a for a in all_apps if a.status in ACTIVE_APPLICATION_STATUSES]
     if not apps:
-        apps = app_repo.get_applications()
+        apps = all_apps
     if not apps:
         console.print("[yellow]No applications found.[/yellow]")
         return None, None

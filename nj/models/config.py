@@ -23,6 +23,10 @@ class LLMConfig(BaseModel):
     scoring_model: str = "claude-haiku-4-5"
     # CV tailoring and cover letters: this is what a human actually reads.
     tailoring_model: str = "claude-sonnet-5"
+    # Adversarial review of a tailored draft. One or two calls per application,
+    # and the task is narrow — find claims the base CV does not support — so the
+    # cheap tier is the right one. It advises; it never gets a veto.
+    review_model: str = "claude-haiku-4-5"
     # Diagnosis, interview prep, project framing: a few calls, highest stakes.
     reasoning_model: str = "claude-opus-5"
     api_key: str = ""

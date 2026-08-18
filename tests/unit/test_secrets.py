@@ -78,13 +78,22 @@ def test_check_all_reports_status_without_exposing_values(monkeypatch):
     report = check_all()
     keys = {r["key"] for r in report}
     assert "ANTHROPIC_API_KEY" in keys
-    assert "LINKEDIN_LI_AT" in keys
+    assert "OPENAI_API_KEY" in keys
 
     # No entry may carry the value itself.
     assert "supersecret" not in str(report)
     anthropic = next(r for r in report if r["key"] == "ANTHROPIC_API_KEY")
     assert anthropic["set"] is True
-    assert anthropic["required"] is True
+
+
+def test_the_linkedin_cookie_is_not_offered_as_a_key_to_set() -> None:
+    """Nothing reads it, so prompting for it only invites live-token exposure.
+
+    `LinkedInScraper` is an inert stub and both CLI entry points stopped
+    constructing it, so a cookie set here would sit in `.env` unused — a full
+    session token for the account the operator job-hunts from.
+    """
+    assert "LINKEDIN_LI_AT" not in {r["key"] for r in check_all()}
 
 
 def test_check_all_marks_unset_keys(monkeypatch):

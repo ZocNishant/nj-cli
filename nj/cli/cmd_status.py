@@ -19,6 +19,8 @@ console = Console()
 STATUS_COLORS = {
     "submitted": "green",
     "applied": "green",
+    # Yellow, not green: work is done but the application is not out the door.
+    "generated": "yellow",
     "interview": "blue",
     "pending": "yellow",
     "failed": "red",
@@ -117,7 +119,12 @@ def _print_stats(applications: list) -> None:
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
 
+    # "submitted" is what a human confirmed they sent. "generated" is a CV and
+    # letter waiting in output/ for that to happen. They are counted separately
+    # on purpose: rolling them together is how a pile of unsent drafts starts
+    # reading as a week of applications.
     submitted = [a for a in applications if a.status.value in ("submitted", "applied")]
+    generated = [a for a in applications if a.status.value == "generated"]
     this_week = [
         a for a in submitted if a.applied_at and a.applied_at.replace(tzinfo=UTC) >= week_ago
     ]
@@ -130,6 +137,11 @@ def _print_stats(applications: list) -> None:
     stats = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
     stats.add_column(width=28, style="dim")
     stats.add_column(width=10, justify="right")
+    if generated:
+        stats.add_row(
+            "Generated, not yet sent",
+            f"[yellow]{len(generated)}[/yellow]",
+        )
     stats.add_row("Applied this week", str(len(this_week)))
     stats.add_row("Applied this month", str(len(this_month)))
     stats.add_row("Average score (applied)", f"{avg_score:.1f}")

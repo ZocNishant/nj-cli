@@ -23,7 +23,12 @@ and availability. Enthusiasm without begging. One sentence on next steps.
 RULES:
 - Maximum 250 words total
 - No bullet points
-- Address to "Hiring Manager" if no name known
+- Open with "Dear <name>," or "Dear Hiring Manager," if no name is known
+- Close with "Sincerely," then the candidate's name
+
+LAYOUT — plain text, not prose run together:
+Greeting on its own line, blank line, then each paragraph separated by a blank
+line, then a blank line, "Sincerely,", and the name on the final line.
 - Never mention the word "passionate"
 - Only use facts from the candidate profile provided
 - Sign off with the candidate's name from the profile"""
@@ -37,6 +42,12 @@ SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + UNTRUSTED_INPUT_NOTICE
 def _build_candidate_facts(cv_base: dict) -> str:
     facts = []
     personal = cv_base.get("personal", {})
+
+    # First, because the system prompt instructs the model to sign off with it.
+    # Omitting it did not produce an unsigned letter — it produced one signed
+    # "[Candidate Name]", which reads as a mail merge that failed.
+    if personal.get("name"):
+        facts.append(f"Candidate name (sign the letter with this): {personal['name']}")
 
     visa_status = personal.get("visa_status", "")
     work_auth = personal.get("work_authorization", "")
@@ -57,10 +68,22 @@ def _build_candidate_facts(cv_base: dict) -> str:
         summary = bullets[0][:100] if bullets else ""
         facts.append(f"{anchor['name']}: {summary}")
 
-    experience = cv_base.get("experience", [])
-    incoming = [e for e in experience if isinstance(e, dict) and e.get("status") == "incoming"]
-    for exp in incoming[:1]:
-        facts.append(f"Upcoming: {exp.get('title')} at {exp.get('company')} ({exp.get('start')})")
+    # Most recent roles first, whatever their status. This used to select only
+    # `status == "incoming"`, so the day an internship finished it vanished from
+    # every cover letter — the candidate's only professional experience, dropped
+    # by the field that was supposed to highlight it.
+    experience = [e for e in cv_base.get("experience", []) if isinstance(e, dict)]
+    for exp in experience[:2]:
+        when = (
+            f"starting {exp.get('start')}"
+            if exp.get("status") == "incoming"
+            else f"{exp.get('start')} to {exp.get('end')}"
+        )
+        line = f"{exp.get('title')} at {exp.get('company')} ({when})"
+        bullets = exp.get("bullets") or []
+        if bullets:
+            line += f" -- {bullets[0][:220]}"
+        facts.append(line)
 
     skills = cv_base.get("skills", {})
     all_skills: list[str] = []
@@ -73,6 +96,29 @@ def _build_candidate_facts(cv_base: dict) -> str:
     return "\n".join(f"- {f}" for f in facts)
 
 
+def build_system_prompt(cv_base: dict | None = None) -> str:
+    """The instructions plus the candidate's facts — the operator-authored turn.
+
+    Same split as `tailoring_v1.build_system_prompt`: the candidate's facts are
+    the operator's, the job posting is not, and they belong in different turns.
+    A cover letter is signed by the candidate and read by a human, so a fact the
+    posting managed to inject here is a lie the candidate has put their name to.
+    """
+    if not cv_base:
+        return SYSTEM_PROMPT
+
+    facts = _build_candidate_facts(cv_base)
+    if not facts:
+        return SYSTEM_PROMPT
+
+    return (
+        SYSTEM_PROMPT
+        + "\n\nCANDIDATE FACTS — the only facts you may assert about this "
+        + "person. Do not add to them.\n"
+        + facts
+    )
+
+
 def build_user_prompt(
     job_title: str,
     job_company: str,
@@ -81,9 +127,14 @@ def build_user_prompt(
     overall_rationale: str,
     cv_base: dict | None = None,
 ) -> str:
-    from nj.prompts.untrusted import fence
+    """The task and the untrusted posting. Deliberately carries no CV content.
 
-    facts = _build_candidate_facts(cv_base) if cv_base else ""
+    `cv_base` is accepted and ignored so existing call sites keep working; the
+    candidate's facts belong in `build_system_prompt`.
+    """
+    del cv_base
+
+    from nj.prompts.untrusted import fence
 
     return f"""Write a cover letter for this application.
 
@@ -97,7 +148,5 @@ Key matched skills: {", ".join(matched_skills[:6])}
 JD excerpt (untrusted):
 {fence(job_description, 800)}
 
-Candidate facts to draw from:
-{facts}
-
+Draw only on the candidate facts given in your system prompt.
 Write the 3-paragraph cover letter now. Plain text only, no formatting."""

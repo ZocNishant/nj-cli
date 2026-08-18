@@ -64,9 +64,9 @@ def build_user_prompt(
     recent_scores: list[dict] | None = None,
     graph_context: str = "",
 ) -> str:
-    import json
+    from nj.prompts.cv_context import render_cv_for_prompt
 
-    cv_json = json.dumps(cv_base, indent=2)[:5000]
+    cv_json = render_cv_for_prompt(cv_base)
 
     score_context = ""
     if recent_scores:

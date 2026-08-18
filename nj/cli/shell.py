@@ -81,6 +81,7 @@ class NJCompleter:
         "tailor": [],
         "review": [],
         "label": [],
+        "reclassify": ["--apply", "--sample"],
         "quality": [],
         "watch": ["--setup", "--days"],
         "init": ["--force"],
@@ -221,6 +222,7 @@ SHELL_COMMANDS = {
     "status": "Application tracker dashboard",
     "calibrate": "Tune score threshold",
     "label": "Label jobs for calibration dataset",
+    "reclassify": "Re-derive stored visa labels with the current classifier",
     "quality": "Run quality gate on tailored applications",
     "watch": "Check Gmail for interview callbacks",
     "ml": "ML models — sponsorship, salary, semantic",
@@ -372,6 +374,14 @@ def _get_stats() -> dict:
                     ).scalar()
                     or 0
                 )
+                # Rendered but not sent. Kept out of "applied" deliberately —
+                # see ApplicationStatus.GENERATED.
+                stats["ready"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM applications WHERE status='generated'")
+                    ).scalar()
+                    or 0
+                )
                 stats["interviews"] = (
                     conn.execute(
                         text(
@@ -407,6 +417,10 @@ def _render_splash(stats: dict, version: str) -> None:
             stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['jobs']}[/bold] [dim]jobs[/dim]")
         if stats.get("scored", 0) > 0:
             stat_parts.append(f"[cyan]◆[/cyan] [bold]{stats['scored']}[/bold] [dim]scored[/dim]")
+        if stats.get("ready", 0) > 0:
+            stat_parts.append(
+                f"[yellow]◆[/yellow] [bold]{stats['ready']}[/bold] [dim]ready to send[/dim]"
+            )
         if stats.get("applied", 0) > 0:
             stat_parts.append(
                 f"[green]◆[/green] [bold]{stats['applied']}[/bold] [dim]applied[/dim]"
@@ -449,7 +463,7 @@ def _show_help() -> None:
             "intel",
             "ml",
         ],
-        "Job hunting": ["search", "run", "review", "tailor", "quality"],
+        "Job hunting": ["search", "run", "review", "tailor", "quality", "reclassify"],
         "Applications": ["status", "calibrate", "label", "watch", "prep"],
         "CV management": ["update-cv", "update-role"],
         "System": ["logs", "config", "manual", "demo", "help", "clear", "exit"],
@@ -498,6 +512,7 @@ def _dispatch(command: str, args: list[str], config) -> bool:
         "status": "nj.cli.cmd_status:run_status",
         "calibrate": "nj.cli.cmd_calibrate:run_calibrate",
         "label": "nj.cli.cmd_label:run_label",
+        "reclassify": "nj.cli.cmd_reclassify:run_reclassify",
         "quality": "nj.cli.cmd_quality:run_quality_check",
         "watch": "nj.cli.cmd_watch:run_watch",
         "ml": "nj.cli.cmd_ml:run_ml",
@@ -676,6 +691,18 @@ def _dispatch(command: str, args: list[str], config) -> bool:
             from nj.cli.cmd_postmortem import run_postmortem
 
             run_postmortem(config=config, min_applications=min_apps)
+            _show_success(command)
+            return True
+
+        if command == "reclassify":
+            sample_s = _get_flag(args, "--sample")
+            from nj.cli.cmd_reclassify import run_reclassify
+
+            run_reclassify(
+                config=config,
+                apply="--apply" in args,
+                sample=int(sample_s) if sample_s else 10,
+            )
             _show_success(command)
             return True
 

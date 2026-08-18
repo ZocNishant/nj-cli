@@ -32,6 +32,8 @@ scraper:
                                 # free tier: 10 searches/day; set JSEARCH_API_KEY in .env
 
   # Optional scrapers (disabled by default)
-  linkedin_enabled: true        # requires LINKEDIN_LI_AT cookie in .env
+  linkedin_enabled: false       # inert: nj/scrapers/linkedin.py is a stub that returns []
+                                # and no code path reads a session cookie. Cookie-driven
+                                # scraping risks a ban on the account you job-hunt from.
   usajobs_enabled: false        # USAJobs.gov — federal ML/AI roles; opt-in only
                                 # set USAJOBS_API_KEY + USAJOBS_USER_AGENT in .env

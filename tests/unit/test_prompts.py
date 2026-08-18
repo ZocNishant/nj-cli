@@ -113,7 +113,30 @@ def test_cover_letter_system_prompt_bans_passion() -> None:
     assert "3 paragraphs" in p or "3-paragraph" in p or "3 paragraph" in p
 
 
-def test_cover_letter_build_user_prompt_uses_cv_base() -> None:
+def test_cover_letter_system_prompt_carries_the_candidate_facts() -> None:
+    """The candidate's facts belong in the operator-authored turn."""
+    system = cover_letter_v1.build_system_prompt(_SAMPLE_CV)
+    assert "MedVision" in system
+    assert "F-1 OPT" in system
+    assert "Research Institute" in system
+
+
+def test_cover_letter_system_prompt_carries_the_candidate_name() -> None:
+    """The prompt tells the model to sign with the name, so the name must be there.
+
+    Without it a real letter shipped signed "[Candidate Name]".
+    """
+    system = cover_letter_v1.build_system_prompt(_SAMPLE_CV)
+    assert _SAMPLE_CV["personal"]["name"] in system
+
+
+def test_cover_letter_system_prompt_without_cv_is_the_bare_instructions() -> None:
+    assert cover_letter_v1.build_system_prompt(None) == cover_letter_v1.SYSTEM_PROMPT
+    assert cover_letter_v1.build_system_prompt({}) == cover_letter_v1.SYSTEM_PROMPT
+
+
+def test_cover_letter_user_prompt_keeps_cv_out_of_the_untrusted_turn() -> None:
+    """A posting must never share a turn with the facts it might try to amend."""
     prompt = cover_letter_v1.build_user_prompt(
         job_title="ML Engineer",
         job_company="DeepMind",
@@ -122,10 +145,36 @@ def test_cover_letter_build_user_prompt_uses_cv_base() -> None:
         overall_rationale="Strong CV match on computer vision.",
         cv_base=_SAMPLE_CV,
     )
-    assert "MedVision" in prompt
     assert "DeepMind" in prompt
-    assert "F-1 OPT" in prompt
-    assert "Research Institute" in prompt
+    assert "MedVision" not in prompt
+    assert "F-1 OPT" not in prompt
+    assert "Research Institute" not in prompt
+
+
+def test_tailoring_system_prompt_carries_the_cv() -> None:
+    system = tailoring_v1.build_system_prompt(_SAMPLE_CV)
+    assert "MedVision" in system
+    assert "Research Institute" in system
+    assert "anchor project" in system
+
+
+def test_tailoring_system_prompt_without_cv_is_the_bare_instructions() -> None:
+    assert tailoring_v1.build_system_prompt(None) == tailoring_v1.SYSTEM_PROMPT
+    assert tailoring_v1.build_system_prompt({}) == tailoring_v1.SYSTEM_PROMPT
+
+
+def test_tailoring_user_prompt_keeps_cv_out_of_the_untrusted_turn() -> None:
+    prompt = tailoring_v1.build_user_prompt(
+        job_title="CV Engineer",
+        job_company="Acme Corp",
+        job_description="We need OpenCV and PyTorch skills.",
+        score_result={"matched_skills": [], "missing_skills": [], "recommended_emphasis": []},
+        cv_base=_SAMPLE_CV,
+        keywords=["OpenCV"],
+    )
+    assert "Acme Corp" in prompt
+    assert "Research Institute" not in prompt
+    assert "State University" not in prompt
 
 
 def test_cover_letter_build_user_prompt_no_cv_base() -> None:
@@ -153,3 +202,29 @@ def test_prompt_versions_are_strings() -> None:
     assert isinstance(tailoring_v1.PROMPT_VERSION, str)
     assert isinstance(cover_letter_v1.PROMPT_VERSION, str)
     assert isinstance(intern_update_v1.PROMPT_VERSION, str)
+
+
+def test_cover_letter_facts_carry_completed_experience() -> None:
+    """A finished role is the candidate's evidence, not something to drop.
+
+    The selector once matched only `status == "incoming"`, so the day an
+    internship ended the letter lost every mention of professional experience.
+    """
+    cv = {
+        "personal": {"name": "Nishant Joshi"},
+        "experience": [
+            {
+                "title": "Graduate Student Intern",
+                "company": "Moffitt Cancer Center",
+                "start": "June 2026",
+                "end": "August 2026",
+                "status": "ended",
+                "bullets": ["Built and validated a transcriptomic ML pipeline."],
+            }
+        ],
+    }
+
+    system = cover_letter_v1.build_system_prompt(cv)
+
+    assert "Moffitt Cancer Center" in system
+    assert "transcriptomic" in system

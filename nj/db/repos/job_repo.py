@@ -39,6 +39,22 @@ class JobRepo:
         with get_session(self.db_path) as session:
             return session.get(JobORM, job_id) is not None
 
+    def get_job(self, job_id: str) -> Job | None:
+        """One job by id, or None. Accepts a unique id prefix.
+
+        The prefix form exists because these ids are 64-character hashes and
+        every path that shows one to a human truncates it.
+        """
+        with get_session(self.db_path) as session:
+            orm = session.get(JobORM, job_id)
+            if orm is not None:
+                return self._to_model(orm)
+
+            matches = session.query(JobORM).filter(JobORM.id.startswith(job_id)).limit(2).all()
+            if len(matches) == 1:
+                return self._to_model(matches[0])
+            return None
+
     def get_jobs(self, status: JobStatus | None = None) -> list[Job]:
         with get_session(self.db_path) as session:
             q = session.query(JobORM)
@@ -57,6 +73,26 @@ class JobRepo:
             job = session.get(JobORM, job_id)
             if job:
                 job.status = status.value
+
+    def update_visa_labels(self, labels: dict[str, VisaLabel]) -> int:
+        """Rewrite stored visa labels in one transaction. Returns rows changed.
+
+        Bulk rather than per-job because the caller is re-deriving every label
+        from the current classifier: a partial write would leave the table
+        split between two classifier versions, which is worse than either one
+        alone. Rows whose label already matches are skipped so the count
+        reflects real changes.
+        """
+        if not labels:
+            return 0
+        changed = 0
+        with get_session(self.db_path) as session:
+            for job_id, label in labels.items():
+                job = session.get(JobORM, job_id)
+                if job is not None and job.visa_label != label.value:
+                    job.visa_label = label.value
+                    changed += 1
+        return changed
 
     def _to_model(self, orm: JobORM) -> Job:
         return Job(
