@@ -146,3 +146,14 @@ output.
 - After `alembic revision --autogenerate`, run `ruff format alembic/` and read
   the generated file — autogenerate renders a rename as a drop plus an add,
   which silently loses that column's data.
+- `docs/ARCHITECTURE.md` is the system-design reference: layers, both pipelines,
+  the trust boundaries, the data model, and a ranked backlog of structural work
+  in its section 15. **Update it in the same PR as any change it describes** —
+  invariant sections (design stance, drafter/reviewer, trust boundaries,
+  application lifecycle) must be edited whenever that invariant moves, and the
+  Status column in section 15 ticked when an item lands. Its numbers are
+  measured, not estimated; re-run the commands in its "Maintaining this
+  document" section and bump `Last verified` rather than guessing. A browsable
+  copy is published at
+  <https://claude.ai/code/artifact/328ca114-f10c-46b4-9299-d147d631f6e1> —
+  republish that same URL, do not create a second artifact.
