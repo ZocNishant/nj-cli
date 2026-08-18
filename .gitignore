@@ -12,11 +12,14 @@ config.yaml
 !.claude/commands/
 !.claude/skills/
 .claude/settings.local.json
-# `.scratch/` holds the wayfinder maps and their decision tickets. Ignored
-# because this repo is public and the maps carry the operator's job-search
-# timeline and strategy — a plan of record, but a personal one.
+# `.scratch/` holds the wayfinder maps and their decision tickets, and
+# PROJECT_STATE.md is the operator's own working snapshot of blockers and next
+# steps. Both ignored because this repo is public and both carry the
+# operator's job-search timeline and strategy — a plan of record, but a
+# personal one.
 
 .scratch/
+PROJECT_STATE.md
 
 cv/cv_base.json
 cv/profile.json
