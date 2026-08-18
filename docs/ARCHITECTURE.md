@@ -1,6 +1,6 @@
 # nj-cli — Architecture and System Design
 
-**Last verified against the source: 2026-08-18** (nj-cli v1.2.0, commit `5a3e018`)
+**Last verified against the source: 2026-08-18** (nj-cli v1.2.0, after the backlog pass on branch `fix/architecture-backlog`)
 
 Published as a browsable page: <https://claude.ai/code/artifact/328ca114-f10c-46b4-9299-d147d631f6e1>
 
@@ -11,12 +11,12 @@ Published as a browsable page: <https://claude.ai/code/artifact/328ca114-f10c-46
 
 | | |
 |---|---|
-| Lines in `nj/` | 19,485 |
-| Modules / packages | 138 / 21 |
+| Lines in `nj/` | 19,852 |
+| Modules / packages | 138 / 22 |
 | Commands | 29 |
 | Tables | 9 |
-| Tests | 670 passing, 3 skipped |
-| Coverage | 59% (floor 55%) |
+| Tests | 751 passing, 3 skipped |
+| Coverage | 65% (floor 62%) |
 
 ---
 
@@ -84,10 +84,10 @@ share space with the record it would amend.
 
 ## 2 · System map
 
-The intended architecture is CLI → service orchestration → storage → provider
-integrations. Three of those four exist as code. **The orchestration layer does not:**
-it lives inside the command modules themselves, which is the largest structural finding
-in this document (see [C1](#c--architecture)).
+The architecture is CLI → service orchestration → storage → provider integrations, and
+as of the 2026-08-18 backlog pass all four exist as code. The orchestration layer used
+to live inside the command modules; it is now `nj/pipeline/`, and the commands parse
+arguments and print.
 
 ```mermaid
 flowchart TD
@@ -96,9 +96,10 @@ flowchart TD
     A2["nj.cli.shell<br/>REPL, completion, banner"]
   end
 
-  subgraph ORCH["ORCHESTRATION — lives inside the command modules"]
-    B1["cmd_run.py<br/>scrape · dedup · ghost · score · tailor · gate · record"]
-    B2["cmd_search.py<br/>scrape · ghost · enrich · score (concurrent) · display"]
+  subgraph ORCH["ORCHESTRATION — nj/pipeline/"]
+    B1["IngestService<br/>scrape · dedup · save · ghost · enrich"]
+    B2["ScoringService<br/>concurrency · retries · 429 backoff"]
+    B3["build_scrapers<br/>which sources are active"]
   end
 
   subgraph SVC["SERVICES"]
@@ -114,18 +115,20 @@ flowchart TD
 
   A1 --> ORCH
   A2 --> ORCH
+  B3 --> B1
   B1 --> C1
+  B2 --> C1
   B1 --> C2
   B1 --> C3
-  B2 --> C1
   C1 --> D1
   C2 --> D2
   C3 --> D1
 ```
 
-`cmd_run.py` (435 lines) and `cmd_search.py` (553 lines) *are* the orchestration, which
-is why they sit at 23% and 20% test coverage while the services beneath them average
-above 90%.
+`cmd_run.py` and `cmd_search.py` held 988 lines between them and *were* the
+orchestration, which is why they sat at 23% and 20% coverage while the services beneath
+them averaged above 90%. They are now 710 lines of argument handling and Rich output,
+and `nj/pipeline/` is at 90%.
 
 ---
 
@@ -133,30 +136,30 @@ above 90%.
 
 | Package | Responsibility | LOC | Cov. |
 |---|---|--:|--:|
-| `nj/cli` | Typer commands + the interactive REPL. Currently also the orchestration layer. | 8,692 | 35% |
+| `nj/cli` | Typer commands + the interactive REPL. Argument parsing and presentation only. | 8,420 | 43% |
 | `nj/tailoring` | Drafter, reviewer, the two blocking validators, section ranker, suppressor, LaTeX renderer, prep generator. | 1,867 | 92% |
 | `nj/prompts` | Versioned prompt builders, untrusted-input fencing, whole-CV serialisation. | 1,281 | 89% |
-| `nj/db` | Declarative ORM, engine/session helpers, 6 repositories. | 1,049 | 67% |
-| `nj/scrapers` | 8 sources behind `BaseScraper`. Adzuna, JSearch, USAJobs, RemoteOK, WeWorkRemotely, Arbeitnow, plus two inert stubs. | 920 | 85% |
-| `nj/scoring` | LLM scorer, ghost-job filter, negation-aware visa classifier, pre-submit quality gate, calibration display. | 922 | 79% |
+| `nj/db` | Declarative ORM, engine/session helpers, 6 repositories. One engine per database file. | 1,125 | 72% |
+| `nj/scrapers` | 8 sources behind `BaseScraper`. Async `scrape()`, blocking `fetch()`. | 943 | 85% |
+| `nj/scoring` | LLM scorer, ghost-job filter, negation-aware visa classifier, pre-submit quality gate, calibration display. | 939 | 79% |
 | `nj/models` | Pydantic v2 domain models: Job, ScoreResult, ApplicationRecord, ReviewReport, Config. | 660 | 99% |
 | `nj/analytics` | Outcome analysis, threshold optimisation, skill-gap ranking. | 659 | 96% |
 | `nj/ml` | Local models: sponsorship RandomForest, rule-based salary estimator, sentence-transformer similarity. | 634 | 56% |
 | `nj/graph` | Career knowledge graph — nodes and edges in the same SQLite file. | 494 | 71% |
-| `nj/providers` | `BaseLLMProvider`, Claude and OpenAI-compatible clients, task→model registry. | 382 | 96% |
+| `nj/pipeline` | **Orchestration.** `IngestService`, `ScoringService`, `build_scrapers`. | 364 | 90% |
+| `nj/providers` | `BaseLLMProvider`, Claude and OpenAI-compatible clients, task→model registry. | 454 | 97% |
 | `nj/intel` | USCIS H-1B ingestion and per-job enrichment fan-out. | 377 | 64% |
 | `nj/integrations` | Gmail watcher that reads interview signals back into outcomes. | 312 | 20% |
 | `nj/diagnostics` | CV diagnosis engine and its LaTeX report renderer. | 297 | 81% |
-| `nj/utils` | structlog setup, LaTeX escaping, pydantic-settings secrets, dedup. | 275 | 70% |
+| `nj/utils` | structlog setup, LaTeX escaping, pydantic-settings secrets, dedup, rate limiting. | 387 | 83% |
 | `nj/notify` | SMTP/SendGrid notifier and digest formatting. | 194 | 79% |
 | `nj/scheduler` | launchd on macOS, cron elsewhere. | 166 | 44% |
-| `nj/applying` | Rate limiter, plus the deliberately-raising Easy Apply stub. | 104 | 76% |
+| `nj/applying` | The deliberately-raising Easy Apply stub, and nothing else. | 41 | 0% |
 | `nj/demo`, `nj/plugins` | Offline sample data; an unimplemented plugin loader. | 200 | — |
 
-Four files are one-line `TODO: implement` stubs and carry no behaviour:
-`nj/utils/rate_limiter.py`, `nj/scoring/categories.py`, `nj/applying/base.py`,
-`nj/plugins/loader.py`. The real rate limiter lives in `nj/applying/anti_bot.py`, which
-is a misleading address for it.
+The `TODO: implement` stubs are gone, and `RateLimiter` moved from
+`nj/applying/anti_bot.py` — a module named for a concern the project abandoned — to
+`nj/utils/rate_limiter.py`.
 
 ---
 
@@ -178,73 +181,70 @@ startup fast across a surface this wide.
 
 ## 5 · The two pipelines
 
-`nj search` and `nj run` share their first three stages, then implement the same work
-twice with different properties. **Neither is a superset of the other**, so the choice
-of command silently changes what your jobs get.
+`nj search` and `nj run` share every stage they have in common — they call the same
+services now, so they cannot drift apart the way they had.
 
 ```mermaid
 flowchart TD
-  S1["scrape<br/><i>asyncio.gather over enabled scrapers ·<br/>each sync scrape() in asyncio.to_thread</i>"]
-  S2["deduplicate<br/><i>JobDeduplicator.filter_new — one job_exists() query per job, id only</i>"]
-  S3["ghost filter<br/><i>GhostJobFilter(max_age_days=45) — stale, spam, vague, unrealistic</i>"]
-  S1 --> S2 --> S3
+  SRC["build_scrapers(config)<br/><i>one registry, was duplicated in both commands</i>"]
+  S1["IngestService.collect()<br/><i>scrape (async gather) · dedup (one query, content-aware)<br/>· save · ghost filter</i>"]
+  S2["IngestService.enrich()<br/><i>sponsorship · salary · semantic · USCIS to job_enrichments</i>"]
+  S3["visa filter"]
+  S4["ScoringService.score_batch()<br/><i>Semaphore(5, or 2 on the gateway) · 3 attempts · 429 backoff</i>"]
+  SRC --> S1 --> S2 --> S3 --> S4
 
-  S3 --> L1
-  S3 --> R1
+  S4 --> L1
+  S4 --> R1
 
   subgraph LEFT["nj search"]
-    L1["<b>enrich</b><br/>sponsorship · salary · semantic · USCIS → job_enrichments"]
-    L2["visa filter<br/><i>blocked jobs dropped, nothing recorded</i>"]
-    L3["<b>score — concurrent</b><br/>Semaphore(5) · 3 attempts · backoff on 429"]
-    L4["status → PENDING_REVIEW<br/><i>ranked table printed</i>"]
-    L5["no application row is ever written"]
-    L1 --> L2 --> L3 --> L4 --> L5
+    L1["status to PENDING_REVIEW<br/><i>ranked table printed</i>"]
+    L2["no application row is written<br/><i>tailoring is nj tailor's job</i>"]
+    L1 --> L2
   end
 
   subgraph RIGHT["nj run"]
-    R1["visa filter<br/><i>blocked → SKIPPED_VISA row saved</i>"]
-    R2["<b>score — serial</b><br/>asyncio.run(score_job) inside a for loop"]
-    R3["threshold<br/><i>below scoring.threshold → SKIPPED_THRESHOLD row</i>"]
-    R4["<b>automation_phase == 1 → stop</b><br/><i>the configured value today</i>"]
-    R5["tailor → render → quality gate"]
-    R6["GENERATED + applied_at<br/><i>counts against apply.max_per_day · email digest</i>"]
-    R1 --> R2 --> R3 --> R4 --> R5 --> R6
+    R1["skips recorded<br/><i>SKIPPED_VISA / SKIPPED_THRESHOLD rows</i>"]
+    R2["--tailor?<br/><i>defaults to apply.tailor_unattended</i>"]
+    R3["tailor to render to quality gate"]
+    R4["GENERATED + applied_at<br/><i>counts against apply.max_per_day · email digest</i>"]
+    R1 --> R2 --> R3 --> R4
   end
 ```
 
-Four divergences, all consequential:
+What is left is a genuine difference in purpose, not an accident of which command got
+which improvement:
 
 | | `nj search` | `nj run` |
 |---|---|---|
-| Enrichment | Yes — writes `job_enrichments` | **No** |
-| Scoring | Concurrent, `Semaphore(5)`, 429 backoff | **Serial**, one event loop per job |
+| Enrichment | Yes | Yes |
+| Scoring | Concurrent, capped, 429 backoff | Identical — same service |
 | Skip reasons | Dropped silently | Recorded as `SKIPPED_VISA` / `SKIPPED_THRESHOLD` |
-| Tailoring | Never — that is `nj tailor`'s job | Yes, unless `automation_phase == 1` |
+| Tailoring | Never — that is `nj tailor`'s job | With `--tailor` or `apply.tailor_unattended` |
 
-With `automation_phase: 1` in the current `config.yaml`, **`nj run` stops before
-tailoring anything.**
-
----
+Four divergences were removed on 2026-08-18: a duplicated scraper registry, serial
+versus concurrent scoring, enrichment in only one command, and an opaque
+`automation_phase` integer that silently made `nj run` unable to produce a CV.
 
 ## 6 · Stage by stage
 
 ### 1 · Scrape
 
-`_get_enabled_scrapers()` assembles sources from config and environment: JSearch and
-Adzuna need API keys, RemoteOK / WeWorkRemotely / Arbeitnow need none, USAJobs needs a
+`build_scrapers()` in `nj/pipeline/sources.py` assembles sources from config and
+environment: JSearch and Adzuna need API keys, RemoteOK / WeWorkRemotely / Arbeitnow need none, USAJobs needs a
 key and a user-agent. If nothing qualifies it falls back to RemoteOK so a run never
-returns empty-handed for want of credentials. Each scraper is a sync `scrape()` pushed
-into a thread, and the set is gathered with `return_exceptions=True` — one dead source
-cannot take down a run. Every scraper builds a `Job` with
+returns empty-handed for want of credentials. `BaseScraper.scrape()` is async for every source;
+implementations supply blocking `fetch()`, which the base puts on a worker thread. The
+set is gathered with `return_exceptions=True` — one dead source cannot take down a run. Every scraper builds a `Job` with
 `id = sha256(company + title + url)` and classifies sponsorship at scrape time, writing
 `visa_label` into the row.
 
 ### 2 · Deduplicate
 
-`JobDeduplicator.filter_new` asks the database whether each id already exists. That id
-is a hash of company, title and URL, so the same posting syndicated to a second board
-is a different id and survives as a new job. `description_hash` is computed by every
-scraper and stored on every row, and **no code reads it** ([B3](#b--correctness)).
+`JobDeduplicator.filter_new` asks the database once for the whole batch — it used to ask
+once per job, each call opening a session. Two passes: known ids are dropped, then
+postings that are the same role reached by a different URL are collapsed on
+`description_hash`, falling back to normalised company+title for a board that reformats
+the body.
 
 ### 3 · Ghost filter
 
@@ -268,7 +268,9 @@ someone on OPT is authorized.
 
 ### 5 · Score
 
-One LLM call per job on the scoring tier. The system prompt carries the rubric, the six
+`ScoringService` scores the batch concurrently — five at a time, or two on the gateway
+provider whose free-tier backends rate-limit sooner — with three attempts and
+exponential backoff on 429. One LLM call per job on the scoring tier. The system prompt carries the rubric, the six
 weighted categories and the candidate profile — identical for every job in a run, and
 marked `cache_system=True`. The user turn carries only the fenced posting. The response
 is requested against `SCORE_SCHEMA`, parsed with a fence-tolerant fallback, and the
@@ -316,8 +318,8 @@ because escaping would corrupt `\href`.
 
 ### 9 · Gate and record
 
-`check_application_quality` runs seven checks — score threshold, sponsorship signals,
-seniority mismatch, banned cover-letter phrases, letter length, CV completeness, scoring
+`check_application_quality` runs seven checks — score threshold, sponsorship (delegated
+to `VisaFilter`, so the gate and the classifier cannot disagree), seniority mismatch, banned cover-letter phrases, letter length, CV completeness, scoring
 confidence. Only the first two block. A blocked application is saved as `FAILED` with
 the reason; an approved one is saved as `GENERATED` with `applied_at` stamped, which is
 what makes `apply.max_per_day` able to count it.
@@ -423,6 +425,9 @@ Work is tiered by how much the output quality matters. `resolve_model(config, ta
 reads a task name and returns the model for that tier, falling back to `config.model`.
 Every call site passes `task=`; nothing constructs a provider without one.
 
+All three provider paths tier — the gateway path used to read one field for every task,
+which made the reviewer the same model as the drafter.
+
 | Task | Volume | Default tier | Configured today |
 |---|---|---|---|
 | `scoring` | Dozens to hundreds per run | Haiku 4.5 | `gpt-5.4-mini` |
@@ -460,6 +465,20 @@ it *learns* two things at runtime and remembers them for the process:
 > cover letters for 600; both were consumed entirely by reasoning, both returned `""`,
 > and the JSON parser had nothing to salvage. Seven rows in `score_results` still carry
 > `total_score = 0` from that era.
+
+### Constrained decoding, finally enforced
+
+`LLMRequest` has carried `json_schema` and `response_format` since the schemas were
+written, and this provider dropped both. `complete()` now sends the strongest constraint
+the model has not refused and learns the ceiling the same way it learns everything else —
+from the first 400. The ladder is `json_schema` → `json_object` → nothing, and the bottom
+rung still works because the parser tolerates a fenced response. Text requests are left
+unconstrained: forcing JSON on a cover letter would corrupt the one artefact a human
+signs.
+
+Prompt caching needs no parameter here — OpenAI caches long stable prefixes
+automatically — so the provider keeps `cache_system` by construction: system message
+first, never mutated between calls.
 
 ### Why there is no tenacity anywhere
 
@@ -531,6 +550,11 @@ key as `SecretStr`. `bootstrap()` runs once at process start and mirrors values 
 code path can use a session cookie any more, and listing it would invite an operator to
 set a live token for nothing.
 
+`apply.tailor_unattended` decides whether `nj run` tailors what it scores or stops at the
+review queue; `nj run --tailor/--no-tailor` overrides it per run. It replaced an integer
+called `automation_phase`, whose default silently made the command unable to produce a
+CV. A config that still sets the old key is migrated on load.
+
 `nj --schedule N` installs a launchd job on macOS (`com.nj-cli.run`) or a cron line
 marked `# nj-cli` elsewhere. `--schedule 0` removes it; `--schedule show` prints it.
 
@@ -538,7 +562,7 @@ marked `# nj-cli` elsewhere. `--schedule 0` removes it; `--schedule show` prints
 
 ## 13 · Quality gates
 
-- **670 tests, 3 skipped, 10 seconds.** No unit test performs a live call; the only
+- **751 tests, 3 skipped, under 10 seconds.** No unit test performs a live call; the only
   network-touching suite is `tests/integration/test_prompt_regression.py`, opt-in behind
   `NJ_RUN_REGRESSION_TESTS`.
 - **Regression coverage where mistakes were expensive.** 19 anti-hallucination cases
@@ -560,9 +584,11 @@ marked `# nj-cli` elsewhere. `--schedule 0` removes it; `--schedule show` prints
   any edit under `nj/` or `tests/`. Advisory rather than blocking, because mid-refactor
   states legitimately fail.
 
-Coverage sits at 59% against a `--cov-fail-under=55` ratchet. The gap is not evenly
-spread: the services average above 90%, and the deficit is concentrated in exactly the
-modules that run in production.
+Coverage sits at 65% against a `--cov-fail-under=62` ratchet, raised from 55 on
+2026-08-18. Two things earned it: extracting `nj/pipeline/` made the orchestration
+testable without going through Typer, and `graph`, `ml`, `intel`, `watch` and
+`update-role` got smoke tests — all five had been at 0%, meaning nothing had ever
+executed them in CI. The remaining gaps are `nj/integrations` and `nj/cli/shell`.
 
 ---
 
@@ -582,10 +608,11 @@ numbers say the machine is built and the fuel line is not connected.
 | Companies with ML petitions | 0 | Of 87,595. `h1b_petitions.job_title` is the literal string `"H1B Employee"` on all 154,112 rows. |
 | Sponsor tier `STRONG` | 0 | 83,828 are `UNKNOWN`, 3,726 `WEAK`, 41 `MODERATE`. Max petition count is 54. |
 
-Two configuration facts complete the picture. `apply.automation_phase` is `1`, so
-`nj run` stops at "queued for review" and never reaches the tailoring stage. And the
-provider recorded against all 18 real scores is `freellmapi`, though every one of them
-was produced by OpenAI.
+Two notes on this table. `nj run` still defaults to queueing rather than tailoring, but
+that is now an explicit `apply.tailor_unattended` / `--tailor` decision rather than an
+opaque integer. And the provider recorded against all 18 existing scores is
+`freellmapi` — a bug fixed on 2026-08-18, though **the existing rows still carry the
+wrong value** and would need rewriting to be trustworthy.
 
 ---
 
@@ -594,26 +621,31 @@ was produced by OpenAI.
 Ranked by return, not by difficulty. **Update the Status column as items land** — this
 table is the project's working backlog for structural work.
 
+Thirteen of the eighteen landed on 2026-08-18; the commit is in the Status column. What
+remains is either yours to unblock (A1, D2), a product call (D3), or a change that moves
+live data and should be watched (C3, D1). Detail on each is unchanged below, so the
+reasoning stays readable next to the outcome.
+
 | # | Change | Effort | Impact | Status |
 |---|---|---|---|---|
-| A1 | Supply Adzuna and JSearch credentials | Minutes | Blocking everything | ☐ open |
-| A2 | Replace `automation_phase` with an explicit flag | An hour | Blocking `nj run` | ☐ open |
-| A3 | Report the real provider name | One line | Data integrity | ☐ open |
-| B1 | Key the engine cache by database path | A few lines | Silent data loss | ☐ open |
-| B2 | Route the quality gate through `VisaFilter` | An hour | Wasted spend | ☐ open |
-| B3 | Dedupe on `description_hash` as well as id | Half a day | Cost | ☐ open |
-| B4 | Batch the dedup existence check | An hour | Latency | ☐ open |
-| B5 | Honour `json_schema` and `cache_system` on the OpenAI path | Half a day | Cost + reliability | ☐ open |
-| B6 | Tier the Groq path like the OpenAI one | An hour | Correctness | ☐ open |
-| C1 | Extract a real service layer | 2–3 days | Structural | ☐ open |
-| C2 | Make the scraper contract async | An hour | Clarity | ☐ open |
-| C3 | Move H-1B intel to its own database file | Half a day | Operability | ☐ open |
-| C4 | Delete the ChromaDB line from CLAUDE.md | Minutes | Honesty | ☐ open |
-| C5 | Remove four dead stub modules | Minutes | Clarity | ☐ open |
-| D1 | Re-ingest H-1B data from LCA disclosures | Two days | Capability | ☐ open |
-| D2 | Close the outcome feedback loop | Ongoing | Capability | ☐ open |
-| D3 | Retire or fold in the unused commands | A day | Maintenance | ☐ open |
-| D4 | Raise the coverage ratchet behind C1 | Ongoing | Assurance | ☐ open |
+| A1 | Supply Adzuna and JSearch credentials | Minutes | Blocking everything | ⏸ needs your API keys |
+| A2 | Replace `automation_phase` with an explicit flag | An hour | Blocking `nj run` | ✅ 2cf6d03 |
+| A3 | Report the real provider name | One line | Data integrity | ✅ 57654d2 |
+| B1 | Key the engine cache by database path | A few lines | Silent data loss | ✅ 57654d2 |
+| B2 | Route the quality gate through `VisaFilter` | An hour | Wasted spend | ✅ 69b9677 |
+| B3 | Dedupe on `description_hash` as well as id | Half a day | Cost | ✅ 57654d2 |
+| B4 | Batch the dedup existence check | An hour | Latency | ✅ 57654d2 |
+| B5 | Honour `json_schema` and `cache_system` on the OpenAI path | Half a day | Cost + reliability | ✅ 8ea3c64 |
+| B6 | Tier the Groq path like the OpenAI one | An hour | Correctness | ✅ 8ea3c64 |
+| C1 | Extract a real service layer | 2–3 days | Structural | ✅ 27f988c |
+| C2 | Make the scraper contract async | An hour | Clarity | ✅ 27f988c |
+| C3 | Move H-1B intel to its own database file | Half a day | Operability | ☐ open — moves 241k live rows |
+| C4 | Delete the ChromaDB line from CLAUDE.md | Minutes | Honesty | ✅ 2cf6d03 |
+| C5 | Remove four dead stub modules | Minutes | Clarity | ✅ 57654d2 |
+| D1 | Re-ingest H-1B data from LCA disclosures | Two days | Capability | ☐ open — needs a data-source decision |
+| D2 | Close the outcome feedback loop | Ongoing | Capability | ⏸ needs you to label jobs |
+| D3 | Retire or fold in the unused commands | A day | Maintenance | ◐ partial — smoke-tested, not retired |
+| D4 | Raise the coverage ratchet behind C1 | Ongoing | Assurance | ✅ 6a8db0e |
 
 ### A · Unblock the system
 
@@ -775,12 +807,23 @@ coverage of 59% leaves four points of slack, and the gap is concentrated in `cmd
 is what makes those testable; raise the floor deliberately as each extraction lands,
 rather than setting a target the suite cannot yet meet.
 
-### If only three things get done
+### What is left
 
-Supply the US job-source keys (A1), so the system finally sees the postings it was
-designed for; fix the engine cache (B1) and the quality gate's sponsorship check (B2),
-because both are quietly wrong in ways no test will catch; and start extracting the
-service layer (C1), because until it exists every improvement has to be made twice.
+**A1 is now the only thing standing between nj and a working US pipeline.** Everything
+downstream of it was fixed on 2026-08-18; nothing downstream of it can be exercised
+until the Adzuna and JSearch keys are in `.env`. **D2** is the other one only you can
+start — thirty labels with `nj label` is enough for `nj calibrate` to say something.
+
+**C3** and **D1** are deliberately not done. C3 moves 241,707 live rows between database
+files, and D1 replaces the ingested dataset wholesale; both are the kind of change that
+should be run with someone watching, and D1 needs a decision about which disclosure files
+to pull. **D3** is half done: the five 0%-coverage commands are now exercised, but
+whether `graph`, `ml` and `intel` should stay as top-level commands is a product call,
+not a cleanup.
+
+One piece of debris worth knowing about: the 18 existing rows in `score_results` still
+record `freellmapi` as their provider. The bug is fixed for new scores; the old rows are
+wrong until something rewrites them.
 
 ---
 

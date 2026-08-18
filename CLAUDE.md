@@ -35,11 +35,11 @@ The sections above are the target. This section records where the code actually
 stands, so a session reading this file does not assume a component exists.
 Update it as items land; delete it once nothing is outstanding.
 
-Last verified: 2026-08-17 (CV template restored; application status split).
+Last verified: 2026-08-18 (architecture backlog pass: service layer extracted, 13 of 18 items closed).
 
 | Guideline | Status | Notes |
 |---|---|---|
-| Typer CLI layer, thin commands | Met | One module per command in `nj/cli/`, no business logic. |
+| Typer CLI layer, thin commands | Met | One module per command in `nj/cli/`. Orchestration lives in `nj/pipeline/` (`IngestService`, `ScoringService`, `build_scrapers`) — it did not until 2026-08-18, when `cmd_run` and `cmd_search` held 988 lines of it between them and had drifted apart in four ways. Register a new scraper in `build_scrapers()`, once. |
 | Pydantic v2 schemas | Met | Models in `nj/models/`. Scoring and review responses are schema-constrained via `output_config.format` (`SCORE_SCHEMA` in `nj/prompts/scoring_v1.py`, `REVIEW_SCHEMA` in `nj/models/review.py`). |
 | SQLite via SQLAlchemy | Met | `nj/db/`, repository pattern. |
 | Alembic migrations | Met | `alembic/` with a baseline covering all 9 tables. URL comes from `NJ_DB_PATH`/`NJ_ALEMBIC_URL`, not the tracked ini. `render_as_batch` is on because SQLite cannot ALTER a column. `data/nj.db` was stamped at the baseline on 2026-08-17. `tests/unit/test_migrations.py` fails on ORM/migration drift. See `alembic/README`. |
@@ -49,7 +49,7 @@ Last verified: 2026-08-17 (CV template restored; application status split).
 | Model topology (Haiku/Sonnet/Opus) | Met | `LLMConfig` tiers + `resolve_model()` in `nj/providers/registry.py`; commands pass `task=`. Four tiers: `scoring` and `review` on Haiku, `tailoring` on Sonnet, `reasoning` on Opus. |
 | Drafter-reviewer pipeline | Met | `nj/tailoring/drafter.py` (Sonnet) → `nj/tailoring/reviewer.py` (Haiku) → revision round, orchestrated in `tailor.py`. **The asymmetry is load-bearing:** `validate_tailored_cv` findings BLOCK, the reviewer model's findings only ADVISE. A reviewer that fails, times out, or returns nonsense degrades to the pre-existing validator guarantee and never below it. Do not promote reviewer findings to blocking — a cheap model's false positive would throw away a correct CV. |
 | Ruff pinned `==0.15.14` | Met | `ruff format` also replaces black. Alembic's generated migration bodies are not format-clean; run `ruff format alembic/` after `revision --autogenerate`. |
-| Pytest + pytest-asyncio | Met | 670 passing, 3 skipped (opt-in prompt regression). No unit test touches the network. |
+| Pytest + pytest-asyncio | Met | 751 passing, 3 skipped (opt-in prompt regression). Coverage 65%, ratchet 62%. No unit test touches the network. |
 | CV LaTeX template | Met | `templates/cv_template.tex` was a 0-byte file until 2026-08-17 and is now a working template covering all 14 placeholders in `_fill_template`. **Two traps.** (1) The substitution is a blind string replace over the whole file, *comments included* — a placeholder token written in a comment expands into live LaTeX. That is exactly how the first restored version failed. (2) The list macros are `\begingroup`, not `itemize`, because the `_render_*` helpers emit nothing for an empty section and an empty `itemize` is a hard LaTeX error; `\resumeItem` draws its own bullet for the same reason, since it is emitted both inside a list and bare. Verified against a fully empty CV. |
 | `tectonic` | Required, installed | `render_cv` shells out to it (`renderer.py:115`). `brew install tectonic`. Not in `pyproject.toml` because it is not a Python package — a fresh clone renders nothing without it, and `cmd_run` swallows the failure as a `logger.warning`, so a missing binary looks like a successful run with no PDF. CI installs the pinned musl release from GitHub, not apt: tectonic is not in Ubuntu `noble` proper, only `noble-updates`/`backports`. |
 | Shipped-template CI guard | Met | `tests/unit/test_renderer.py`, the `--- the shipped template ---` block: 8 tests reading `templates/cv_template.tex` itself rather than the synthetic `make_template()`. They pin the 0-byte case, placeholder coverage derived from `inspect.getsource(_fill_template)` (so a new placeholder that the template lacks fails here), a real tectonic compile, a compile with every optional section empty, and the comment-expansion trap. **"No unsubstituted placeholders" is trivially true of an empty file**, so `test_shipped_template_actually_carries_the_cv_content` is what makes that assertion mean anything — do not drop it. `NJ_REQUIRE_TECTONIC=1` in CI turns a missing compiler from a skip into a failure. All verified by mutation: each bug was reintroduced and the corresponding test observed failing. |
@@ -143,6 +143,18 @@ output.
   carve-out sits next to the one for hooks): `/audit` runs every CI gate plus the
   secret checks, `/apply` runs the drafter-reviewer pipeline on one job, `/eval`
   runs the scoring and anti-hallucination regressions.
+- `BaseScraper.scrape()` is async for every source; implementations supply
+  blocking `fetch()`, which the base runs on a worker thread. Do not add an
+  `inspect.iscoroutinefunction` branch back — that is what the contract replaced.
+- `get_engine()` caches one engine per resolved database path and creates any
+  missing tables on first use. Fifteen commands build a repository without
+  calling `init_db`, so a cold database has to work.
+- The quality gate has no sponsorship phrases of its own; it calls
+  `VisaFilter.explain()`. Two classifiers means one of them is stale, and the
+  gate's copy ran after tailoring, so its false positives cost real spend.
+- `apply.tailor_unattended` (and `nj run --tailor`) replaced
+  `apply.automation_phase`. A legacy config is migrated on load by a validator
+  in `ApplyConfig` — keep it until you are sure no config.yaml sets the old key.
 - After `alembic revision --autogenerate`, run `ruff format alembic/` and read
   the generated file — autogenerate renders a rename as a drop plus an add,
   which silently loses that column's data.
