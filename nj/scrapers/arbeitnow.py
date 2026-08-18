@@ -31,7 +31,7 @@ class ArbeitnowScraper(BaseScraper):
     def name(self) -> str:
         return "arbeitnow"
 
-    def scrape(self, roles: list[str], location: str = "") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen_ids: set[str] = set()
 

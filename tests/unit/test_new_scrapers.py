@@ -36,7 +36,7 @@ class TestJSearchScraper:
         from nj.scrapers.jsearch import JSearchScraper
 
         scraper = JSearchScraper(api_key="", visa_config=VISA_CONFIG)
-        jobs = scraper.scrape(["ML Engineer"])
+        jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
     @respx.mock
@@ -49,7 +49,7 @@ class TestJSearchScraper:
         )
         scraper = JSearchScraper(api_key="test-key", visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert len(jobs) >= 1
         assert jobs[0].title == "ML Engineer"
         assert jobs[0].company == "Acme Corp"
@@ -68,7 +68,7 @@ class TestJSearchScraper:
         )
         scraper = JSearchScraper(api_key="test-key", visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert "Remote" in jobs[0].location
 
     @respx.mock
@@ -82,7 +82,7 @@ class TestJSearchScraper:
         )
         scraper = JSearchScraper(api_key="test-key", visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert jobs[0].salary_raw is not None
         assert "$120,000" in jobs[0].salary_raw
 
@@ -97,7 +97,7 @@ class TestJSearchScraper:
         )
         scraper = JSearchScraper(api_key="test-key", visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
 
@@ -127,7 +127,7 @@ class TestArbeitnowScraper:
         )
         scraper = ArbeitnowScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert len(jobs) >= 1
         assert jobs[0].source == "arbeitnow"
 
@@ -142,7 +142,7 @@ class TestArbeitnowScraper:
         )
         scraper = ArbeitnowScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert jobs[0].location == "Remote"
 
     def test_roles_to_tags_ml(self):
@@ -171,7 +171,7 @@ class TestArbeitnowScraper:
         )
         scraper = ArbeitnowScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
 
@@ -211,7 +211,7 @@ class TestWeWorkRemotelyScraper:
         )
         scraper = WeWorkRemotelyScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert len(jobs) >= 1
         assert jobs[0].company == "Acme"
         assert jobs[0].title == "ML Engineer"
@@ -239,7 +239,7 @@ class TestWeWorkRemotelyScraper:
         )
         scraper = WeWorkRemotelyScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["ML Engineer"])
+            jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
     @respx.mock
@@ -263,7 +263,7 @@ class TestWeWorkRemotelyScraper:
         )
         scraper = WeWorkRemotelyScraper(visa_config=VISA_CONFIG)
         with patch("time.sleep"):
-            jobs = scraper.scrape(["Machine Learning"])
+            jobs = scraper.fetch(["Machine Learning"])
         assert len(jobs) >= 1
         assert jobs[0].company == "Unknown"
 
@@ -301,14 +301,14 @@ class TestUSAJobsScraper:
         from nj.scrapers.usajobs import USAJobsScraper
 
         scraper = USAJobsScraper(api_key="", user_agent="", visa_config=VISA_CONFIG)
-        jobs = scraper.scrape(["ML Engineer"])
+        jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
     def test_missing_key_only_returns_empty(self):
         from nj.scrapers.usajobs import USAJobsScraper
 
         scraper = USAJobsScraper(api_key="", user_agent="test@example.com", visa_config=VISA_CONFIG)
-        jobs = scraper.scrape(["ML Engineer"])
+        jobs = scraper.fetch(["ML Engineer"])
         assert jobs == []
 
     @respx.mock
@@ -323,7 +323,7 @@ class TestUSAJobsScraper:
             api_key="test-key", user_agent="test@example.com", visa_config=VISA_CONFIG
         )
         with patch("time.sleep"):
-            jobs = scraper.scrape(["Data Scientist"])
+            jobs = scraper.fetch(["Data Scientist"])
         assert len(jobs) >= 1
         assert jobs[0].source == "usajobs"
         assert jobs[0].company == "Department of Defense"

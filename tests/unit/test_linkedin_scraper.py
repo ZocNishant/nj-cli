@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from nj.applying.anti_bot import RateLimiter
 from nj.models.config import VisaConfig
 from nj.scrapers.linkedin import ENABLE_ENV_VAR, LinkedInScraper, is_enabled
+from nj.utils.rate_limiter import RateLimiter
 
 
 def make_scraper() -> LinkedInScraper:
@@ -21,14 +21,14 @@ def test_linkedin_scraper_name() -> None:
 
 def test_linkedin_scrape_returns_nothing() -> None:
     """The scraper is stubbed; it must stay inert, not merely fail politely."""
-    assert make_scraper().scrape(["ML Engineer"], "United States") == []
+    assert make_scraper().fetch(["ML Engineer"], "United States") == []
 
 
 def test_linkedin_scrape_stays_inert_even_when_opted_in(monkeypatch) -> None:
     """The opt-in var gates a future implementation; it does not resurrect one."""
     monkeypatch.setenv(ENABLE_ENV_VAR, "1")
     assert is_enabled() is True
-    assert make_scraper().scrape(["ML Engineer"]) == []
+    assert make_scraper().fetch(["ML Engineer"]) == []
 
 
 def test_is_enabled_defaults_to_false(monkeypatch) -> None:
@@ -93,7 +93,7 @@ def test_linkedin_scraper_has_no_browser_automation_code() -> None:
 
 def test_linkedin_scraper_constructs_without_a_cookie() -> None:
     """Callers that no longer have a cookie to pass must still work."""
-    assert LinkedInScraper().scrape(["ML Engineer"]) == []
+    assert LinkedInScraper().fetch(["ML Engineer"]) == []
 
 
 def test_rate_limiter_can_apply_when_under_limit() -> None:

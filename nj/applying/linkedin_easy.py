@@ -8,8 +8,8 @@ ban, and submitting applications unattended is worse than scraping — a bad
 submission is visible to the employer and cannot be taken back.
 
 `nj` therefore stops at generating the tailored CV and cover letter. Submitting
-is a human step. `ApplyConfig.automation_phase` exists for a future supervised
-mode; nothing reads it to send anything today.
+is a human step. `ApplyConfig.tailor_unattended` only decides whether `nj run` writes the
+files unattended; nothing reads it to send anything.
 """
 
 from __future__ import annotations

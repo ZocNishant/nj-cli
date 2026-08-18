@@ -28,6 +28,20 @@ _TOKEN_PARAM_MODERN = "max_completion_tokens"
 # for the same reason the parameter shape is: a model list goes stale.
 _MIN_REASONING_HEADROOM = 2048
 
+# Constrained decoding. `json_schema` guarantees the response parses; plain
+# `json_object` only guarantees it is *some* JSON. Both are refused by older
+# models and by some OpenAI-compatible gateways, so — like the token parameter
+# and the reasoning headroom — support is learned from the first rejection
+# rather than assumed from a model name.
+_FORMAT_SCHEMA = "json_schema"
+_FORMAT_OBJECT = "json_object"
+_FORMAT_NONE = "none"
+
+
+def _rejects_response_format(message: str) -> bool:
+    m = message.lower()
+    return "response_format" in m or "json_schema" in m
+
 
 def _rejects(message: str, param: str) -> bool:
     m = message.lower()
@@ -54,6 +68,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         self._token_param = _TOKEN_PARAM_LEGACY
         self._send_temperature = True
         self._reasoning_headroom = 0
+        self._format_mode = _FORMAT_SCHEMA
 
     def _get_client(self):
         if self._client is None:
@@ -69,10 +84,23 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         return self._client
 
     def name(self) -> str:
+        """The provider this client is actually talking to.
+
+        This returned the constant "freellmapi" for every instance, including
+        the OpenAI ones, and `score_job` writes it into
+        `score_results.provider` — so every score OpenAI produced was recorded
+        as having come from Groq. Derived from the base URL instead, because
+        that is the only thing that distinguishes them at runtime.
+        """
+        host = (self.base_url or "").lower()
+        if "api.openai.com" in host:
+            return "openai"
+        if "groq.com" in host:
+            return "groq"
         return "freellmapi"
 
     def supports_json_mode(self) -> bool:
-        return False
+        return True
 
     def _adapt_to(self, error: Exception) -> bool:
         """Learn the parameter shape this model accepts. True if something changed.
@@ -94,7 +122,37 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             self._send_temperature = False
             logger.debug("openai_temperature_dropped", model=self.model)
             return True
+        if _rejects_response_format(message) and self._format_mode != _FORMAT_NONE:
+            # Step down one rung: schema -> plain JSON object -> nothing. The
+            # parser downstream tolerates prose-wrapped JSON, so losing the
+            # constraint degrades quality rather than breaking the call.
+            self._format_mode = (
+                _FORMAT_OBJECT if self._format_mode == _FORMAT_SCHEMA else _FORMAT_NONE
+            )
+            logger.debug("openai_format_downgraded", model=self.model, mode=self._format_mode)
+            return True
         return False
+
+    def _response_format(self, request: LLMRequest) -> dict | None:
+        """The strongest output constraint this model has not yet refused.
+
+        LLMRequest has carried `json_schema` and `response_format` since the
+        schemas were written, and this provider dropped both on the floor — so
+        SCORE_SCHEMA and REVIEW_SCHEMA were built, passed, and never enforced
+        on the provider the project actually runs on.
+        """
+        if request.response_format != "json" or self._format_mode == _FORMAT_NONE:
+            return None
+        if request.json_schema is not None and self._format_mode == _FORMAT_SCHEMA:
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "response",
+                    "strict": True,
+                    "schema": request.json_schema,
+                },
+            }
+        return {"type": "json_object"}
 
     def _learn_headroom(self, response) -> bool:
         """Grow the reasoning allowance after a budget-starved empty response.
@@ -135,9 +193,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         messages.append({"role": "user", "content": request.user})
 
         # At most one retry per adaptable parameter, then the error is real.
-        # `_learn_headroom` can also ask for one more pass, so the ceiling
-        # covers both kinds of adaptation.
-        for _ in range(4):
+        # `_learn_headroom` and the response-format downgrade can each ask for
+        # another pass, so the ceiling covers every kind of adaptation.
+        for _ in range(6):
             kwargs: dict = {
                 "model": self.model,
                 "messages": messages,
@@ -145,6 +203,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             }
             if self._send_temperature:
                 kwargs["temperature"] = request.temperature
+            response_format = self._response_format(request)
+            if response_format is not None:
+                kwargs["response_format"] = response_format
             try:
                 response = await client.chat.completions.create(**kwargs)
             except Exception as e:
@@ -156,7 +217,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             if self._learn_headroom(response):
                 continue
             break
-        else:  # pragma: no cover - four adaptations without success
+        else:  # pragma: no cover - every adaptation tried without success
             raise RuntimeError(f"{self.model} rejected every parameter shape tried")
 
         latency_ms = int((time.monotonic() - start) * 1000)
@@ -165,7 +226,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         usage = response.usage
         return LLMResponse(
             content=content,
-            provider="freellmapi",
+            provider=self.name(),
             model=model_used,
             input_tokens=usage.prompt_tokens if usage else 0,
             output_tokens=usage.completion_tokens if usage else 0,

@@ -1,7 +1,7 @@
 # nj-cli Manual
 
-**nj** — AI Career Operating System  
-Anti-hallucination CV tailoring · Explainable scoring · H1B intelligence  
+**nj** — AI Career Operating System
+Anti-hallucination CV tailoring · Explainable scoring · H1B intelligence
 Career knowledge graph · ML models · Interactive shell
 
 ```
@@ -436,7 +436,7 @@ nj run --dry-run   # Full pipeline without applying
 nj run --silent    # Scheduled silent run
 ```
 
-> Phase 1 (default): requires human review before applying. Set `automation_phase` in config to change.
+> By default, queues jobs for `nj review` rather than tailoring them. Use `--tailor`, or set `apply.tailor_unattended`, to tailor unattended. Nothing is ever submitted.
 
 ---
 

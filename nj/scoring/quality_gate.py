@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 
 from nj.models.config import Config
-from nj.models.job import Job
+from nj.models.job import Job, VisaLabel
 from nj.models.quality import GateDecision, QualityGateResult, QualityIssue
 from nj.models.score import ScoreResult
+from nj.scoring.visa_filter import VisaFilter
 from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,15 +31,37 @@ SENIOR_SIGNALS = [
     r"\blead\s+researcher\b",
 ]
 
-NO_SPONSORSHIP_SIGNALS = [
-    "no sponsorship",
-    "citizen only",
-    "green card only",
-    "must be authorized",
-    "no visa",
-    "us citizens only",
-    "permanent residents only",
-]
+# There is no second list of sponsorship phrases here on purpose.
+#
+# There used to be, and it contained "must be authorized" — the exact phrase
+# nj/scoring/visa_filter.py removed, with a comment explaining why: nearly every
+# US posting contains it, and someone on OPT *is* authorized. So the bug was
+# fixed in one classifier and left standing in the other, and this copy was the
+# worse of the two: bare substring matching, no negation awareness, no phrase
+# context, and it blocked.
+#
+# The cost was not only a wrong verdict. This gate runs *after* tailoring and
+# rendering, so a false block threw away two LLM calls, a reviewer pass and a
+# tectonic compile, and recorded the job as FAILED.
+#
+# One classifier, one place to fix it. See _visa_block_reason below.
+
+
+def _visa_block_reason(job: Job, config: Config) -> str | None:
+    """The evidence for blocking on sponsorship, or None to let it through.
+
+    Re-derives from the posting rather than reading `job.visa_label`, because
+    the stored label was written at scrape time and this gate exists to catch
+    what the earlier stages missed. Same classifier, so the two can never
+    disagree — which is the whole point of routing through it.
+    """
+    if not (config.visa.enabled and config.visa.skip_no_sponsorship):
+        return None
+
+    label, evidence = VisaFilter(config.visa).explain(job.description)
+    if label is VisaLabel.BLOCKED:
+        return evidence
+    return None
 
 
 def check_application_quality(
@@ -69,21 +92,18 @@ def check_application_quality(
             )
         )
 
-    # 2. Visa compatibility check
-    if config.visa.enabled and config.visa.skip_no_sponsorship:
-        jd_lower = job.description.lower()
-        for signal in NO_SPONSORSHIP_SIGNALS:
-            if signal in jd_lower:
-                blocking_reasons.append(f"Job contains no-sponsorship signal: '{signal}'")
-                issues.append(
-                    QualityIssue(
-                        category="visa",
-                        issue=f"Job description contains '{signal}' — likely no sponsorship",
-                        severity="high",
-                        blocking=True,
-                    )
-                )
-                break
+    # 2. Visa compatibility check — delegated to the one classifier
+    visa_evidence = _visa_block_reason(job, config)
+    if visa_evidence:
+        blocking_reasons.append(f"No-sponsorship language in the posting: {visa_evidence}")
+        issues.append(
+            QualityIssue(
+                category="visa",
+                issue=f"Posting rules out sponsorship — {visa_evidence}",
+                severity="high",
+                blocking=True,
+            )
+        )
 
     # 3. Seniority mismatch check
     jd_lower = job.description.lower()

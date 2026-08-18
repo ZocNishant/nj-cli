@@ -18,73 +18,6 @@ logger = get_logger(__name__)
 console = Console()
 
 
-def _get_enabled_scrapers(config: Config) -> list:
-    import os
-
-    scrapers = []
-
-    jsearch_key = os.getenv("JSEARCH_API_KEY", "")
-    if jsearch_key and config.scraper.jsearch_enabled:
-        from nj.scrapers.jsearch import JSearchScraper
-
-        scrapers.append(JSearchScraper(api_key=jsearch_key, visa_config=config.visa))
-
-    # LinkedIn is deliberately absent. `LinkedInScraper` is an inert stub that
-    # returns [] (see nj/scrapers/linkedin.py), so constructing it did nothing
-    # except read LINKEDIN_LI_AT out of the environment and hand a live session
-    # cookie to a constructor that discards it. Reading a credential that no
-    # code path can use is pure exposure, so the read is gone too.
-
-    adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
-    adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)
-    if adzuna_id and config.scraper.adzuna_enabled:
-        from nj.scrapers.indeed import AdzunaScraper
-
-        scrapers.append(
-            AdzunaScraper(
-                app_id=adzuna_id,
-                app_key=adzuna_key,
-                visa_config=config.visa,
-                country=config.scraper.adzuna_country,
-            )
-        )
-
-    if config.scraper.remoteok_enabled:
-        from nj.scrapers.remoteok import RemoteOKScraper
-
-        scrapers.append(RemoteOKScraper(visa_config=config.visa))
-
-    if config.scraper.weworkremotely_enabled:
-        from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
-
-        scrapers.append(WeWorkRemotelyScraper(visa_config=config.visa))
-
-    if config.scraper.arbeitnow_enabled:
-        from nj.scrapers.arbeitnow import ArbeitnowScraper
-
-        scrapers.append(ArbeitnowScraper(visa_config=config.visa))
-
-    usajobs_key = os.getenv("USAJOBS_API_KEY", "")
-    usajobs_agent = os.getenv("USAJOBS_USER_AGENT", "")
-    if usajobs_key and usajobs_agent and config.scraper.usajobs_enabled:
-        from nj.scrapers.usajobs import USAJobsScraper
-
-        scrapers.append(
-            USAJobsScraper(
-                api_key=usajobs_key,
-                user_agent=usajobs_agent,
-                visa_config=config.visa,
-            )
-        )
-
-    if not scrapers:
-        from nj.scrapers.remoteok import RemoteOKScraper
-
-        scrapers.append(RemoteOKScraper(visa_config=config.visa))
-
-    return scrapers
-
-
 SENIORITY_FILTERS = {
     "junior": {
         "include": [
@@ -187,18 +120,13 @@ def run_search(
     all_langs: bool = False,
     visa_mode: str = "any",
 ) -> None:
-    import asyncio
 
     from nj.db.engine import init_db
     from nj.db.repos.job_repo import JobRepo
     from nj.db.repos.score_repo import ScoreRepo
+    from nj.pipeline import IngestService, ScoringService
     from nj.providers.registry import get_provider
-    from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
-    from nj.utils.dedup import JobDeduplicator
-
-    scrapers = _get_enabled_scrapers(config)
-    logger.info("scrapers_active", scrapers=[s.name() for s in scrapers])
 
     cv_path = Path("cv/cv_base.json")
     if not cv_path.exists():
@@ -211,43 +139,12 @@ def run_search(
     init_db(db_path)
     job_repo = JobRepo(db_path)
     score_repo = ScoreRepo(db_path)
-    dedup = JobDeduplicator(job_repo)
     provider = get_provider(config.llm, task="scoring")
     visa_filter = VisaFilter(config.visa)
-
-    import inspect
+    ingest = IngestService(config, job_repo)
+    logger.info("scrapers_active", scrapers=[s.name() for s in ingest.scrapers])
 
     from nj.utils.logger import is_verbose
-
-    async def _scrape_one(scraper) -> tuple[str, list]:
-        try:
-            if inspect.iscoroutinefunction(scraper.scrape):
-                jobs = await scraper.scrape(
-                    config.search.roles,
-                    config.search.primary_region,
-                )
-            else:
-                jobs = await asyncio.to_thread(
-                    scraper.scrape,
-                    config.search.roles,
-                    config.search.primary_region,
-                )
-            logger.info("scraper_done", scraper=scraper.name(), count=len(jobs))
-            return scraper.name(), jobs
-        except Exception as e:
-            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
-            return scraper.name(), []
-
-    async def _scrape_all() -> dict[str, list]:
-        results = await asyncio.gather(*[_scrape_one(s) for s in scrapers], return_exceptions=True)
-        output = {}
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("scraper_gather_failed", error=str(result))
-                continue
-            name, jobs = result
-            output[name] = jobs
-        return output
 
     t_start = time.monotonic()
 
@@ -258,97 +155,33 @@ def run_search(
             live.update(Text(f"  ⟳  {msg}  [{elapsed}s]", style="dim cyan"))
 
         update_live("connecting to job sources...")
-        scraper_results = asyncio.run(_scrape_all())
+        result = ingest.collect()
         update_live("deduplicating...")
 
-    t_elapsed = round(time.monotonic() - t_start, 1)
-
-    all_raw_jobs: list = []
-    counts: dict[str, int] = {}
-    for name, jobs in scraper_results.items():
-        counts[name] = len(jobs)
-        all_raw_jobs.extend(jobs)
-
-    new_jobs = dedup.filter_new(all_raw_jobs)
-    for job in new_jobs:
-        job_repo.save_job(job)
-    all_jobs = list(new_jobs)
+    all_jobs = result.jobs
 
     if not is_verbose():
-        total = sum(counts.values())
-        sources = " · ".join(f"{name}={count}" for name, count in counts.items() if count > 0)
         console.print(
-            f"\n[green]✓[/green] Scraped [bold]{total}[/bold] jobs in "
-            f"[cyan]{t_elapsed}s[/cyan]  "
-            f"[dim]({len(all_raw_jobs) - len(new_jobs)} dupes skipped)[/dim]"
+            f"\n[green]✓[/green] Scraped [bold]{result.scraped}[/bold] jobs in "
+            f"[cyan]{result.elapsed_seconds}s[/cyan]  "
+            f"[dim]({result.duplicates} dupes skipped)[/dim]"
         )
-        if sources:
-            console.print(f"[dim]Sources: {sources}[/dim]")
+        if result.sources_line:
+            console.print(f"[dim]Sources: {result.sources_line}[/dim]")
 
-    from nj.scoring.ghost_filter import GhostJobFilter
-
-    ghost_filter = GhostJobFilter(enabled=True, max_age_days=45)
-    all_jobs, ghost_jobs = ghost_filter.filter_jobs(all_jobs)
-
-    if ghost_jobs and not is_verbose():
+    if result.ghosts and not is_verbose():
         console.print(
-            f"[dim]Ghost filter: {len(ghost_jobs)} jobs removed ({len(all_jobs)} remaining)[/dim]"
+            f"[dim]Ghost filter: {len(result.ghosts)} jobs removed "
+            f"({len(all_jobs)} remaining)[/dim]"
         )
-    elif ghost_jobs and is_verbose():
-        console.print(f"[dim]Ghost filter removed {len(ghost_jobs)} jobs:[/dim]")
-        for job, result in ghost_jobs[:5]:
-            console.print(f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]")
-
-    if not all_langs:
-        pre_lang = len(all_jobs)
-        all_jobs = [j for j in all_jobs if _is_likely_english(j)]
-        removed = pre_lang - len(all_jobs)
-        if removed:
-            console.print(
-                f"[dim]Language filter: {removed} non-English jobs removed "
-                f"(use --all-langs to include)[/dim]"
-            )
-
-    if visa_mode == "sponsor":
-        pre_visa = len(all_jobs)
-        all_jobs = [j for j in all_jobs if j.visa_label.value in ("confirmed", "likely")]
-        removed_visa = pre_visa - len(all_jobs)
-        if removed_visa:
-            console.print(
-                f"[dim]Visa filter: showing sponsored jobs only ({removed_visa} removed)[/dim]"
-            )
-
-    if level:
-        all_jobs, level_removed = _apply_seniority_filter(all_jobs, level)
-        if level_removed > 0:
-            console.print(
-                f"[dim]Level filter ({level}): {level_removed} jobs removed "
-                f"({len(all_jobs)} remaining)[/dim]"
-            )
-
-    if not all_jobs:
-        console.print("[yellow]No new jobs found.[/yellow]")
-        return
-
-    if limit > 0 and len(all_jobs) > limit:
-        console.print(f"[dim]Limiting to {limit} jobs (use --limit 0 to score all)[/dim]")
-        all_jobs = all_jobs[:limit]
-
-    console.print(f"\n[bold]{len(all_jobs)} new jobs found.[/bold] Scoring now...\n")
-
-    from nj.db.repos.enrichment_repo import EnrichmentRepo
-    from nj.intel.enrichment import JobEnrichment
-
-    enricher = JobEnrichment(db_path=db_path)
-    enrichment_repo = EnrichmentRepo(db_path=db_path)
+    elif result.ghosts and is_verbose():
+        console.print(f"[dim]Ghost filter removed {len(result.ghosts)} jobs:[/dim]")
+        for job, ghost in result.ghosts[:5]:
+            console.print(f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {ghost.reason}[/dim]")
 
     if not is_verbose():
         console.print("[dim]Enriching jobs with intel...[/dim]")
-    enrichments = enricher.enrich_batch(all_jobs, cv_base)
-    for job_id, enrichment in enrichments.items():
-        enrichment_repo.save_enrichment(job_id, enrichment)
-
-    from asyncio import Semaphore
+    enrichments = ingest.enrich(all_jobs, cv_base, db_path)
 
     from nj.models.job import JobStatus
 
@@ -359,9 +192,12 @@ def run_search(
         _display_search_results([], blocked, dry_run, enrichments)
         return
 
-    provider_name = config.llm.provider
-    concurrency = 2 if provider_name in ("groq", "freellmapi") else 5
-    sem = Semaphore(concurrency)
+    scoring_service = ScoringService(
+        config=config,
+        provider=provider,
+        cv_base=cv_base,
+        score_repo=score_repo,
+    )
     t_score_start = time.monotonic()
 
     with Progress(
@@ -372,36 +208,10 @@ def run_search(
         transient=True,
     ) as progress:
         score_task = progress.add_task("Scoring with AI...", total=len(jobs_to_score))
-
-        async def _score_all_jobs() -> list:
-            async def _score_one(job):
-                async with sem:
-                    for attempt in range(3):
-                        try:
-                            result = await score_job(
-                                job=job,
-                                cv_base=cv_base,
-                                config=config,
-                                provider=provider,
-                                repo=score_repo,
-                            )
-                            progress.advance(score_task)
-                            return job, result
-                        except Exception as e:
-                            err = str(e)
-                            if "429" in err or "rate" in err.lower():
-                                wait = 2**attempt * 5
-                                await asyncio.sleep(wait)
-                                continue
-                            logger.warning("score_failed", job_id=job.id, error=err)
-                            break
-                    progress.advance(score_task)
-                    return None
-
-            results = await asyncio.gather(*[_score_one(j) for j in jobs_to_score])
-            return [r for r in results if r is not None]
-
-        score_pairs = asyncio.run(_score_all_jobs())
+        score_pairs = scoring_service.score_batch(
+            jobs_to_score,
+            on_result=lambda job, result: progress.advance(score_task),
+        )
 
     t_score_elapsed = round(time.monotonic() - t_score_start, 1)
 

@@ -112,13 +112,19 @@ def test_registry_returns_freellmapi_provider():
     assert provider.name() == "freellmapi"
 
 
-def test_registry_freellmapi_supports_json_mode_false():
+def test_registry_freellmapi_supports_json_mode():
+    """It does now — `complete()` sends response_format and steps down on a 400.
+
+    This asserted False while LLMRequest.json_schema was being dropped on the
+    floor, so SCORE_SCHEMA and REVIEW_SCHEMA were built, passed and never
+    enforced on the provider the project actually runs on.
+    """
     config = LLMConfig(
         provider="freellmapi",
         freellmapi_api_key="test-key",
     )
     provider = get_provider(config)
-    assert provider.supports_json_mode() is False
+    assert provider.supports_json_mode() is True
 
 
 def test_registry_claude_unchanged():
@@ -305,3 +311,49 @@ async def test_provider_reraises_an_error_it_cannot_adapt_to():
         with pytest.raises(Exception, match="not a chat model"):
             await provider.complete(LLMRequest(system="s", user="u", max_tokens=500))
     assert client.chat.completions.create.await_count == 1
+
+
+# --- the gateway path must tier like the others ----------------------------
+#
+# resolve_model was bypassed for provider=freellmapi, so all four tasks got
+# freellmapi_model. The reviewer then audited a draft written by itself.
+
+
+def test_gateway_path_resolves_a_model_per_task():
+    config = LLMConfig(
+        provider="freellmapi",
+        freellmapi_api_key="k",
+        freellmapi_model="fallback-model",
+        scoring_model="cheap-model",
+        tailoring_model="strong-model",
+        review_model="cheap-model",
+        reasoning_model="reasoning-model",
+    )
+    assert get_provider(config, task="scoring").model == "cheap-model"
+    assert get_provider(config, task="tailoring").model == "strong-model"
+    assert get_provider(config, task="reasoning").model == "reasoning-model"
+
+
+def test_the_gateway_reviewer_is_not_the_drafter():
+    """The invariant the drafter-reviewer split depends on."""
+    config = LLMConfig(
+        provider="freellmapi",
+        freellmapi_api_key="k",
+        freellmapi_model="fallback-model",
+        tailoring_model="strong-model",
+        review_model="cheap-model",
+    )
+    drafter = get_provider(config, task="tailoring")
+    reviewer = get_provider(config, task="review")
+    assert drafter.model != reviewer.model
+
+
+def test_freellmapi_model_is_still_the_fallback_for_an_untiered_task():
+    config = LLMConfig(
+        provider="freellmapi",
+        freellmapi_api_key="k",
+        freellmapi_model="fallback-model",
+        scoring_model="",
+    )
+    assert get_provider(config, task="scoring").model == "fallback-model"
+    assert get_provider(config).model == "fallback-model"

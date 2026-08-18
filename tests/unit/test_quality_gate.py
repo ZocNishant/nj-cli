@@ -214,3 +214,82 @@ def test_run_quality_check_no_cv(tmp_path, monkeypatch) -> None:
     with patch("nj.cli.cmd_quality.console", c):
         run_quality_check(Config(), db_path=str(tmp_path / "nj.db"))
     assert "cv_base.json" in buf.getvalue()
+
+
+# --- the gate and the classifier must agree --------------------------------
+#
+# The gate carried its own NO_SPONSORSHIP_SIGNALS list containing
+# "must be authorized" — the exact phrase visa_filter.py removed as
+# OPT-satisfiable. Because the gate runs after tailoring and rendering, a false
+# block here discards two LLM calls, a reviewer pass and a tectonic compile,
+# and records the job as FAILED.
+
+
+def _gate(description: str):
+    from nj.models.config import Config
+    from nj.scoring.quality_gate import check_application_quality
+
+    config = Config()
+    job = make_job()
+    job.description = description
+    score = make_score()
+    score.total_score = config.scoring.threshold + 10
+    return check_application_quality(
+        job=job,
+        tailored_cv={"personal": {"name": "A", "email": "a@b.c", "phone": "1", "linkedin": "l"}},
+        cover_letter="A specific letter about the role and the team's work.",
+        score=score,
+        config=config,
+    )
+
+
+def test_must_be_authorized_alone_no_longer_blocks() -> None:
+    """Satisfied by OPT, and present in nearly every US posting."""
+    result = _gate("You must be authorized to work in the United States at time of hire.")
+    assert result.decision is not GateDecision.BLOCKED
+
+
+def test_a_sponsoring_employer_that_also_says_must_be_authorized_passes() -> None:
+    result = _gate(
+        "We sponsor H-1B visas for qualified candidates. "
+        "Must be authorized to work in the US at time of hire."
+    )
+    assert result.decision is not GateDecision.BLOCKED
+
+
+def test_an_actual_refusal_still_blocks() -> None:
+    result = _gate("We are unable to offer visa sponsorship for this position.")
+    assert result.decision is GateDecision.BLOCKED
+    assert any("sponsor" in r.lower() for r in result.blocking_reasons)
+
+
+def test_citizens_only_still_blocks() -> None:
+    result = _gate("This role is open to US citizens only.")
+    assert result.decision is GateDecision.BLOCKED
+
+
+def test_the_gate_reports_the_phrase_that_decided_it() -> None:
+    """The evidence, not just the verdict — a wrong block has to be diagnosable."""
+    result = _gate("We do not sponsor employment visas, now or in the future.")
+    assert result.blocking_reasons
+    assert "sponsor" in result.blocking_reasons[0].lower()
+
+
+def test_visa_checking_can_be_turned_off() -> None:
+    from nj.models.config import Config
+    from nj.scoring.quality_gate import check_application_quality
+
+    config = Config()
+    config.visa.skip_no_sponsorship = False
+    job = make_job()
+    job.description = "US citizens only."
+    score = make_score()
+    score.total_score = config.scoring.threshold + 10
+    result = check_application_quality(
+        job=job,
+        tailored_cv={"personal": {"name": "A", "email": "a@b.c", "phone": "1", "linkedin": "l"}},
+        cover_letter="A specific letter.",
+        score=score,
+        config=config,
+    )
+    assert result.decision is not GateDecision.BLOCKED

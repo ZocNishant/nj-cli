@@ -108,13 +108,19 @@ def run(
     dry_run: bool = typer.Option(False, "--dry-run"),
     silent: bool = typer.Option(False, "--silent"),
     db_path: str = typer.Option("data/nj.db", "--db"),
+    tailor: bool = typer.Option(
+        None,
+        "--tailor/--no-tailor",
+        help="Tailor a CV for every job that clears the threshold. "
+        "Defaults to apply.tailor_unattended. Nothing is ever submitted.",
+    ),
 ) -> None:
-    """Full pipeline: scrape jobs, score, tailor CV, apply."""
+    """Full pipeline: scrape jobs, score them, and optionally tailor a CV for each."""
     from nj.cli.cmd_run import run_pipeline
     from nj.models.config import Config
 
     config = Config.load()
-    run_pipeline(config=config, db_path=db_path, dry_run=dry_run, silent=silent)
+    run_pipeline(config=config, db_path=db_path, dry_run=dry_run, silent=silent, tailor=tailor)
 
 
 @app.command()

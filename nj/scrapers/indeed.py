@@ -44,7 +44,7 @@ class AdzunaScraper(BaseScraper):
     def name(self) -> str:
         return "adzuna"
 
-    def scrape(self, roles: list[str], location: str = "United States") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "United States") -> list[Job]:
         if not self.app_id or not self.app_key:
             logger.warning(
                 "adzuna_credentials_missing",
