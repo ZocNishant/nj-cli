@@ -183,3 +183,103 @@ def test_run_review_exits_on_empty_queue() -> None:
 
     output = buf.getvalue()
     assert "No jobs pending review" in output
+
+
+# --- approving must not claim an artifact that does not exist --------------
+#
+# Approving wrote JobStatus.TAILORED, which asserts a rendered CV is on disk.
+# Nothing was generated, so following the documented review loop left rows
+# labelled `tailored` and an empty output/ — and `nj quality`, which selects on
+# TAILORED, then tried to gate applications that had never been produced.
+
+
+def _review_with_keys(keys, job=None, score=None):
+    """Drive run_review through a scripted sequence of keypresses."""
+    job = job or make_job()
+    score = score or make_score()
+
+    job_repo = MagicMock()
+    job_repo.get_jobs.return_value = [job]
+    score_repo = MagicMock()
+    score_repo.get_score.return_value = score
+
+    with (
+        patch("nj.cli.cmd_review.JobRepo", return_value=job_repo),
+        patch("nj.cli.cmd_review.ScoreRepo", return_value=score_repo),
+        patch("nj.cli.cmd_review.LabelRepo", return_value=MagicMock()),
+        patch("nj.cli.cmd_review._get_keypress", side_effect=list(keys)),
+    ):
+        run_review(config=MagicMock(), db_path=":memory:")
+    return job_repo
+
+
+def test_approving_does_not_write_tailored() -> None:
+    job_repo = _review_with_keys(["a"])
+    written = [c.args[1] for c in job_repo.update_job_status.call_args_list]
+    assert JobStatus.TAILORED not in written
+
+
+def test_approving_writes_approved_pending_tailoring() -> None:
+    job_repo = _review_with_keys(["a"])
+    job_repo.update_job_status.assert_called_once_with(
+        "job-1", JobStatus.APPROVED_PENDING_TAILORING
+    )
+
+
+def test_the_status_written_matches_the_artifacts_that_exist(tmp_path) -> None:
+    """The invariant: TAILORED may only be written when a CV was rendered.
+
+    Approving renders nothing, so no path through nj review may produce it.
+    """
+    import inspect
+
+    from nj.cli import cmd_review
+
+    source = inspect.getsource(cmd_review)
+    assert "JobStatus.TAILORED" not in source
+
+
+def test_approving_tells_you_it_generated_nothing(capsys) -> None:
+    _review_with_keys(["a"])
+    out = capsys.readouterr().out
+    assert "Nothing generated yet" in out
+    assert "nj tailor --job-id" in out
+
+
+def test_the_session_ends_by_naming_the_tailor_command(capsys) -> None:
+    """Approving is a decision, not an artifact — the session has to say so."""
+    _review_with_keys(["a"])
+    out = capsys.readouterr().out
+    assert "nothing is generated yet" in out.lower()
+
+
+def test_skipping_still_writes_skipped() -> None:
+    job_repo = _review_with_keys(["s"])
+    job_repo.update_job_status.assert_called_once_with("job-1", JobStatus.SKIPPED)
+
+
+def test_a_session_with_no_approvals_prints_no_next_steps(capsys) -> None:
+    _review_with_keys(["s"])
+    out = capsys.readouterr().out
+    assert "nj tailor --job-id" not in out
+
+
+def test_approved_pending_tailoring_is_a_real_status() -> None:
+    assert JobStatus.APPROVED_PENDING_TAILORING.value == "approved_pending_tailoring"
+    assert JobStatus("approved_pending_tailoring") is JobStatus.APPROVED_PENDING_TAILORING
+
+
+def test_approved_jobs_leave_the_review_queue() -> None:
+    """The queue selects PENDING_REVIEW; the new status is not that."""
+    assert JobStatus.APPROVED_PENDING_TAILORING is not JobStatus.PENDING_REVIEW
+
+
+def test_quality_gate_still_selects_only_tailored_jobs() -> None:
+    """nj quality checks rendered applications. An approval has no files to check."""
+    import inspect
+
+    from nj.cli import cmd_quality
+
+    source = inspect.getsource(cmd_quality)
+    assert "JobStatus.TAILORED" in source
+    assert "JobStatus.APPROVED_PENDING_TAILORING" not in source

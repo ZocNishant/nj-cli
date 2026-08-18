@@ -17,6 +17,13 @@ class VisaLabel(str, Enum):
 class JobStatus(str, Enum):
     NEW = "new"
     SCORED = "scored"
+    # A human approved this in `nj review` and no files exist yet. Distinct
+    # from TAILORED, which asserts a rendered CV is on disk: approving used to
+    # write TAILORED directly, so the queue filled with jobs whose status
+    # claimed an artifact that had never been generated — and `nj quality`,
+    # which selects on TAILORED, then tried to gate applications that did not
+    # exist.
+    APPROVED_PENDING_TAILORING = "approved_pending_tailoring"
     TAILORED = "tailored"
     PENDING_REVIEW = "pending_review"
     APPLIED = "applied"
