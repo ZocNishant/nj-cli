@@ -13,7 +13,7 @@ _TASK_MODEL_FIELDS = {
 }
 
 
-def resolve_model(config: LLMConfig, task: str | None = None) -> str:
+def resolve_model(config: LLMConfig, task: str | None = None, default: str | None = None) -> str:
     """Pick the model for a task, falling back to the generic one.
 
     Tasks are coarse on purpose: `scoring` is high-volume and disposable,
@@ -21,10 +21,11 @@ def resolve_model(config: LLMConfig, task: str | None = None) -> str:
     the cheap tier, `reasoning` is low-volume and high-stakes. See LLMConfig for
     the defaults behind each.
     """
+    fallback = default or config.model
     field = _TASK_MODEL_FIELDS.get(task or "")
     if field:
-        return getattr(config, field, None) or config.model
-    return config.model
+        return getattr(config, field, None) or fallback
+    return fallback
 
 
 def get_provider(config: LLMConfig, task: str | None = None) -> BaseLLMProvider:
@@ -47,7 +48,12 @@ def get_provider(config: LLMConfig, task: str | None = None) -> BaseLLMProvider:
                 or os.getenv("FREELLMAPI_API_KEY")
                 or config.freellmapi_api_key
             )
-            model = config.freellmapi_model
+            # Tiered like every other path. This read `freellmapi_model` for
+            # every task, so scoring, tailoring, review and reasoning all
+            # collapsed onto one model — which made the reviewer the same model
+            # as the drafter. `freellmapi_model` is now the fallback for a task
+            # with no tier set, not the answer for all four.
+            model = resolve_model(config, task, default=config.freellmapi_model)
         else:
             base_url = "https://api.openai.com/v1"
             api_key = os.getenv("OPENAI_API_KEY") or config.api_key

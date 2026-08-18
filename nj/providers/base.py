@@ -21,6 +21,11 @@ class LLMRequest(BaseModel):
     json_schema: dict | None = None
     # Marks the system prompt as a stable cache prefix. Worth setting whenever
     # the same system text is reused across many calls in one run (scoring).
+    #
+    # Anthropic needs this stated explicitly (cache_control on the system
+    # block). OpenAI caches long stable prefixes automatically, so there the
+    # flag is a promise the provider keeps by *construction*: it puts the
+    # system message first and never mutates it between calls.
     cache_system: bool = False
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -326,3 +327,114 @@ def test_the_registry_builds_a_provider_that_knows_it_is_openai() -> None:
 
     provider = get_provider(LLMConfig(provider="openai", api_key="k"), task="scoring")
     assert provider.name() == "openai"
+
+
+# --- constrained decoding --------------------------------------------------
+#
+# LLMRequest has carried json_schema and response_format since the schemas were
+# written, and the OpenAI provider dropped both. SCORE_SCHEMA and REVIEW_SCHEMA
+# were built, passed, and never enforced on the provider the project runs on.
+
+
+class _Recorder:
+    """Captures the kwargs of each call and replays scripted outcomes."""
+
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.calls = []
+
+    async def create(self, **kwargs):
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def _provider_with(recorder, base_url="https://api.openai.com/v1"):
+    from nj.providers.openai import OpenAICompatibleProvider
+
+    p = OpenAICompatibleProvider(api_key="k", base_url=base_url, model="m")
+    p._client = SimpleNamespace(chat=SimpleNamespace(completions=recorder))
+    return p
+
+
+def _ok(content="{}"):
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content=content),
+                finish_reason="stop",
+            )
+        ],
+        model="m",
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1, completion_tokens_details=None),
+    )
+
+
+SCHEMA = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+
+
+async def test_a_schema_request_sends_json_schema() -> None:
+    rec = _Recorder([_ok()])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="s", user="u", json_schema=SCHEMA))
+    fmt = rec.calls[0]["response_format"]
+    assert fmt["type"] == "json_schema"
+    assert fmt["json_schema"]["schema"] == SCHEMA
+    assert fmt["json_schema"]["strict"] is True
+
+
+async def test_a_json_request_without_a_schema_asks_for_a_json_object() -> None:
+    rec = _Recorder([_ok()])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="s", user="u"))
+    assert rec.calls[0]["response_format"] == {"type": "json_object"}
+
+
+async def test_a_text_request_constrains_nothing() -> None:
+    """Cover letters are prose; forcing JSON would corrupt them."""
+    rec = _Recorder([_ok("Dear hiring manager,")])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="s", user="u", response_format="text"))
+    assert "response_format" not in rec.calls[0]
+
+
+async def test_a_model_that_refuses_json_schema_falls_back_to_json_object() -> None:
+    rec = _Recorder([Exception("400: response_format json_schema is not supported"), _ok()])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="s", user="u", json_schema=SCHEMA))
+    assert rec.calls[0]["response_format"]["type"] == "json_schema"
+    assert rec.calls[1]["response_format"] == {"type": "json_object"}
+
+
+async def test_a_gateway_that_refuses_every_format_still_answers() -> None:
+    """Losing the constraint degrades quality; it must not break the call."""
+    rec = _Recorder(
+        [
+            Exception("400: response_format not supported"),
+            Exception("400: response_format not supported"),
+            _ok('```json\n{"a": "b"}\n```'),
+        ]
+    )
+    p = _provider_with(rec)
+    response = await p.complete(LLMRequest(system="s", user="u", json_schema=SCHEMA))
+    assert "response_format" not in rec.calls[2]
+    assert response.content
+
+
+async def test_the_downgrade_is_remembered_across_calls() -> None:
+    rec = _Recorder([Exception("400: json_schema is not supported"), _ok(), _ok()])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="s", user="u", json_schema=SCHEMA))
+    await p.complete(LLMRequest(system="s", user="u", json_schema=SCHEMA))
+    assert rec.calls[2]["response_format"] == {"type": "json_object"}
+
+
+async def test_the_system_prompt_leads_so_a_stable_prefix_can_cache() -> None:
+    """cache_system is kept by construction on this path, not by a parameter."""
+    rec = _Recorder([_ok()])
+    p = _provider_with(rec)
+    await p.complete(LLMRequest(system="rubric", user="posting", cache_system=True))
+    messages = rec.calls[0]["messages"]
+    assert messages[0] == {"role": "system", "content": "rubric"}

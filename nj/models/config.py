@@ -32,6 +32,12 @@ class LLMConfig(BaseModel):
     api_key: str = ""
     freellmapi_base_url: str = "http://localhost:3001/v1"
     freellmapi_api_key: str = ""
+    # Fallback for the OpenAI-compatible gateway path when no tier is set.
+    # The four fields above are read for this provider too — see
+    # nj/providers/registry.py. They used to be ignored here, which collapsed
+    # every tier onto this one model and, worse, made the reviewer the same
+    # model as the drafter. A model asked to audit its own output is the one
+    # thing the drafter-reviewer split exists to prevent.
     freellmapi_model: str = "auto"
 
 
