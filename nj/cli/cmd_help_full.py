@@ -320,7 +320,7 @@ COMMAND_REFERENCE = {
             ("nj run --dry-run", "Full pipeline without applying"),
             ("nj run --silent", "Scheduled silent run"),
         ],
-        "notes": "Phase 1 (default): requires human review before applying. Set automation_phase in config to change.",
+        "notes": "By default, queues jobs for `nj review` rather than tailoring them. Use --tailor, or set apply.tailor_unattended, to tailor unattended. Nothing is ever submitted.",
     },
     "demo": {
         "description": "Interactive demo using sample data — see what nj produces without an API key.",

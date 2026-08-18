@@ -1,14 +1,14 @@
 # Project Guidelines: nj-cli (Job Search Engine CLI)
 
 ## Architecture & Principles
-1. Maintain strict layer separation: CLI Layer (Typer) -> Service Orchestration -> DB/Vector Storage (ChromaDB + SQLite) -> Provider Integrations.
+1. Maintain strict layer separation: CLI Layer (Typer) -> Service Orchestration (`nj/pipeline/`) -> DB Storage (SQLite) -> Provider Integrations. Commands parse arguments and print; they do not orchestrate.
 2. Enforce strict typing and Pydantic v2 schemas for all inputs, outputs, and JSON model responses.
 3. Keep all external network operations (API calls, DB queries) strictly asynchronous using `async/await`.
 
 ## Tech Stack
 - **CLI Framework:** Typer
 - **Package Manager:** Poetry (`pyproject.toml`, `poetry.lock`)
-- **Storage:** ChromaDB (Local Embeddings) + SQLite via SQLAlchemy (Job metadata, application logs)
+- **Storage:** SQLite via SQLAlchemy (job metadata, scores, application logs)
 - **Providers:** Anthropic SDK (`AsyncAnthropic`), OpenAI / Groq SDK (`AsyncOpenAI`)
 - **Model Topology:**
   - High Volume / Ranking: Haiku 4.5
@@ -43,7 +43,7 @@ Last verified: 2026-08-17 (CV template restored; application status split).
 | Pydantic v2 schemas | Met | Models in `nj/models/`. Scoring and review responses are schema-constrained via `output_config.format` (`SCORE_SCHEMA` in `nj/prompts/scoring_v1.py`, `REVIEW_SCHEMA` in `nj/models/review.py`). |
 | SQLite via SQLAlchemy | Met | `nj/db/`, repository pattern. |
 | Alembic migrations | Met | `alembic/` with a baseline covering all 9 tables. URL comes from `NJ_DB_PATH`/`NJ_ALEMBIC_URL`, not the tracked ini. `render_as_batch` is on because SQLite cannot ALTER a column. `data/nj.db` was stamped at the baseline on 2026-08-17. `tests/unit/test_migrations.py` fails on ORM/migration drift. See `alembic/README`. |
-| **ChromaDB / vector storage** | **Not present** | No embedding store and no RAG pipeline exist. Semantic matching is TF-IDF + cosine in `nj/ml/semantic_model.py`. Any "RAG chunking" test coverage is therefore also outstanding. |
+| ~~ChromaDB / vector storage~~ | **Removed from the target** | Struck from the stack above on 2026-08-18. No embedding store or RAG pipeline was ever built; semantic matching is TF-IDF + cosine in `nj/ml/semantic_model.py` with an optional sentence-transformer. At this corpus size a vector store earns nothing, and a spec describing a system nobody intends to build costs every reader an investigation. The "RAG chunking" coverage requirement goes with it. |
 | `AsyncAnthropic` provider | Met | `nj/providers/claude.py`. |
 | `AsyncOpenAI` provider | Met | `nj/providers/openai.py`, used for Groq. |
 | Model topology (Haiku/Sonnet/Opus) | Met | `LLMConfig` tiers + `resolve_model()` in `nj/providers/registry.py`; commands pass `task=`. Four tiers: `scoring` and `review` on Haiku, `tailoring` on Sonnet, `reasoning` on Opus. |

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from nj.models.score import DEFAULT_WEIGHTS
 
@@ -72,12 +72,47 @@ class ScoringConfig(BaseModel):
     weights: dict[str, float] = {k.value: v for k, v in DEFAULT_WEIGHTS.items()}
 
 
+def _coerce_phase(phase: object) -> bool:
+    """`automation_phase: 1` meant "queue only"; anything higher meant tailor."""
+    try:
+        return int(phase) > 1
+    except (TypeError, ValueError):
+        return False
+
+
 class ApplyConfig(BaseModel):
     enabled: bool = False
     max_per_day: int = 5
     delay_min: int = 30
     delay_max: int = 90
-    automation_phase: int = 1
+    # Whether `nj run` tailors the jobs it scores, or stops after queueing them
+    # for `nj review`.
+    #
+    # This was an integer named `automation_phase`, read at exactly one place,
+    # and at its default of 1 the command could never produce a CV — which made
+    # the four stages after it unreachable, with nothing in the name to hint at
+    # that. "Phase" also implied a progression toward auto-submission that the
+    # project has deliberately abandoned: nj cannot submit, and
+    # nj/applying/linkedin_easy.py raises rather than try.
+    #
+    # Unattended tailoring is safe under that same rule — nothing is sent
+    # either way — so the flag says what it does and the default stays
+    # conservative. `nj run --tailor` turns it on for a single run.
+    tailor_unattended: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy_automation_phase(cls, data: object) -> object:
+        """Read an existing config.yaml that still says `automation_phase`.
+
+        Dropping the key outright would silently flip behaviour for anyone
+        whose file sets it to 2 — they asked for unattended tailoring and would
+        quietly stop getting it.
+        """
+        if isinstance(data, dict) and "automation_phase" in data:
+            phase = data.pop("automation_phase")
+            data.setdefault("tailor_unattended", _coerce_phase(phase))
+        return data
 
 
 class NotifyConfig(BaseModel):

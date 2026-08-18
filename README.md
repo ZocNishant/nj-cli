@@ -272,12 +272,12 @@ nj status --update-id <id> --update-status submitted   # only a human does this
 ### `nj run` — the batched version
 
 `nj run` is the same pipeline unattended: scrape → score → visa/threshold
-filter → queue. **On the default `automation_phase: 1` it stops at the queue**
-and tailors nothing, which is what makes it safe to schedule.
+filter → queue. **By default it stops at the queue** and tailors nothing,
+which is what makes it safe to schedule.
 
-Raising `automation_phase` above 1 does change behaviour — the run continues
-into tailoring, rendering, the quality gate, the daily rate limit, the
-application record and the notification email. It still never submits:
+`nj run --tailor` (or `apply.tailor_unattended: true`) continues into
+tailoring, rendering, the quality gate, the daily rate limit, the application
+record and the notification email. It still never submits:
 `nj/applying/linkedin_easy.py` raises by design, so a caller cannot record a
 phantom submission.
 
@@ -376,7 +376,7 @@ visa:
 apply:
   enabled: false
   max_per_day: 5
-  automation_phase: 1
+  tailor_unattended: false
 ```
 
 On Claude the equivalent tiers are `claude-haiku-4-5` for scoring and review,
@@ -497,10 +497,10 @@ table, and the subsystems currently known to be broken.
 | 2 | Semi-auto — nj submits, you approve each | Not implemented |
 | 3 | Full auto behind the quality gate | Not implemented |
 
-Submission itself is not implemented at any phase, and phases 2 and 3 as
-designed do not exist. What `automation_phase > 1` actually does today is
-unattend the *generation* half: `nj run` continues past the review queue into
-tailoring, rendering, the quality gate and the application log instead of
+Submission is not implemented at all. What `apply.tailor_unattended` (or
+`nj run --tailor`) actually does is unattend the *generation* half: `nj run`
+continues past the review queue into tailoring, rendering, the quality gate
+and the application log instead of
 stopping. Everything nj produces still lands in `output/` for you to send
 yourself.
 
@@ -625,7 +625,7 @@ The 2026-08-16/17 hardening pass, in the order it happened:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- **Adding a scraper:** extend `BaseScraper`, add tests, register in `_get_enabled_scrapers()`. See [docs/adding-a-scraper.md](docs/adding-a-scraper.md).
+- **Adding a scraper:** extend `BaseScraper`, add tests, register in `build_scrapers()`. See [docs/adding-a-scraper.md](docs/adding-a-scraper.md).
 - **Adding an LLM provider:** extend `BaseLLMProvider`, register in `registry.py`. See [docs/adding-a-provider.md](docs/adding-a-provider.md).
 - **Improving prompts:** all prompts in `nj/prompts/` are versioned modules. See [docs/prompt-engineering.md](docs/prompt-engineering.md).
 - **Understanding the system:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) covers every layer, both pipelines, the trust boundaries and the open structural backlog.

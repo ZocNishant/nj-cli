@@ -21,7 +21,16 @@ def run_pipeline(
     db_path: str = "data/nj.db",
     dry_run: bool = False,
     silent: bool = False,
+    tailor: bool | None = None,
 ) -> None:
+    """The batched pipeline: scrape, score, and optionally tailor.
+
+    `tailor=None` defers to `apply.tailor_unattended`; `--tailor` on the
+    command line overrides it for one run. Tailoring writes files and never
+    sends anything, so turning it on is safe — see ApplyConfig.
+    """
+    if tailor is None:
+        tailor = config.apply.tailor_unattended
     from nj.db.engine import init_db
     from nj.db.repos.application_repo import ApplicationRepo
     from nj.db.repos.job_repo import JobRepo
@@ -174,7 +183,7 @@ def run_pipeline(
 
         job_repo.update_job_status(job.id, JobStatus.PENDING_REVIEW)
 
-        if config.apply.automation_phase == 1:
+        if not tailor:
             if not silent:
                 console.print(
                     f"  [green]Queued for review:[/green] "
@@ -315,7 +324,7 @@ def run_pipeline(
             new_jobs=len(new_jobs),
             processed=processed,
             dry_run=dry_run,
-            phase=config.apply.automation_phase,
+            tailored=tailor,
         )
 
 
@@ -323,15 +332,16 @@ def _print_run_summary(
     new_jobs: int,
     processed: int,
     dry_run: bool,
-    phase: int,
+    tailored: bool,
 ) -> None:
     console.print("\n[bold]Run complete.[/bold]")
     console.print(f"  New jobs scraped:  {new_jobs}")
     console.print(f"  Processed:         {processed}")
     if dry_run:
         console.print("  [dim]Dry run — no applications submitted.[/dim]")
-    if phase == 1:
+    if not tailored:
         console.print(
-            "\n  Phase 1 mode: jobs queued for review.\n"
-            "  Run [bold]nj review[/bold] to approve jobs."
+            "\n  Jobs were queued, not tailored.\n"
+            "  Run [bold]nj review[/bold] to approve them, or "
+            "[bold]nj run --tailor[/bold] to tailor unattended."
         )

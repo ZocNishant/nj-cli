@@ -103,7 +103,7 @@ def run_init(config_path: str = "config.yaml", force: bool = False) -> None:
     config_data["apply"] = {
         "enabled": False,
         "max_per_day": 5,
-        "automation_phase": 1,
+        "tailor_unattended": False,
     }
     config_data["schedule"] = {"enabled": False, "every_days": 3, "time": "08:00"}
 

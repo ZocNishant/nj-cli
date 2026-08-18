@@ -89,8 +89,7 @@ class MyScraper(BaseScraper):
 
 ## Registering your scraper
 
-Add it to `_get_enabled_scrapers()` in both
-`nj/cli/cmd_search.py` and `nj/cli/cmd_run.py`.
+Register it in `build_scrapers()` in `nj/pipeline/sources.py` — one place now, not two. Implement blocking `fetch()`; `BaseScraper.scrape()` is async and puts it on a worker thread.
 
 Add a config flag to `ScraperConfig` in `nj/models/config.py`.
 
