@@ -29,13 +29,11 @@ def _get_enabled_scrapers(config: Config) -> list:
 
         scrapers.append(JSearchScraper(api_key=jsearch_key, visa_config=config.visa))
 
-    li_at = os.getenv("LINKEDIN_LI_AT", "")
-    if li_at and config.scraper.linkedin_enabled:
-        from nj.scrapers.linkedin import LinkedInScraper
-
-        scrapers.append(
-            LinkedInScraper(session_cookie=li_at, visa_config=config.visa, headless=True)
-        )
+    # LinkedIn is deliberately absent. `LinkedInScraper` is an inert stub that
+    # returns [] (see nj/scrapers/linkedin.py), so constructing it did nothing
+    # except read LINKEDIN_LI_AT out of the environment and hand a live session
+    # cookie to a constructor that discards it. Reading a credential that no
+    # code path can use is pure exposure, so the read is gone too.
 
     adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
     adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)

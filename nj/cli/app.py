@@ -162,16 +162,24 @@ def search(
 
 @app.command()
 def tailor(
-    url: str = typer.Argument(..., help="Job URL to tailor CV for"),
+    url: str = typer.Argument(None, help="Job URL to fetch and tailor for"),
+    job_id: str = typer.Option(
+        None, "--job-id", "-j", help="Id of a job already in the DB (prefix is enough)"
+    ),
     db_path: str = typer.Option("data/nj.db", "--db"),
     output_dir: str = typer.Option("output", "--output"),
 ) -> None:
-    """Tailor your CV and generate cover letter for a job URL."""
+    """Tailor your CV and cover letter for one job, by stored id or by URL.
+
+    Prefer --job-id. Fetching a URL re-derives the posting from the live page
+    and cannot recover the title or company, so the tailoring runs against
+    whatever text the page yields.
+    """
     from nj.cli.cmd_tailor import run_tailor
     from nj.models.config import Config
 
     config = Config.load()
-    run_tailor(url=url, config=config, db_path=db_path, output_dir=output_dir)
+    run_tailor(url=url, config=config, db_path=db_path, output_dir=output_dir, job_id=job_id)
 
 
 @app.command()

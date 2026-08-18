@@ -15,10 +15,28 @@ logger = get_logger(__name__)
 _TOKEN_PARAM_LEGACY = "max_tokens"
 _TOKEN_PARAM_MODERN = "max_completion_tokens"
 
+# Reasoning models spend tokens thinking before they emit a character, and that
+# spend counts against `max_completion_tokens`. A budget sized for the visible
+# answer alone is therefore consumed entirely by reasoning and the call returns
+# `finish_reason="length"` with an EMPTY string — not an error, just nothing.
+# Measured on gpt-5.5: a trivial 150-word request burned 600-1200 reasoning
+# tokens, so every call site under ~2k silently produced "".
+#
+# `max_tokens` on LLMRequest means "tokens of visible output I want", so for
+# these models the provider adds headroom on top. Which models need it is
+# learned from the first empty-with-reasoning response rather than hardcoded,
+# for the same reason the parameter shape is: a model list goes stale.
+_MIN_REASONING_HEADROOM = 2048
+
 
 def _rejects(message: str, param: str) -> bool:
     m = message.lower()
     return param in m and ("unsupported" in m or "not supported" in m or "use '" in m)
+
+
+def _reasoning_tokens(usage) -> int:
+    details = getattr(usage, "completion_tokens_details", None) if usage else None
+    return getattr(details, "reasoning_tokens", 0) or 0
 
 
 class OpenAICompatibleProvider(BaseLLMProvider):
@@ -35,6 +53,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # Learned on first use; see the module comment.
         self._token_param = _TOKEN_PARAM_LEGACY
         self._send_temperature = True
+        self._reasoning_headroom = 0
 
     def _get_client(self):
         if self._client is None:
@@ -77,6 +96,36 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             return True
         return False
 
+    def _learn_headroom(self, response) -> bool:
+        """Grow the reasoning allowance after a budget-starved empty response.
+
+        True if something changed and the call is worth retrying. Only ever
+        grows, and only on the exact signature of the failure it fixes — an
+        empty answer that stopped on `length` having spent tokens reasoning.
+        """
+        choice = response.choices[0]
+        if (choice.message.content or "").strip():
+            return False
+        if choice.finish_reason != "length":
+            return False
+        spent = _reasoning_tokens(response.usage)
+        if spent <= 0:
+            return False
+
+        # The next call reasons about a different prompt and may think longer,
+        # so budget well past what this one happened to spend.
+        headroom = max(_MIN_REASONING_HEADROOM, spent * 2)
+        if headroom <= self._reasoning_headroom:
+            return False
+        self._reasoning_headroom = headroom
+        logger.debug(
+            "openai_reasoning_headroom_learned",
+            model=self.model,
+            reasoning_tokens=spent,
+            headroom=headroom,
+        )
+        return True
+
     async def complete(self, request: LLMRequest) -> LLMResponse:
         client = self._get_client()
         start = time.monotonic()
@@ -86,21 +135,28 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         messages.append({"role": "user", "content": request.user})
 
         # At most one retry per adaptable parameter, then the error is real.
-        for _ in range(3):
+        # `_learn_headroom` can also ask for one more pass, so the ceiling
+        # covers both kinds of adaptation.
+        for _ in range(4):
             kwargs: dict = {
                 "model": self.model,
                 "messages": messages,
-                self._token_param: request.max_tokens,
+                self._token_param: request.max_tokens + self._reasoning_headroom,
             }
             if self._send_temperature:
                 kwargs["temperature"] = request.temperature
             try:
                 response = await client.chat.completions.create(**kwargs)
-                break
             except Exception as e:
                 if not self._adapt_to(e):
                     raise
-        else:  # pragma: no cover - three adaptations without success
+                continue
+            # A 200 that carries no text is still a failed call: retry it with
+            # room to think rather than handing "" back to a JSON parser.
+            if self._learn_headroom(response):
+                continue
+            break
+        else:  # pragma: no cover - four adaptations without success
             raise RuntimeError(f"{self.model} rejected every parameter shape tried")
 
         latency_ms = int((time.monotonic() - start) * 1000)

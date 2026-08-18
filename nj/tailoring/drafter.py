@@ -23,6 +23,12 @@ from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Visible output only. Reasoning models need room to think on top of this, which
+# the provider adds — see the headroom note in nj/providers/openai.py. A letter
+# runs ~350 words, so this is generous rather than tight; it is the one number
+# that decides whether the model gets to finish a sentence.
+COVER_LETTER_MAX_TOKENS = 900
+
 
 class DrafterError(Exception):
     pass
@@ -124,7 +130,7 @@ async def draft_cover_letter(
     request = LLMRequest(
         system=cover_letter_v1.build_system_prompt(cv_base),
         user=user_prompt,
-        max_tokens=600,
+        max_tokens=COVER_LETTER_MAX_TOKENS,
         temperature=0.5,
         response_format="text",
     )

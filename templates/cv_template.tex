@@ -132,21 +132,17 @@
 %% is absent from the CV JSON.
 %%GAP_BLOCK%%
 
-\section{Research Interests}
-\small %%RESEARCH_INTERESTS%%
-\vspace{2pt}
+%% The four blocks below each emit their own \section and list wrapper, and
+%% collapse to the empty string when the CV has nothing for them. A bare
+%% \section here instead would print a heading with a rule and no content
+%% whenever a section is absent -- which is exactly what shipped when a CV
+%% dropped research_interests and soft_skills.
+%%RESEARCH_BLOCK%%
 
-\section{Certifications}
-\resumeSubHeadingListStart
 %%CERTIFICATIONS_BLOCK%%
-\resumeSubHeadingListEnd
 
-\section{Professional Memberships}
-\resumeSubHeadingListStart
 %%MEMBERSHIPS_BLOCK%%
-\resumeSubHeadingListEnd
 
-\section{Soft Skills}
-\small %%SOFT_SKILLS%%
+%%SOFT_SKILLS_BLOCK%%
 
 \end{document}

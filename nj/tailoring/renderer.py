@@ -183,11 +183,23 @@ def _fill_template(template: str, cv: dict) -> str:
         "%%SKILLS_BLOCK%%": _render_skills(cv.get("skills", {})),
         "%%EXPERIENCE_BLOCK%%": _render_experience(cv.get("experience", [])),
         "%%GAP_BLOCK%%": _render_gap(cv.get("gap_explanation")),
-        "%%RESEARCH_INTERESTS%%": _render_research(cv.get("research_interests", [])),
         "%%PROJECTS_BLOCK%%": _render_projects(cv.get("projects", [])),
-        "%%MEMBERSHIPS_BLOCK%%": _render_memberships(cv.get("memberships", [])),
-        "%%CERTIFICATIONS_BLOCK%%": _render_certifications(cv.get("certifications", [])),
-        "%%SOFT_SKILLS%%": " $|$ ".join(escape_latex(s) for s in cv.get("soft_skills", [])),
+        "%%RESEARCH_BLOCK%%": _section(
+            "Research Interests",
+            _render_research(cv.get("research_interests", [])),
+            listed=False,
+        ),
+        "%%CERTIFICATIONS_BLOCK%%": _section(
+            "Certifications", _render_certifications(cv.get("certifications", []))
+        ),
+        "%%MEMBERSHIPS_BLOCK%%": _section(
+            "Professional Memberships", _render_memberships(cv.get("memberships", []))
+        ),
+        "%%SOFT_SKILLS_BLOCK%%": _section(
+            "Soft Skills",
+            " $|$ ".join(escape_latex(s) for s in cv.get("soft_skills", [])),
+            listed=False,
+        ),
     }
     result = template
     for placeholder, value in replacements.items():
@@ -216,15 +228,21 @@ def _render_education(education: list) -> str:
             start = escape_latex(edu.get("start", ""))
             end = escape_latex(edu.get("end", ""))
             courses = edu.get("courses", [])
+            # Free-form lines under a degree — a thesis, a research project —
+            # that are not courses and must not be folded into that list.
+            highlights = edu.get("highlights", [])
         else:
             continue
         lines.append(
             f"\\resumeSubheading\n  {{{inst}}}{{{loc}}}\n  {{{degree}}}{{{start} -- {end}}}"
         )
-        if courses:
+        if courses or highlights:
             lines.append("  \\resumeItemListStart")
-            courses_str = escape_latex(", ".join(courses))
-            lines.append(f"    \\resumeItem{{Relevant Courses: {courses_str}}}")
+            if courses:
+                courses_str = escape_latex(", ".join(courses))
+                lines.append(f"    \\resumeItem{{Relevant Courses: {courses_str}}}")
+            for highlight in highlights:
+                lines.append(f"    \\resumeItem{{{escape_latex(str(highlight))}}}")
             lines.append("  \\resumeItemListEnd")
     return "\n".join(lines)
 
@@ -241,6 +259,16 @@ def _render_skills(skills: dict) -> str:
         "security_tools": "Security Tools",
         "operating_systems": "Operating Systems",
         "it_network_tools": "IT \\& Network Tools",
+        # An unregistered key still renders, as Title Case of the key itself,
+        # so a missing entry here is a cosmetic bug rather than a crash:
+        # "ml_statistical_techniques" would reach the PDF as "Ml Statistical
+        # Techniques". These carry intentional `\&` and cannot be derived.
+        "ml_models": "ML Models",
+        "ml_statistical_techniques": "ML \\& Statistical Techniques",
+        "deployment_mlops": "Deployment \\& MLOps",
+        "bioinformatics_genomics": "Bioinformatics \\& Genomics",
+        "systems_networking": "Systems \\& Networking",
+        "tools": "Tools",
     }
     lines = []
     for key, items in skills.items():
@@ -328,6 +356,21 @@ def _render_gap(gap: dict | None) -> str:
 
 def _render_research(interests: list) -> str:
     return " $|$ ".join(escape_latex(i) for i in interests)
+
+
+def _section(title: str, body: str, *, listed: bool = True) -> str:
+    """A whole section, or nothing at all when the body is empty.
+
+    Sections must own their headings. When the template carried the `\\section`
+    itself, a CV with no research interests still printed the heading and its
+    rule with a blank space beneath — the reader sees a broken document, not an
+    omitted section.
+    """
+    if not body or not body.strip():
+        return ""
+    if listed:
+        return f"\\section{{{title}}}\n\\resumeSubHeadingListStart\n{body}\n\\resumeSubHeadingListEnd\n"
+    return f"\\section{{{title}}}\n\\small {body}\n\\vspace{{2pt}}\n"
 
 
 def _render_memberships(memberships: list) -> str:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,8 +20,13 @@ async def generate_and_save_cover_letter(
     provider: BaseLLMProvider,
     output_dir: str,
     content: str | None = None,
-) -> str:
+) -> str | None:
     """Write the cover letter for one job to disk and return its path.
+
+    Returns None when no letter could be produced, and in that case writes
+    nothing. An absent file is a visible, safe failure; a file containing an
+    apology is neither, because everything downstream — the email notifier, the
+    operator about to paste it — treats the path as a finished letter.
 
     `content` lets a caller save a letter that has already been drafted and
     reviewed. Without it this generates a fresh one, which is both a second
@@ -29,6 +35,7 @@ async def generate_and_save_cover_letter(
     """
     from nj.prompts import cover_letter_v1
     from nj.providers.base import LLMRequest
+    from nj.tailoring.drafter import COVER_LETTER_MAX_TOKENS
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -46,7 +53,9 @@ async def generate_and_save_cover_letter(
         request = LLMRequest(
             system=cover_letter_v1.build_system_prompt(cv_base),
             user=user_prompt,
-            max_tokens=600,
+            # Sized for the letter plus a reasoning model's thinking; see the
+            # headroom note in nj/providers/openai.py.
+            max_tokens=COVER_LETTER_MAX_TOKENS,
             temperature=0.5,
             response_format="text",
         )
@@ -54,12 +63,55 @@ async def generate_and_save_cover_letter(
         content = response.content.strip()
     except Exception as e:
         logger.warning("cover_letter_generation_failed", error=str(e))
-        content = _fallback_cover_letter(job, score)
+        return None
+
+    if not content:
+        logger.warning("cover_letter_generation_empty", job_id=job.id)
+        return None
 
     return _save(job, content, output_dir)
 
 
+_GREETING = re.compile(r"^\s*((?:Dear|Hello|Hi)\b[^,\n]{0,60},)\s*", re.IGNORECASE)
+_SIGNOFF = re.compile(
+    r"\s*\b(Sincerely|Best regards|Kind regards|Regards|Best|Yours sincerely|Thank you)\s*,\s*",
+    re.IGNORECASE,
+)
+
+
+def normalize_letter_layout(content: str) -> str:
+    """Put the greeting and the sign-off on their own lines.
+
+    The model reliably writes the right words and unreliably writes the right
+    line breaks — real output ran "Dear Hiring Manager, Spotify's ML Engineer
+    II role..." together on one line and closed with an inline "Sincerely,
+    Nishant Joshi". Asking the prompt more firmly does not fix this every time,
+    and it is pure layout, so it is done deterministically here.
+
+    Only whitespace is rewritten. Every word the reviewer approved survives.
+    """
+    text = content.strip()
+
+    greeting = _GREETING.match(text)
+    if greeting:
+        text = f"{greeting.group(1)}\n\n{text[greeting.end() :].lstrip()}"
+
+    # Search from the end: "Best" and "Regards" are common mid-letter words, and
+    # the closing is the last such match, never the first.
+    matches = list(_SIGNOFF.finditer(text))
+    if matches:
+        last = matches[-1]
+        body = text[: last.start()].rstrip()
+        closing = last.group(1).strip().capitalize()
+        name = text[last.end() :].strip()
+        text = f"{body}\n\n{closing},\n{name}" if name else f"{body}\n\n{closing},"
+
+    # Collapse runs of blank lines so paragraphs are separated by exactly one.
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def _save(job: Job, content: str, output_dir: str) -> str:
+    content = normalize_letter_layout(content)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     safe_company = _safe_filename(job.company)
     safe_title = _safe_filename(job.title)

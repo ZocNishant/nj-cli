@@ -133,6 +133,102 @@ def test_openai_compatible_provider_has_correct_name() -> None:
     assert provider.name() == "freellmapi"
 
 
+# --- reasoning-token headroom ---
+#
+# A reasoning model spends tokens thinking before it writes anything, and that
+# spend counts against `max_completion_tokens`. Budgets sized for the visible
+# answer alone came back as `finish_reason="length"` with an EMPTY string — a
+# 200, not an error — so scoring fed "" to a JSON parser and reported 0/100 for
+# weeks, and every cover letter was blank. Measured on gpt-5.5: 600 and 1200
+# both returned 0 characters, 2500 worked.
+
+
+def _chat_completion(content: str, finish_reason: str = "stop", reasoning: int = 0) -> MagicMock:
+    response = MagicMock()
+    choice = MagicMock()
+    choice.message.content = content
+    choice.finish_reason = finish_reason
+    response.choices = [choice]
+    response.model = "gpt-5.5"
+    response.usage.prompt_tokens = 100
+    response.usage.completion_tokens = 50
+    response.usage.completion_tokens_details.reasoning_tokens = reasoning
+    return response
+
+
+def _openai_provider_with(responses: list[MagicMock]):
+    """Provider whose client returns `responses` in order; returns (provider, calls)."""
+    provider = OpenAICompatibleProvider(api_key="t", base_url="http://x/v1", model="gpt-5.5")
+    calls: list[dict] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs)
+        return responses[len(calls) - 1]
+
+    client = MagicMock()
+    client.chat.completions.create = create
+    provider._client = client
+    return provider, calls
+
+
+async def test_empty_reasoning_response_is_retried_with_headroom() -> None:
+    provider, calls = _openai_provider_with(
+        [
+            _chat_completion("", finish_reason="length", reasoning=600),
+            _chat_completion("The letter."),
+        ]
+    )
+
+    response = await provider.complete(LLMRequest(system="s", user="u", max_tokens=600))
+
+    assert response.content == "The letter."
+    assert len(calls) == 2
+    # The retry must actually ask for more room, or it just fails again.
+    assert calls[1]["max_tokens"] > calls[0]["max_tokens"]
+
+
+async def test_headroom_is_remembered_for_later_calls() -> None:
+    """Learned once per process: the second call must not repeat the empty one."""
+    provider, calls = _openai_provider_with(
+        [
+            _chat_completion("", finish_reason="length", reasoning=600),
+            _chat_completion("first"),
+            _chat_completion("second"),
+        ]
+    )
+
+    await provider.complete(LLMRequest(system="s", user="u", max_tokens=600))
+    await provider.complete(LLMRequest(system="s", user="u", max_tokens=600))
+
+    assert len(calls) == 3
+    assert calls[2]["max_tokens"] == calls[1]["max_tokens"] > calls[0]["max_tokens"]
+
+
+async def test_a_short_answer_that_stopped_normally_is_not_retried() -> None:
+    """Only the empty-and-truncated signature triggers a retry, not brevity."""
+    provider, calls = _openai_provider_with([_chat_completion("Yes.", reasoning=400)])
+
+    response = await provider.complete(LLMRequest(system="s", user="u", max_tokens=600))
+
+    assert response.content == "Yes."
+    assert len(calls) == 1
+
+
+async def test_a_non_reasoning_truncation_is_not_retried() -> None:
+    """Truncated with no reasoning spend is a real budget problem, not headroom.
+
+    Retrying it would double the cost of every genuinely over-long generation.
+    """
+    provider, calls = _openai_provider_with(
+        [_chat_completion("", finish_reason="length", reasoning=0)]
+    )
+
+    response = await provider.complete(LLMRequest(system="s", user="u", max_tokens=600))
+
+    assert response.content == ""
+    assert len(calls) == 1
+
+
 def test_registry_returns_claude_provider(mock_async_client) -> None:
     config = LLMConfig(provider="claude", api_key="test-key")
     provider = get_provider(config)

@@ -64,6 +64,8 @@ Last verified: 2026-08-17 (CV template restored; application status split).
 | Mocked LLM calls in unit tests | Met | No unit test performs a live call. `tests/integration/test_prompt_regression.py` is opt-in via `NJ_RUN_REGRESSION_TESTS`. |
 | Visa matching regression coverage | Met | `tests/unit/test_visa_filter.py` pins both historical failure directions. |
 | Stored visa labels | Met, but **re-run after any classifier change** | `jobs.visa_label` is written once at scrape time and `should_skip`/`nj search` read the stored value, so fixing `visa_filter.py` does not touch a single row. On 2026-08-17 the DB still held labels from the old substring matcher: 224 jobs read CONFIRMED when only 7 contained the word "sponsor", and two — Anduril (security clearance) and itD Tech ("unable to offer sponsorship") — were outright refusals stored as confirmed. `nj reclassify` re-derives every label, is read-only until `--apply`, and is idempotent. 247 of 470 labels changed. Run it after touching the classifier. |
+| **Completeness (the other direction)** | Met, added 2026-08-17 | `validate_completeness` in `nj/tailoring/completeness.py`, BLOCKING alongside `validate_tailored_cv`. The two are mirrors: one rejects what a draft *added*, the other what it *lost*. Until this existed only addition was guarded — `anti_hallucination`'s docstring explicitly permits dropping — so a draft could omit every project and pass every gate. It did: a `[:3000]` slice in `tailoring_v1.build_system_prompt` showed the drafter 28% of an 10,874-char CV, it returned the 6 of 13 sections it could see, and the rendered PDF had empty Projects/Certifications headings and one job. Validator passed, reviewer approved, page budget passed, every log line said success. **Rule: sections and entries must survive, bullets need not** — trimming to two bullets is the tailoring the prompt asks for. Blocking is safe because the fallback (`cv_suppressed`) is complete by construction. 11 tests in `tests/unit/test_completeness.py`. |
+| **Never truncate the base CV** | Met | `render_cv_for_prompt` in `nj/prompts/cv_context.py` is now the only way a CV enters a prompt. It returns every byte and logs if the CV is implausibly large; it never trims. Four prompts had been slicing it — tailoring at 3000, review and prep at 4000, diagnosis at 5000. The review one was the subtlest: the reviewer audited drafts against a CV cut at 4000 chars, so sections it could not see were indistinguishable from sections that never existed. |
 | Anti-hallucination regression coverage | Met | `tests/unit/test_anti_hallucination.py` — 19 cases over realistic CV shapes, asserting reorder/drop/reword pass and invented employer, title, institution, degree, project, certification, skill, and free-text claims fail. `tests/unit/test_drafter_reviewer.py` covers the pipeline around it, including a dead reviewer and a revision that regresses. |
 | **LinkedIn automation** | **Deliberately disabled** | `nj/scrapers/linkedin.py` was a cookie-authenticated Playwright scraper of the operator's own account; `nj/applying/linkedin_easy.py` was a placeholder for Easy Apply. Both are now inert stubs. Cookie-driven automation risks a checkpoint or a permanent ban on the account the operator job-hunts from, and an auto-submitted application cannot be retracted. `LinkedInScraper.scrape()` returns `[]` and keeps the `BaseScraper` contract; the constructor accepts `session_cookie` and drops it rather than storing it. `NJ_ENABLE_LINKEDIN_SCRAPER` is an opt-in gate for a *future* implementation and does not resurrect anything on its own. Do not reinstate this without asking. |
 
@@ -99,10 +101,21 @@ output.
   was verified with a real completion through nj's own provider, not a
   `models.list` lookup. `gpt-5.5-pro` is **not** a chat model and 404s on
   `v1/chat/completions` — do not set it as a tier.
-  One caveat remains on this path: `OpenAICompatibleProvider.complete()` still
-  ignores `json_schema`, `response_format` and `cache_system`, so
-  `SCORE_SCHEMA`/`REVIEW_SCHEMA` are not enforced and scoring falls back to
-  salvaging JSON out of prose. Outstanding.
+  **The "scoring is broken because `json_schema` is ignored" diagnosis below was
+  wrong**, and is corrected here because it cost weeks. Scoring returned 0/100
+  because `gpt-5.5` is a reasoning model: it spends 600-1200 tokens thinking
+  before emitting a character, and that spend counts against
+  `max_completion_tokens`. Measured 2026-08-17 — budget 600 → 0 chars,
+  `finish_reason="length"`, 600 reasoning tokens; budget 1200 → 0 chars; budget
+  2500 → works. Scoring asked for 1200 and cover letters for 600, so both
+  returned the empty string, and the JSON parser had nothing to salvage. It is a
+  200 OK, not an error, which is why nothing surfaced it.
+  `OpenAICompatibleProvider` now learns a reasoning allowance from the first
+  empty-and-truncated response and retries; see `_learn_headroom`. Four tests in
+  `tests/unit/test_providers.py` pin it, verified by mutation.
+  Still genuinely outstanding on this path: `complete()` ignores `json_schema`,
+  `response_format` and `cache_system`, so `SCORE_SCHEMA`/`REVIEW_SCHEMA` are
+  not *enforced* — but scoring parses fine without them now.
   `GROQ_API_KEY` also works as a fallback (`provider: freellmapi`,
   `freellmapi_base_url: https://api.groq.com/openai/v1`,
   `freellmapi_model: openai/gpt-oss-120b`), but `registry.py` reads the single

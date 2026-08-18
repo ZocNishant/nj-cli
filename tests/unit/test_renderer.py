@@ -108,11 +108,11 @@ def make_template() -> str:
         "%%SKILLS_BLOCK%%\n"
         "%%EXPERIENCE_BLOCK%%\n"
         "%%GAP_BLOCK%%\n"
-        "%%RESEARCH_INTERESTS%%\n"
+        "%%RESEARCH_BLOCK%%\n"
         "%%PROJECTS_BLOCK%%\n"
         "%%MEMBERSHIPS_BLOCK%%\n"
         "%%CERTIFICATIONS_BLOCK%%\n"
-        "%%SOFT_SKILLS%%\n"
+        "%%SOFT_SKILLS_BLOCK%%\n"
         "\\end{document}"
     )
 
@@ -295,6 +295,48 @@ def test_shipped_template_compiles_with_every_optional_section_empty(tmp_path: P
         job_title="Empty Sections",
     )
     assert Path(pdf).exists()
+
+
+def test_an_absent_section_prints_no_heading() -> None:
+    """A section the CV does not have must leave no trace in the .tex.
+
+    Regression: the template carried `\\section{Research Interests}` and
+    `\\section{Soft Skills}` itself and substituted only their bodies, so a CV
+    without them rendered both headings — title, horizontal rule, nothing
+    underneath. Every automated gate passed; it was visible only by reading the
+    PDF.
+    """
+    cv = make_cv()
+    cv["research_interests"] = []
+    cv["soft_skills"] = []
+    cv["certifications"] = []
+    cv["memberships"] = []
+
+    filled = _fill_template(SHIPPED_TEMPLATE.read_text(encoding="utf-8"), cv)
+
+    for heading in (
+        "Research Interests",
+        "Soft Skills",
+        "Certifications",
+        "Professional Memberships",
+    ):
+        assert f"\\section{{{heading}}}" not in filled, f"{heading!r} printed with no content"
+
+
+def test_a_present_section_still_prints_its_heading() -> None:
+    """The other half: suppressing empties must not suppress real content.
+
+    Without this, deleting the headings outright would pass the test above.
+    """
+    filled = _fill_template(SHIPPED_TEMPLATE.read_text(encoding="utf-8"), make_cv())
+
+    for heading in (
+        "Research Interests",
+        "Soft Skills",
+        "Certifications",
+        "Professional Memberships",
+    ):
+        assert f"\\section{{{heading}}}" in filled
 
 
 def test_shipped_template_has_no_placeholder_tokens_inside_comments() -> None:

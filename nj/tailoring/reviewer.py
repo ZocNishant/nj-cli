@@ -2,9 +2,11 @@
 
 Two layers, combined into one `ReviewReport`:
 
-1. **The validator** — `validate_tailored_cv`, set membership against the base
-   CV. Deterministic, cheap, and impossible to talk out of a finding. Its
-   findings are BLOCKING: the draft does not ship while one stands.
+1. **The validator** — `validate_tailored_cv` and `validate_completeness`,
+   both set membership against the base CV, in opposite directions: the first
+   rejects what the draft *added*, the second what it *lost*. Deterministic,
+   cheap, and impossible to talk out of a finding. Both are BLOCKING: the draft
+   does not ship while one stands.
 2. **The reviewer model** — Haiku 4.5, asked to prove the draft wrong. It exists
    to catch what set comparison structurally cannot: a date widened, ownership
    upgraded from "contributed to" to "led", expertise implied without being
@@ -28,6 +30,7 @@ from nj.models.review import REVIEW_SCHEMA, ReviewReport, Revision, Severity, So
 from nj.prompts import review_v1
 from nj.providers.base import BaseLLMProvider, LLMRequest
 from nj.tailoring.anti_hallucination import validate_tailored_cv
+from nj.tailoring.completeness import validate_completeness
 from nj.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,19 +41,22 @@ MAX_FINDINGS = 25
 
 
 def _validator_revisions(cv_base: dict, draft: dict) -> list[Revision]:
-    """Run the deterministic pass and lift its messages into Revisions."""
-    is_valid, violations = validate_tailored_cv(cv_base, draft)
-    if is_valid:
-        return []
+    """Run both deterministic passes and lift their messages into Revisions."""
+    _, invented = validate_tailored_cv(cv_base, draft)
+    _, dropped = validate_completeness(cv_base, draft)
+
+    findings = [(v, "This does not appear anywhere in the base CV.") for v in invented]
+    findings += [(v, "Return this section unchanged rather than omitting it.") for v in dropped]
+
     return [
         Revision(
             location="",
-            claim=v,
-            problem="This does not appear anywhere in the base CV.",
+            claim=claim,
+            problem=problem,
             severity=Severity.BLOCKING,
             source=Source.VALIDATOR,
         )
-        for v in violations[:MAX_FINDINGS]
+        for claim, problem in findings[:MAX_FINDINGS]
     ]
 
 

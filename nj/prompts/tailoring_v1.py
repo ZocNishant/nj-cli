@@ -39,7 +39,15 @@ For status='active': include bullets if provided.
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the exact schema of the input cv_base. \
 No preamble, no explanation, no markdown. Just the JSON object.
-Include a "summary" field with a 3-line targeted summary paragraph."""
+Include a "summary" field with a 3-line targeted summary paragraph.
+
+COMPLETENESS — THIS IS AS IMPORTANT AS THE ACCURACY RULES:
+Return EVERY top-level key present in the base CV, including ones you did not \
+change. Copy an untouched section through verbatim rather than omitting it. \
+Keep every experience entry and every project; "suppress" above means shorten \
+bullets, never delete the entry.
+An omitted section does not read as a tailoring choice on the rendered CV — it \
+reads as a candidate who has no projects, no certifications, and one job."""
 
 
 # This prompt receives a scraped job posting, so it carries the shared
@@ -62,7 +70,7 @@ def build_system_prompt(cv_base: dict | None = None) -> str:
     if not cv_base:
         return SYSTEM_PROMPT
 
-    import json
+    from nj.prompts.cv_context import render_cv_for_prompt
 
     anchor = next(
         (p for p in cv_base.get("projects", []) if p.get("anchor")),
@@ -81,7 +89,7 @@ def build_system_prompt(cv_base: dict | None = None) -> str:
         + "\n\nBASE CV — the candidate's complete and only factual record. "
         + "Tailor this. Every employer, title, date, number, project, and skill "
         + "in your output must already appear here.\n"
-        + json.dumps(cv_base, indent=2)[:3000]
+        + render_cv_for_prompt(cv_base)
         + anchor_note
     )
 

@@ -379,7 +379,9 @@ async def test_pipeline_survives_a_dead_drafter() -> None:
         make_job(), make_score(), make_cv_base(), Config(), ExplodingProvider()
     )
     assert tailored["experience"][0]["company"] == "USD"
-    assert "failed" in letter.lower()
+    # None, not an explanatory string: the caller writes this to disk as the
+    # letter, so prose here ships an apology to a recruiter.
+    assert letter is None
 
 
 @pytest.mark.asyncio
@@ -499,8 +501,88 @@ async def test_saving_without_content_still_generates(tmp_path) -> None:
     assert Path(path).read_text() == "A fresh letter."
 
 
+@pytest.mark.asyncio
+async def test_a_failed_letter_writes_no_file(tmp_path) -> None:
+    """Regression: a failure must not be saved in the position of a letter.
+
+    The pipeline once returned "Cover letter generation failed: ..." as the
+    letter, and the saver — seeing a non-empty string — wrote that sentence to
+    `..._cover.txt`. Nothing downstream could tell it from a real letter.
+    """
+    path = await generate_and_save_cover_letter(
+        make_job(), make_score(), make_cv_base(), ExplodingProvider(), str(tmp_path)
+    )
+
+    assert path is None
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_an_empty_letter_writes_no_file(tmp_path) -> None:
+    """A 200 carrying whitespace is a failure too, not a very short letter."""
+    path = await generate_and_save_cover_letter(
+        make_job(), make_score(), make_cv_base(), FakeProvider(["   \n  "]), str(tmp_path)
+    )
+
+    assert path is None
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_empty_report_is_clean_and_approved() -> None:
     report = ReviewReport()
     assert report.clean is True
     assert report.approved is True
     assert report.feedback_block() == ""
+
+
+# --- letter layout ---
+#
+# The model writes the right words and the wrong line breaks. Real output ran
+# "Dear Hiring Manager, Spotify's ML Engineer II role..." onto one line and
+# closed with an inline "Sincerely, Nishant Joshi".
+
+
+def test_greeting_and_signoff_get_their_own_lines() -> None:
+    from nj.tailoring.cover_letter import normalize_letter_layout
+
+    out = normalize_letter_layout(
+        "Dear Hiring Manager, Spotify's role interests me. Sincerely, Nishant Joshi"
+    )
+
+    assert out.splitlines()[0] == "Dear Hiring Manager,"
+    assert out.endswith("Sincerely,\nNishant Joshi")
+
+
+def test_normalizing_layout_changes_no_words() -> None:
+    """Whitespace only. This runs after the reviewer, so it must not edit prose."""
+    from nj.tailoring.cover_letter import normalize_letter_layout
+
+    raw = "Dear Hiring Manager, I built a pipeline achieving 96.11% accuracy. Best regards, N J"
+
+    assert normalize_letter_layout(raw).split() == raw.split()
+
+
+def test_an_already_formatted_letter_is_left_alone() -> None:
+    from nj.tailoring.cover_letter import normalize_letter_layout
+
+    good = "Dear Hiring Manager,\n\nOne paragraph.\n\nSincerely,\nNishant Joshi"
+
+    assert normalize_letter_layout(good) == good
+
+
+def test_signoff_matching_prefers_the_closing_over_mid_letter_words() -> None:
+    """ "Best" and "Regards" appear mid-letter; the closing is the last one."""
+    from nj.tailoring.cover_letter import normalize_letter_layout
+
+    out = normalize_letter_layout(
+        "Dear Hiring Manager, I do my best, always. Sincerely, Nishant Joshi"
+    )
+
+    assert "I do my best, always." in out
+    assert out.endswith("Sincerely,\nNishant Joshi")
+
+
+def test_a_letter_with_no_greeting_or_signoff_survives() -> None:
+    from nj.tailoring.cover_letter import normalize_letter_layout
+
+    assert normalize_letter_layout("Just a bare paragraph.") == "Just a bare paragraph."

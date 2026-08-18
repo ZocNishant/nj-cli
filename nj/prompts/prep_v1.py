@@ -85,7 +85,6 @@ def build_user_prompt(
     cv_base: dict,
     score_result: dict | None = None,
 ) -> str:
-    import json
 
     score_context = ""
     if score_result:
@@ -99,7 +98,9 @@ def build_user_prompt(
             f"Rationale: {score_result.get('overall_rationale', '')}\n"
         )
 
-    cv_json = json.dumps(cv_base, indent=2)[:4000]
+    from nj.prompts.cv_context import render_cv_for_prompt
+
+    cv_json = render_cv_for_prompt(cv_base)
 
     return f"""Prepare interview materials for this application.
 

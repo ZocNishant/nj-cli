@@ -73,14 +73,19 @@ SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + UNTRUSTED_DRAFT_NOTICE
 
 
 def build_system_prompt(cv_base: dict) -> str:
-    """Instructions plus the base CV — the record every claim is checked against."""
-    import json
+    """Instructions plus the base CV — the record every claim is checked against.
+
+    Whole, never sliced. A reviewer holding a truncated CV reports the tail of
+    it as unsupported: the sections it cannot see are indistinguishable from
+    sections that were never there.
+    """
+    from nj.prompts.cv_context import render_cv_for_prompt
 
     return (
         SYSTEM_PROMPT
         + "\n\nBASE CV — the candidate's complete and only factual record. "
         + "A claim is supported only if it appears here.\n"
-        + json.dumps(cv_base, indent=2)[:4000]
+        + render_cv_for_prompt(cv_base)
     )
 
 

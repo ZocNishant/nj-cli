@@ -39,6 +39,22 @@ class JobRepo:
         with get_session(self.db_path) as session:
             return session.get(JobORM, job_id) is not None
 
+    def get_job(self, job_id: str) -> Job | None:
+        """One job by id, or None. Accepts a unique id prefix.
+
+        The prefix form exists because these ids are 64-character hashes and
+        every path that shows one to a human truncates it.
+        """
+        with get_session(self.db_path) as session:
+            orm = session.get(JobORM, job_id)
+            if orm is not None:
+                return self._to_model(orm)
+
+            matches = session.query(JobORM).filter(JobORM.id.startswith(job_id)).limit(2).all()
+            if len(matches) == 1:
+                return self._to_model(matches[0])
+            return None
+
     def get_jobs(self, status: JobStatus | None = None) -> list[Job]:
         with get_session(self.db_path) as session:
             q = session.query(JobORM)

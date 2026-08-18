@@ -1,13 +1,23 @@
 .env
 config.yaml
-# Claude Code: track the shared config, hooks and commands, ignore personal
-# overrides. The commands are project workflows, so they belong to everyone
-# working on the repo.
+# Claude Code: track the shared config, hooks, commands and skills, ignore
+# personal overrides. The commands are project workflows, so they belong to
+# everyone working on the repo. `.claude/skills/` is relative symlinks into
+# `.agents/skills/`, which `npx skills` owns and `skills-lock.json` pins; Claude
+# Code reads only the former, so leaving it untracked breaks every skill on a
+# fresh clone.
 .claude/*
 !.claude/settings.json
 !.claude/hooks/
 !.claude/commands/
+!.claude/skills/
 .claude/settings.local.json
+# `.scratch/` holds the wayfinder maps and their decision tickets. Ignored
+# because this repo is public and the maps carry the operator's job-search
+# timeline and strategy — a plan of record, but a personal one.
+
+.scratch/
+
 cv/cv_base.json
 cv/profile.json
 cookies/

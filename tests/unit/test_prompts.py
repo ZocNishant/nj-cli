@@ -121,6 +121,15 @@ def test_cover_letter_system_prompt_carries_the_candidate_facts() -> None:
     assert "Research Institute" in system
 
 
+def test_cover_letter_system_prompt_carries_the_candidate_name() -> None:
+    """The prompt tells the model to sign with the name, so the name must be there.
+
+    Without it a real letter shipped signed "[Candidate Name]".
+    """
+    system = cover_letter_v1.build_system_prompt(_SAMPLE_CV)
+    assert _SAMPLE_CV["personal"]["name"] in system
+
+
 def test_cover_letter_system_prompt_without_cv_is_the_bare_instructions() -> None:
     assert cover_letter_v1.build_system_prompt(None) == cover_letter_v1.SYSTEM_PROMPT
     assert cover_letter_v1.build_system_prompt({}) == cover_letter_v1.SYSTEM_PROMPT
@@ -193,3 +202,29 @@ def test_prompt_versions_are_strings() -> None:
     assert isinstance(tailoring_v1.PROMPT_VERSION, str)
     assert isinstance(cover_letter_v1.PROMPT_VERSION, str)
     assert isinstance(intern_update_v1.PROMPT_VERSION, str)
+
+
+def test_cover_letter_facts_carry_completed_experience() -> None:
+    """A finished role is the candidate's evidence, not something to drop.
+
+    The selector once matched only `status == "incoming"`, so the day an
+    internship ended the letter lost every mention of professional experience.
+    """
+    cv = {
+        "personal": {"name": "Nishant Joshi"},
+        "experience": [
+            {
+                "title": "Graduate Student Intern",
+                "company": "Moffitt Cancer Center",
+                "start": "June 2026",
+                "end": "August 2026",
+                "status": "ended",
+                "bullets": ["Built and validated a transcriptomic ML pipeline."],
+            }
+        ],
+    }
+
+    system = cover_letter_v1.build_system_prompt(cv)
+
+    assert "Moffitt Cancer Center" in system
+    assert "transcriptomic" in system

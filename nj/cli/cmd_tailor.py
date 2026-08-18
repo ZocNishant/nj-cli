@@ -14,43 +14,27 @@ logger = get_logger(__name__)
 console = Console()
 
 
-def run_tailor(
-    url: str,
-    config: Config,
-    db_path: str = "data/nj.db",
-    output_dir: str = "output",
-) -> None:
+def _job_from_url(url: str, config: Config):
+    """Build a throwaway Job by fetching a posting we have never seen.
+
+    Everything here is a guess: the title and company are unknown, and the
+    description is whatever `clean_html` salvages from the page — on a
+    JavaScript-rendered board that is page furniture, not the posting. Prefer
+    `--job-id` whenever the job is already in the database.
+    """
     from datetime import UTC, datetime
 
     import httpx
 
     from nj.models.job import Job, JobStatus
-    from nj.providers.registry import get_provider
-    from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
-    from nj.tailoring.cover_letter import generate_and_save_cover_letter
-    from nj.tailoring.renderer import PageBudgetError, render_cv
-    from nj.tailoring.tailor import tailor_cv
-
-    cv_path = Path("cv/cv_base.json")
-    if not cv_path.exists():
-        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
-        return
-
-    with open(cv_path) as f:
-        cv_base = json.load(f)
+    from nj.utils.text import clean_html, truncate
 
     console.print(f"[dim]Fetching job from {url}...[/dim]")
-    try:
-        resp = httpx.get(url, timeout=15, follow_redirects=True)
-        from nj.utils.text import clean_html, truncate
+    resp = httpx.get(url, timeout=15, follow_redirects=True)
+    description = truncate(clean_html(resp.text), 3000)
 
-        description = truncate(clean_html(resp.text), 3000)
-    except Exception as e:
-        console.print(f"[red]Failed to fetch URL:[/red] {e}")
-        return
-
-    job = Job(
+    return Job(
         id=Job.generate_id("direct", "job", url),
         title="Job from URL",
         company="Company",
@@ -63,6 +47,49 @@ def run_tailor(
         status=JobStatus.NEW,
         description_hash=Job.generate_hash(description),
     )
+
+
+def run_tailor(
+    url: str | None,
+    config: Config,
+    db_path: str = "data/nj.db",
+    output_dir: str = "output",
+    job_id: str | None = None,
+) -> None:
+    from nj.db.repos.job_repo import JobRepo
+    from nj.providers.registry import get_provider
+    from nj.scoring.scorer import score_job
+    from nj.tailoring.cover_letter import generate_and_save_cover_letter
+    from nj.tailoring.renderer import PageBudgetError, render_cv
+    from nj.tailoring.tailor import tailor_cv
+
+    if bool(url) == bool(job_id):
+        console.print("[red]Pass exactly one of[/red] URL [red]or[/red] --job-id.")
+        return
+
+    cv_path = Path("cv/cv_base.json")
+    if not cv_path.exists():
+        console.print("[red]cv/cv_base.json not found.[/red] Run [bold]nj init[/bold] first.")
+        return
+
+    with open(cv_path) as f:
+        cv_base = json.load(f)
+
+    if job_id:
+        job = JobRepo(db_path).get_job(job_id)
+        if job is None:
+            console.print(
+                f"[red]No job matching[/red] {job_id}. "
+                "Run [bold]nj search[/bold] or [bold]nj review[/bold] to list ids."
+            )
+            return
+        console.print(f"[dim]{job.title} @ {job.company}[/dim]")
+    else:
+        try:
+            job = _job_from_url(url, config)
+        except Exception as e:
+            console.print(f"[red]Failed to fetch URL:[/red] {e}")
+            return
 
     provider = get_provider(config.llm, task="tailoring")
     # Audits the drafter's output on the cheap tier before anything is rendered.
@@ -104,7 +131,12 @@ def run_tailor(
             job, result, cv_base, provider, output_dir, content=cover_letter
         )
     )
-    console.print(f"[green]Cover letter:[/green] {cover_path}")
+    if cover_path:
+        console.print(f"[green]Cover letter:[/green] {cover_path}")
+    else:
+        # No file is written in this case, by design. Say so, or the operator
+        # sends the CV believing a letter went with it.
+        console.print("[yellow]Cover letter failed — no file written.[/yellow] See logs.")
 
     if config.notify.email_to:
         from nj.notify.email import EmailNotifier
@@ -113,7 +145,7 @@ def run_tailor(
         notifier.send_application_email(
             job_title=job.title,
             company=job.company,
-            job_url=url,
+            job_url=job.url,
             score=result.total_score,
             confidence=result.confidence,
             matched_skills=result.matched_skills,
@@ -132,7 +164,7 @@ def run_tailor(
             f"{result.overall_rationale}\n\n"
             f"Matched: {', '.join(result.matched_skills[:5])}\n"
             f"Missing: {', '.join(result.missing_skills[:3])}",
-            title=f"Results — {url[:60]}",
+            title=f"Results — {job.title} @ {job.company}"[:70],
             border_style="cyan",
         )
     )

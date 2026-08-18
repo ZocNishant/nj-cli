@@ -51,11 +51,12 @@ async def tailor_cv(
     config: Config,
     provider: BaseLLMProvider,
     review_provider: BaseLLMProvider | None = None,
-) -> tuple[dict, str]:
+) -> tuple[dict, str | None]:
     """Tailor a CV and write a cover letter for one job.
 
-    Returns (tailored_cv, cover_letter). Never raises for model failures — a
-    failed run degrades to the suppressed base CV and a fallback letter.
+    Returns (tailored_cv, cover_letter), the letter being None if drafting it
+    failed. Never raises for model failures — a failed run degrades to the
+    suppressed base CV, which contains no model-written prose.
     """
     logger.info("tailoring_start", job_id=job.id, title=job.title, company=job.company)
 
@@ -204,18 +205,24 @@ async def _draft_and_review_letter(
     cv_base: dict,
     provider: BaseLLMProvider,
     reviewer: BaseLLMProvider,
-) -> str:
-    """Draft a cover letter, then audit it.
+) -> str | None:
+    """Draft a cover letter, then audit it. None if drafting failed outright.
 
     Findings here are all advisory — prose has no structure to validate against
     — so a flagged letter gets exactly one revision round and then ships. The
     alternative, withholding the letter, leaves the operator with nothing.
+
+    Failure returns None rather than an explanatory string. A caller writes this
+    to disk as the letter, and a string is indistinguishable from a real one at
+    the point of writing: an earlier version returned
+    "Cover letter generation failed: ..." and that sentence was duly saved to
+    `..._cover.txt`, one copy-paste away from a recruiter.
     """
     try:
         letter = await draft_cover_letter(job, score, cv_base, provider)
     except Exception as e:
         logger.warning("cover_letter_failed", error=str(e))
-        return f"Cover letter generation failed: {e}"
+        return None
 
     try:
         review = await review_cover_letter(

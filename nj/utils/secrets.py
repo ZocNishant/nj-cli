@@ -79,10 +79,13 @@ def get(key: str, default: str = "") -> str:
 
 # Status report used by `nj config --check-keys`
 _KEYS: list[tuple[str, str, bool]] = [
-    ("ANTHROPIC_API_KEY", "Claude AI — required if provider=claude", True),
+    ("OPENAI_API_KEY", "OpenAI — required if provider=openai", False),
+    ("ANTHROPIC_API_KEY", "Claude — required if provider=claude", False),
     ("GROQ_API_KEY", "Groq — required if provider=freellmapi", False),
     ("JSEARCH_API_KEY", "JSearch / RapidAPI (job aggregator)", False),
-    ("LINKEDIN_LI_AT", "LinkedIn session cookie (scraper)", False),
+    # LINKEDIN_LI_AT is deliberately not listed. The scraper is an inert stub
+    # and nothing reads the cookie any more; listing it invites an operator to
+    # set a live session token that no code path can use.
     ("ADZUNA_APP_ID", "Adzuna App ID (job search)", False),
     ("ADZUNA_APP_KEY", "Adzuna App Key (job search)", False),
     ("USAJOBS_API_KEY", "USAJobs.gov (government roles)", False),
