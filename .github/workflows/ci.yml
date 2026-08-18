@@ -67,14 +67,19 @@ jobs:
         # coverage so a PR that drops it fails, and is raised deliberately as
         # coverage improves. It was set to 70 against real coverage of 56, which
         # meant the gate could never pass — invisible until the lint step in
-        # front of it started passing. Raise this as gaps close; the biggest are
-        # nj/applying, nj/integrations, and the tailor/cover-letter paths.
+        # front of it started passing.
+        #
+        # Raised 55 -> 62 on 2026-08-18 against real coverage of 65%. Two things
+        # earned it: extracting nj/pipeline/ made the orchestration testable
+        # without going through Typer, and graph/ml/intel/watch/update-role got
+        # smoke tests — all five had been at 0%, meaning nothing had ever run
+        # them in CI. The remaining gaps are nj/integrations and nj/cli/shell.
         run: |
           poetry run pytest tests/ \
             --tb=short \
             --cov=nj \
             --cov-report=term-missing \
-            --cov-fail-under=55
+            --cov-fail-under=62
 
   secrets:
     runs-on: ubuntu-latest
