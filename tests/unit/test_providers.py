@@ -290,3 +290,39 @@ def test_claude_supports_json_mode(mock_async_client) -> None:
 
 def test_openai_alias_is_compatible_provider() -> None:
     assert OpenAIProvider is OpenAICompatibleProvider
+
+
+# --- provider provenance ---------------------------------------------------
+#
+# `name()` returned the constant "freellmapi" for every instance, and
+# `score_job` writes it into `score_results.provider`. Every score OpenAI
+# produced was therefore recorded as having come from Groq.
+
+
+def test_openai_base_url_reports_openai() -> None:
+    from nj.providers.openai import OpenAICompatibleProvider
+
+    p = OpenAICompatibleProvider(api_key="k", base_url="https://api.openai.com/v1", model="m")
+    assert p.name() == "openai"
+
+
+def test_groq_base_url_reports_groq() -> None:
+    from nj.providers.openai import OpenAICompatibleProvider
+
+    p = OpenAICompatibleProvider(api_key="k", base_url="https://api.groq.com/openai/v1", model="m")
+    assert p.name() == "groq"
+
+
+def test_unknown_base_url_keeps_the_generic_name() -> None:
+    from nj.providers.openai import OpenAICompatibleProvider
+
+    p = OpenAICompatibleProvider(api_key="k", base_url="http://localhost:3001/v1", model="m")
+    assert p.name() == "freellmapi"
+
+
+def test_the_registry_builds_a_provider_that_knows_it_is_openai() -> None:
+    from nj.models.config import LLMConfig
+    from nj.providers.registry import get_provider
+
+    provider = get_provider(LLMConfig(provider="openai", api_key="k"), task="scoring")
+    assert provider.name() == "openai"

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from nj.applying.anti_bot import RateLimiter
 from nj.models.config import VisaConfig
 from nj.scrapers.linkedin import ENABLE_ENV_VAR, LinkedInScraper, is_enabled
+from nj.utils.rate_limiter import RateLimiter
 
 
 def make_scraper() -> LinkedInScraper:

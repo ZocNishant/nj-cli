@@ -85,7 +85,6 @@ def run_pipeline(
     dry_run: bool = False,
     silent: bool = False,
 ) -> None:
-    from nj.applying.anti_bot import RateLimiter
     from nj.db.engine import init_db
     from nj.db.repos.application_repo import ApplicationRepo
     from nj.db.repos.job_repo import JobRepo
@@ -97,6 +96,7 @@ def run_pipeline(
     from nj.tailoring.cover_letter import generate_and_save_cover_letter
     from nj.tailoring.renderer import render_cv
     from nj.tailoring.tailor import tailor_cv
+    from nj.utils.rate_limiter import RateLimiter
 
     init_db(db_path)
     job_repo = JobRepo(db_path)

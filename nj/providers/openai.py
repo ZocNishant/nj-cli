@@ -69,6 +69,19 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         return self._client
 
     def name(self) -> str:
+        """The provider this client is actually talking to.
+
+        This returned the constant "freellmapi" for every instance, including
+        the OpenAI ones, and `score_job` writes it into
+        `score_results.provider` — so every score OpenAI produced was recorded
+        as having come from Groq. Derived from the base URL instead, because
+        that is the only thing that distinguishes them at runtime.
+        """
+        host = (self.base_url or "").lower()
+        if "api.openai.com" in host:
+            return "openai"
+        if "groq.com" in host:
+            return "groq"
         return "freellmapi"
 
     def supports_json_mode(self) -> bool:
@@ -165,7 +178,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         usage = response.usage
         return LLMResponse(
             content=content,
-            provider="freellmapi",
+            provider=self.name(),
             model=model_used,
             input_tokens=usage.prompt_tokens if usage else 0,
             output_tokens=usage.completion_tokens if usage else 0,

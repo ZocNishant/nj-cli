@@ -39,6 +39,23 @@ class JobRepo:
         with get_session(self.db_path) as session:
             return session.get(JobORM, job_id) is not None
 
+    def existing_ids(self, job_ids: list[str]) -> set[str]:
+        """Which of these ids are already stored, in one round trip.
+
+        The dedup path used to call `job_exists` once per scraped job, and each
+        call opened and closed a session. SQLite caps a statement at ~32k bound
+        parameters, so the query is chunked well under that.
+        """
+        if not job_ids:
+            return set()
+        found: set[str] = set()
+        chunk = 500
+        with get_session(self.db_path) as session:
+            for i in range(0, len(job_ids), chunk):
+                rows = session.query(JobORM.id).filter(JobORM.id.in_(job_ids[i : i + chunk])).all()
+                found.update(r[0] for r in rows)
+        return found
+
     def get_job(self, job_id: str) -> Job | None:
         """One job by id, or None. Accepts a unique id prefix.
 
