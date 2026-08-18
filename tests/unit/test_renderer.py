@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -256,13 +257,21 @@ def test_shipped_template_compiles(tmp_path: Path) -> None:
     actually takes.
     """
     _require_tectonic()
-    pdf = render_cv(
-        cv_data=make_cv(),
-        template_path=str(SHIPPED_TEMPLATE),
-        output_dir=str(tmp_path),
-        company="CI",
-        job_title="Template Check",
-    )
+    for attempt in range(3):
+        try:
+            pdf = render_cv(
+                cv_data=make_cv(),
+                template_path=str(SHIPPED_TEMPLATE),
+                output_dir=str(tmp_path),
+                company="CI",
+                job_title="Template Check",
+            )
+            break
+        except RendererError as e:
+            if attempt < 2 and "429 Too Many Requests" in str(e):
+                time.sleep(2)
+                continue
+            raise
     out = Path(pdf)
     assert out.exists() and out.suffix == ".pdf"
     assert out.stat().st_size > 1000, "PDF is suspiciously small — template may be near-empty"
@@ -287,13 +296,21 @@ def test_shipped_template_compiles_with_every_optional_section_empty(tmp_path: P
     bare["summary"] = ""
     bare["gap_explanation"] = None
 
-    pdf = render_cv(
-        cv_data=bare,
-        template_path=str(SHIPPED_TEMPLATE),
-        output_dir=str(tmp_path),
-        company="CI",
-        job_title="Empty Sections",
-    )
+    for attempt in range(3):
+        try:
+            pdf = render_cv(
+                cv_data=bare,
+                template_path=str(SHIPPED_TEMPLATE),
+                output_dir=str(tmp_path),
+                company="CI",
+                job_title="Empty Sections",
+            )
+            break
+        except RendererError as e:
+            if attempt < 2 and "429 Too Many Requests" in str(e):
+                time.sleep(2)
+                continue
+            raise
     assert Path(pdf).exists()
 
 
