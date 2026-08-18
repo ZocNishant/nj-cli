@@ -1,11 +1,18 @@
-"""Tests for async parallel scraping infrastructure."""
+"""The scraper contract: async at the interface, blocking underneath.
+
+`BaseScraper.scrape` used to be declared synchronous while both pipelines
+branched on `inspect.iscoroutinefunction(scraper.scrape)` before falling back to
+a thread. Every implementation was synchronous, so the async branch was dead
+code and a new scraper author had no contract to follow. The interface is now
+async for everyone; implementations supply blocking `fetch`.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import inspect
+import time
 from datetime import UTC, datetime
-
-import pytest
 
 from nj.models.job import Job, JobStatus, VisaLabel
 from nj.scrapers.base import BaseScraper
@@ -27,19 +34,28 @@ def make_job(job_id: str = "j1") -> Job:
     )
 
 
-class SyncScraper(BaseScraper):
-    def __init__(self, name: str, jobs: list):
+class BlockingScraper(BaseScraper):
+    """The ordinary case: plain httpx-style blocking code."""
+
+    def __init__(self, name: str, jobs: list, delay: float = 0.0):
         self._name = name
         self._jobs = jobs
+        self._delay = delay
+        self.seen_location: str | None = None
 
     def name(self) -> str:
         return self._name
 
-    def scrape(self, roles, location) -> list:
+    def fetch(self, roles, location="its-own-default") -> list:
+        self.seen_location = location
+        if self._delay:
+            time.sleep(self._delay)
         return self._jobs
 
 
-class AsyncScraper(BaseScraper):
+class NativelyAsyncScraper(BaseScraper):
+    """A source that is genuinely async may override scrape directly."""
+
     def __init__(self, name: str, jobs: list):
         self._name = name
         self._jobs = jobs
@@ -47,7 +63,11 @@ class AsyncScraper(BaseScraper):
     def name(self) -> str:
         return self._name
 
-    async def scrape(self, roles, location) -> list:
+    def fetch(self, roles, location="") -> list:  # pragma: no cover - never called
+        raise AssertionError("scrape() was overridden; fetch must not run")
+
+    async def scrape(self, roles, location=None) -> list:
+        await asyncio.sleep(0)
         return self._jobs
 
 
@@ -55,120 +75,96 @@ class FailingScraper(BaseScraper):
     def name(self) -> str:
         return "failing"
 
-    def scrape(self, roles, location) -> list:
+    def fetch(self, roles, location="") -> list:
         raise RuntimeError("Scraper failed")
 
 
-@pytest.mark.asyncio
-async def test_sync_scraper_runs_in_thread():
-    import inspect
-
-    scraper = SyncScraper("test", [make_job("j1")])
-    assert not inspect.iscoroutinefunction(scraper.scrape)
-    result = await asyncio.to_thread(scraper.scrape, ["ML Engineer"], "Remote")
-    assert len(result) == 1
-
-
-@pytest.mark.asyncio
-async def test_async_scraper_runs_directly():
-    import inspect
-
-    scraper = AsyncScraper("test", [make_job("j1")])
+async def test_scrape_is_awaitable_even_for_a_blocking_implementation() -> None:
+    scraper = BlockingScraper("test", [make_job("j1")])
     assert inspect.iscoroutinefunction(scraper.scrape)
-    result = await scraper.scrape(["ML Engineer"], "Remote")
-    assert len(result) == 1
+    assert len(await scraper.scrape(["ML Engineer"], "Remote")) == 1
 
 
-@pytest.mark.asyncio
-async def test_parallel_scrapers_all_run():
-    scrapers = [
-        SyncScraper("s1", [make_job("j1")]),
-        SyncScraper("s2", [make_job("j2")]),
-        SyncScraper("s3", [make_job("j3")]),
-    ]
-
-    async def scrape_one(s):
-        import inspect
-
-        if inspect.iscoroutinefunction(s.scrape):
-            return s.name(), await s.scrape([], "")
-        else:
-            return s.name(), await asyncio.to_thread(s.scrape, [], "")
-
-    results = await asyncio.gather(*[scrape_one(s) for s in scrapers])
-    names = [r[0] for r in results]
-    assert "s1" in names
-    assert "s2" in names
-    assert "s3" in names
+async def test_an_implementation_may_override_scrape() -> None:
+    scraper = NativelyAsyncScraper("test", [make_job("j1")])
+    assert len(await scraper.scrape(["ML Engineer"], "Remote")) == 1
 
 
-@pytest.mark.asyncio
-async def test_failing_scraper_doesnt_break_others():
-    scrapers = [
-        SyncScraper("good1", [make_job("j1")]),
-        FailingScraper(),
-        SyncScraper("good2", [make_job("j2")]),
-    ]
+async def test_omitting_location_preserves_the_implementations_default() -> None:
+    """RemoteOK defaults to 'Remote', Adzuna to 'United States'. Passing "" would
+    silently override both."""
+    scraper = BlockingScraper("test", [])
+    await scraper.scrape(["ML Engineer"])
+    assert scraper.seen_location == "its-own-default"
 
-    async def scrape_one(s):
-        try:
-            import inspect
-
-            if inspect.iscoroutinefunction(s.scrape):
-                jobs = await s.scrape([], "")
-            else:
-                jobs = await asyncio.to_thread(s.scrape, [], "")
-            return s.name(), jobs
-        except Exception:
-            return s.name(), []
-
-    results = await asyncio.gather(*[scrape_one(s) for s in scrapers])
-    all_jobs = []
-    for _name, jobs in results:
-        all_jobs.extend(jobs)
-    assert len(all_jobs) == 2
+    await scraper.scrape(["ML Engineer"], "Berlin")
+    assert scraper.seen_location == "Berlin"
 
 
-@pytest.mark.asyncio
-async def test_semaphore_limits_concurrency():
-    from asyncio import Semaphore
+async def test_blocking_fetches_do_not_serialise() -> None:
+    """The point of the thread: one slow board must not hold up the rest."""
+    scrapers = [BlockingScraper(f"s{i}", [make_job(f"j{i}")], delay=0.05) for i in range(5)]
 
-    sem = Semaphore(2)
-    concurrent = 0
-    max_concurrent = 0
+    started = time.monotonic()
+    await asyncio.gather(*[s.scrape([], "") for s in scrapers])
+    parallel = time.monotonic() - started
 
-    async def task():
-        nonlocal concurrent, max_concurrent
-        async with sem:
-            concurrent += 1
-            max_concurrent = max(max_concurrent, concurrent)
-            await asyncio.sleep(0.01)
-            concurrent -= 1
+    started = time.monotonic()
+    for s in scrapers:
+        await s.scrape([], "")
+    sequential = time.monotonic() - started
 
-    await asyncio.gather(*[task() for _ in range(10)])
-    assert max_concurrent <= 2
+    assert parallel < sequential * 0.6
 
 
-@pytest.mark.asyncio
-async def test_parallel_faster_than_sequential():
-    import time
+async def test_a_failing_source_does_not_end_the_run() -> None:
+    from nj.models.config import Config
+    from nj.pipeline.ingest import IngestService
 
-    async def slow_scrape():
-        await asyncio.sleep(0.05)
-        return [make_job()]
+    class NullRepo:
+        def existing_ids(self, ids):
+            return set()
 
-    t_start = time.monotonic()
-    await asyncio.gather(*[slow_scrape() for _ in range(5)])
-    parallel_time = time.monotonic() - t_start
+        def save_job(self, job):
+            pass
 
-    t_start = time.monotonic()
-    for _ in range(5):
-        await slow_scrape()
-    sequential_time = time.monotonic() - t_start
+    service = IngestService(
+        Config(),
+        NullRepo(),
+        scrapers=[
+            BlockingScraper("good1", [make_job("j1")]),
+            FailingScraper(),
+            BlockingScraper("good2", [make_job("j2")]),
+        ],
+    )
+    results = await service.scrape()
+    assert results["failing"] == []
+    assert len(results["good1"]) == 1
+    assert len(results["good2"]) == 1
 
-    assert parallel_time < sequential_time * 0.6
+
+def test_scrapers_report_a_name() -> None:
+    assert BlockingScraper("test", []).name() == "test"
 
 
-def test_scraper_base_has_name_method():
-    scraper = SyncScraper("test", [])
-    assert scraper.name() == "test"
+def test_every_shipped_scraper_implements_the_contract() -> None:
+    """A source that forgets `fetch` must fail at import, not at 3am in a run."""
+    from nj.scrapers.arbeitnow import ArbeitnowScraper
+    from nj.scrapers.indeed import AdzunaScraper
+    from nj.scrapers.jsearch import JSearchScraper
+    from nj.scrapers.linkedin import LinkedInScraper
+    from nj.scrapers.remoteok import RemoteOKScraper
+    from nj.scrapers.usajobs import USAJobsScraper
+    from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
+
+    for cls in (
+        ArbeitnowScraper,
+        AdzunaScraper,
+        JSearchScraper,
+        LinkedInScraper,
+        RemoteOKScraper,
+        USAJobsScraper,
+        WeWorkRemotelyScraper,
+    ):
+        assert not inspect.isabstract(cls), f"{cls.__name__} does not implement fetch()"
+        assert inspect.iscoroutinefunction(cls.scrape), f"{cls.__name__}.scrape is not async"

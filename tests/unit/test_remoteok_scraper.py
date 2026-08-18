@@ -27,7 +27,7 @@ def test_scraper_returns_ml_jobs(scraper: RemoteOKScraper, monkeypatch: pytest.M
     monkeypatch.setattr("time.sleep", lambda _: None)
     with respx.mock:
         respx.get(REMOTEOK_URL).mock(return_value=httpx.Response(200, json=FIXTURE_JSON))
-        jobs = scraper.scrape(["ML Engineer"])
+        jobs = scraper.fetch(["ML Engineer"])
     assert len(jobs) > 0
     assert all(j.source == "remoteok" for j in jobs)
 
@@ -65,7 +65,7 @@ def test_scraper_returns_empty_on_network_error(
     monkeypatch.setattr("time.sleep", lambda _: None)
     with respx.mock:
         respx.get(REMOTEOK_URL).mock(side_effect=Exception("network error"))
-        jobs = scraper.scrape(["ML Engineer"])
+        jobs = scraper.fetch(["ML Engineer"])
     assert jobs == []
 
 

@@ -70,7 +70,7 @@ class LinkedInScraper(BaseScraper):
     def name(self) -> str:
         return "linkedin"
 
-    def scrape(self, roles: list[str], location: str = "United States") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "United States") -> list[Job]:
         logger.warning(
             "linkedin_scraper_disabled",
             reason=DISABLED_REASON,

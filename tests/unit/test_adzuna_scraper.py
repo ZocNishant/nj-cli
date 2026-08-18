@@ -71,7 +71,7 @@ def test_empty_credentials_returns_empty_list() -> None:
         app_key="",
         visa_config=VisaConfig(),
     )
-    jobs = scraper.scrape(["ML Engineer"])
+    jobs = scraper.fetch(["ML Engineer"])
     assert jobs == []
 
 

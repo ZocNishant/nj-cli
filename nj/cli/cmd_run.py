@@ -16,69 +16,6 @@ logger = get_logger(__name__)
 console = Console()
 
 
-def _get_enabled_scrapers(config: Config) -> list:
-    import os
-
-    scrapers = []
-
-    jsearch_key = os.getenv("JSEARCH_API_KEY", "")
-    if jsearch_key and config.scraper.jsearch_enabled:
-        from nj.scrapers.jsearch import JSearchScraper
-
-        scrapers.append(JSearchScraper(api_key=jsearch_key, visa_config=config.visa))
-
-    # LinkedIn is deliberately absent here too — see the note in cmd_search.py.
-
-    adzuna_id = os.getenv("ADZUNA_APP_ID", config.scraper.adzuna_app_id)
-    adzuna_key = os.getenv("ADZUNA_APP_KEY", config.scraper.adzuna_app_key)
-    if adzuna_id and config.scraper.adzuna_enabled:
-        from nj.scrapers.indeed import AdzunaScraper
-
-        scrapers.append(
-            AdzunaScraper(
-                app_id=adzuna_id,
-                app_key=adzuna_key,
-                visa_config=config.visa,
-                country=config.scraper.adzuna_country,
-            )
-        )
-
-    if config.scraper.remoteok_enabled:
-        from nj.scrapers.remoteok import RemoteOKScraper
-
-        scrapers.append(RemoteOKScraper(visa_config=config.visa))
-
-    if config.scraper.weworkremotely_enabled:
-        from nj.scrapers.weworkremotely import WeWorkRemotelyScraper
-
-        scrapers.append(WeWorkRemotelyScraper(visa_config=config.visa))
-
-    if config.scraper.arbeitnow_enabled:
-        from nj.scrapers.arbeitnow import ArbeitnowScraper
-
-        scrapers.append(ArbeitnowScraper(visa_config=config.visa))
-
-    usajobs_key = os.getenv("USAJOBS_API_KEY", "")
-    usajobs_agent = os.getenv("USAJOBS_USER_AGENT", "")
-    if usajobs_key and usajobs_agent and config.scraper.usajobs_enabled:
-        from nj.scrapers.usajobs import USAJobsScraper
-
-        scrapers.append(
-            USAJobsScraper(
-                api_key=usajobs_key,
-                user_agent=usajobs_agent,
-                visa_config=config.visa,
-            )
-        )
-
-    if not scrapers:
-        from nj.scrapers.remoteok import RemoteOKScraper
-
-        scrapers.append(RemoteOKScraper(visa_config=config.visa))
-
-    return scrapers
-
-
 def run_pipeline(
     config: Config,
     db_path: str = "data/nj.db",
@@ -90,8 +27,8 @@ def run_pipeline(
     from nj.db.repos.job_repo import JobRepo
     from nj.db.repos.score_repo import ScoreRepo
     from nj.notify.email import EmailNotifier
+    from nj.pipeline import ScoringService
     from nj.providers.registry import get_provider
-    from nj.scoring.scorer import score_job
     from nj.scoring.visa_filter import VisaFilter
     from nj.tailoring.cover_letter import generate_and_save_cover_letter
     from nj.tailoring.renderer import render_cv
@@ -147,95 +84,47 @@ def run_pipeline(
     with open(cv_path) as f:
         cv_base = json.load(f)
 
-    from nj.utils.dedup import JobDeduplicator
-
-    dedup = JobDeduplicator(job_repo)
-
+    from nj.pipeline import IngestService
     from nj.utils.logger import is_verbose
 
     if not silent:
         console.print("[dim]Phase 1: Scraping...[/dim]")
-    scrapers = _get_enabled_scrapers(config)
-    import inspect
-    import time
 
-    async def _scrape_one(scraper) -> tuple[str, list]:
-        try:
-            if inspect.iscoroutinefunction(scraper.scrape):
-                jobs = await scraper.scrape(
-                    config.search.roles,
-                    config.search.primary_region,
-                )
-            else:
-                jobs = await asyncio.to_thread(
-                    scraper.scrape,
-                    config.search.roles,
-                    config.search.primary_region,
-                )
-            logger.info("scraper_done", scraper=scraper.name(), count=len(jobs))
-            return scraper.name(), jobs
-        except Exception as e:
-            logger.warning("scraper_failed", scraper=scraper.name(), error=str(e))
-            return scraper.name(), []
+    ingest = IngestService(config, job_repo)
+    result = ingest.collect()
+    new_jobs = result.jobs
 
-    async def _scrape_all() -> dict[str, list]:
-        results = await asyncio.gather(*[_scrape_one(s) for s in scrapers], return_exceptions=True)
-        output = {}
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("scraper_gather_failed", error=str(result))
-                continue
-            name, jobs = result
-            output[name] = jobs
-        return output
-
-    t_scrape_start = time.monotonic()
-    scraper_results = asyncio.run(_scrape_all())
-    t_scrape_elapsed = round(time.monotonic() - t_scrape_start, 1)
-
-    all_raw_jobs: list = []
-    counts: dict[str, int] = {}
-    for name, jobs in scraper_results.items():
-        counts[name] = len(jobs)
-        all_raw_jobs.extend(jobs)
-    new_jobs = dedup.filter_new(all_raw_jobs)
-    for job in new_jobs:
-        job_repo.save_job(job)
     if not silent:
         if not is_verbose():
             console.print(
                 f"  [green]✓[/green] [bold]{len(new_jobs)}[/bold] new jobs in "
-                f"[cyan]{t_scrape_elapsed}s[/cyan]  "
-                f"[dim]({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)[/dim]"
+                f"[cyan]{result.elapsed_seconds}s[/cyan]  "
+                f"[dim]({result.duplicates} duplicates skipped)[/dim]"
             )
-            console.print(
-                "  [dim]Sources: "
-                + " · ".join(f"{s.name()}={counts.get(s.name(), 0)}" for s in scrapers)
-                + "[/dim]\n"
-            )
+            console.print(f"  [dim]Sources: {result.sources_line}[/dim]\n")
         else:
             console.print(
                 f"  Found [bold]{len(new_jobs)}[/bold] new jobs "
-                f"({len(all_raw_jobs) - len(new_jobs)} duplicates skipped)\n"
+                f"({result.duplicates} duplicates skipped)\n"
             )
 
-    from nj.scoring.ghost_filter import GhostJobFilter
-
-    ghost_filter = GhostJobFilter(enabled=True, max_age_days=45)
-    new_jobs, ghost_jobs = ghost_filter.filter_jobs(new_jobs)
-
-    if ghost_jobs and not silent:
+    if result.ghosts and not silent:
         if not is_verbose():
             console.print(
-                f"  [dim]Ghost filter: {len(ghost_jobs)} jobs removed "
+                f"  [dim]Ghost filter: {len(result.ghosts)} jobs removed "
                 f"({len(new_jobs)} remaining)[/dim]\n"
             )
         else:
-            console.print(f"  [dim]Ghost filter removed {len(ghost_jobs)} jobs:[/dim]")
-            for job, result in ghost_jobs[:5]:
+            console.print(f"  [dim]Ghost filter removed {len(result.ghosts)} jobs:[/dim]")
+            for job, ghost in result.ghosts[:5]:
                 console.print(
-                    f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {result.reason}[/dim]"
+                    f"  [dim]✗ {job.title[:30]} @ {job.company[:20]} — {ghost.reason}[/dim]"
                 )
+
+    # Enriched here too. This ran only in `nj search`, so a job that arrived
+    # through the batch pipeline never got a sponsorship probability, a salary
+    # band or a semantic score.
+    ingest.enrich(new_jobs, cv_base, db_path)
 
     if not new_jobs:
         if not silent:
@@ -248,15 +137,28 @@ def run_pipeline(
     applications: list[dict] = []
     processed = 0
 
+    scoreable = []
     for job in new_jobs:
         if visa_filter.should_skip(job):
             record = ApplicationRecord.create(job.id, 0)
             record.status = ApplicationStatus.SKIPPED_VISA
             app_repo.save_application(record)
             continue
+        scoreable.append(job)
 
-        result = asyncio.run(score_job(job, cv_base, config, scoring_provider, score_repo))
+    # Scored as a batch rather than one job per event loop. This was a serial
+    # `for` loop calling asyncio.run per job while nj search scored five at a
+    # time behind a semaphore — same work, several times slower, and with no
+    # rate-limit handling.
+    scoring_service = ScoringService(
+        config=config,
+        provider=scoring_provider,
+        cv_base=cv_base,
+        score_repo=score_repo,
+    )
+    scored = scoring_service.score_batch(scoreable)
 
+    for job, result in scored:
         if result.total_score < config.scoring.threshold:
             record = ApplicationRecord.create(job.id, result.total_score)
             record.status = ApplicationStatus.SKIPPED_THRESHOLD

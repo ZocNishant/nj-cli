@@ -38,7 +38,7 @@ class RemoteOKScraper(BaseScraper):
     def name(self) -> str:
         return "remoteok"
 
-    def scrape(self, roles: list[str], location: str = "Remote") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "Remote") -> list[Job]:
         jobs: list[Job] = []
         seen_ids: set[str] = set()
 

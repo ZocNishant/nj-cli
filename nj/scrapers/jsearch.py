@@ -38,7 +38,7 @@ class JSearchScraper(BaseScraper):
     def name(self) -> str:
         return "jsearch"
 
-    def scrape(self, roles: list[str], location: str = "United States") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "United States") -> list[Job]:
         if not self.api_key:
             logger.warning(
                 "jsearch_key_missing",

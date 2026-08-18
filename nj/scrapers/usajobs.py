@@ -34,7 +34,7 @@ class USAJobsScraper(BaseScraper):
     def name(self) -> str:
         return "usajobs"
 
-    def scrape(self, roles: list[str], location: str = "") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "") -> list[Job]:
         if not self.api_key or not self.user_agent:
             logger.warning(
                 "usajobs_creds_missing",

@@ -47,7 +47,7 @@ class WeWorkRemotelyScraper(BaseScraper):
     def name(self) -> str:
         return "weworkremotely"
 
-    def scrape(self, roles: list[str], location: str = "") -> list[Job]:
+    def fetch(self, roles: list[str], location: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen_ids: set[str] = set()
 
